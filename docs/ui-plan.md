@@ -1,0 +1,33 @@
+# UI rebuild plan — map-forward shell
+
+## Shell
+- **Custom title bar** (`decorations: false`): drag region, app mark, current raid summary (map · lifecycle), monitoring toggle, window controls.
+- **Left nav**, vertical, collapsible to icons (state persisted in `localStorage`): Overview, Map, Activity, Settings.
+- **Toasts** (bottom right, app-wide): new *live* activity events (not recovered history).
+- **Data layer** `useScanner` hook: connection, snapshot, start/stop/check actions. Pages are pure views over it.
+
+## Pages
+| Page | Content |
+|---|---|
+| Overview | Raid context (map, mode, role, lifecycle, start time), scanner state, a few stats: screenshots seen/rejected, positions this raid, activity count, last position age. |
+| Map | Full-bleed pannable/zoomable grid (world X → right, world Z → up, metres). Status chip top right (connection dot + map). Position markers: newest large and accented, fading toward muted as it goes stale but staying larger; older markers small and grey. Marker = teardrop (one sharp corner) pointing along provisional heading; plain dot when heading unknown. Follow toggle auto-pans to each new position; manual pan turns follow off. |
+| Activity | Latest activity list with kind filter + search. |
+| Settings | Source folders + status, scanner health, diagnostics, log coverage. |
+
+## Pieces / order of work
+1. Shell: title bar, nav, page switching, theme tokens. ✅ (this iteration)
+2. `useScanner` extraction + client-side position history. ✅
+3. Map page: grid canvas, markers, freshness, follow. ✅
+4. Overview, Activity, Settings pages. ✅
+5. Toasts. ✅
+
+## Later
+- Backend position history (currently the frontend accumulates `latest_position` per session; lost on reload).
+- Real map images + calibration (world → image transform per map), verified heading.
+- Persisted folder config.
+- Raid outcome, quest names (IDs only today).
+
+## Assumptions recorded
+- Map shows positions for the current raid only (by `raid_id`); positions without a raid ID are shown when no raid is known.
+- "Stale" for the newest marker: full emphasis at receipt, fading over ~2 min to a resting "latest" style.
+- Toasts only for events received live (`recovered: false`), max 4 visible, auto-dismiss after 6 s.

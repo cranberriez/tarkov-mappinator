@@ -13,17 +13,21 @@
     "windows": [
       {
         "label": "main",
-        "title": "Tarkov Mappinator — Diagnostics",
-        "width": 1120,
+        "title": "Tarkov Mappinator",
+        "width": 1280,
         "height": 820,
-        "minWidth": 760,
-        "minHeight": 640,
-        "backgroundColor": "#101714"
+        "minWidth": 820,
+        "minHeight": 560,
+        "backgroundColor": "#121314",
+        "decorations": false
       }
     ],
     "security": {
       "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'"
     }
   },
-  "bundle": { "active": false, "icon": [] }
+  "bundle": {
+    "active": false,
+    "icon": []
+  }
 }
