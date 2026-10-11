@@ -104,7 +104,8 @@ input:disabled { opacity: .55; }
 .stat strong { font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
 
 /* Overview */
-.overview { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2.4fr); gap: 20px; height: 100%; padding: 20px; min-height: 560px; }
+.overview-host { height: 100%; container: overview / size; overflow: auto; }
+.overview { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2.4fr); gap: 20px; height: 100%; padding: 20px; min-height: 320px; }
 .overview-side { display: flex; flex-direction: column; gap: 28px; min-height: 0; padding: 8px 4px; }
 .overview-side .grow { flex: 1; display: flex; flex-direction: column; min-height: 140px; }
 .overview-side .scroll { flex: 1; overflow-y: auto; min-height: 0; }
@@ -225,9 +226,75 @@ input:disabled { opacity: .55; }
 
 @media (max-width: 900px) {
   .page { padding: 28px 24px; }
-  .overview { grid-template-columns: 1fr; height: auto; }
-  .overview-side { order: 2; }
-  .raid-body { grid-template-columns: 1fr; }
-  .minimap { min-height: 260px; }
   .page-header { flex-wrap: wrap; }
+}
+
+/* Overview compaction tiers: lower-priority (p3 → p2) details drop first; lists shrink to latest few.
+   Width tiers */
+@container overview (max-width: 1100px) {
+  .overview { grid-template-columns: minmax(220px, .9fr) minmax(0, 2.4fr); gap: 14px; padding: 14px; }
+  .raid-panel { padding: 22px 24px; gap: 18px; }
+  .raid-details { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .raid-details .p3 { display: none; }
+}
+@container overview (max-width: 900px) {
+  .raid-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 14px; min-height: 0; }
+  .raid-position { order: -1; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; }
+  .raid-position h2 { display: none; }
+  .coords { display: flex; gap: 18px; margin: 0; }
+  .coords div { display: flex; align-items: baseline; gap: 6px; }
+  .coords strong { font-size: 18px; }
+  .kv { flex-direction: row; gap: 18px; }
+  .kv div { display: flex; gap: 6px; align-items: baseline; }
+  .kv dt { margin: 0; }
+  .kv .p3 { display: none; }
+}
+@container overview (max-width: 720px) {
+  .overview { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .overview-side { order: 2; flex-direction: row; flex-wrap: wrap; gap: 10px 28px; padding: 0 4px; align-items: center; }
+  .overview-side h2 { display: none; }
+  .stat-grid { grid-template-columns: repeat(4, auto); background: none; gap: 18px; }
+  .stat-grid .stat { background: none; padding: 0; flex-direction: row-reverse; align-items: baseline; gap: 6px; }
+  .stat-grid .stat strong { font-size: 15px; }
+  .scanner .plain-list { display: flex; gap: 14px; }
+  .scanner .plain-list li { border: 0; padding: 0; gap: 6px; }
+  .scanner .plain-list li > :last-child { display: none; }
+  .overview-side .recent { flex: 1 1 200px; min-height: 0; }
+  .overview-side .recent > p { display: none; }
+  .overview-side .recent li { border: 0; padding: 0; cursor: pointer; }
+  .overview-side .recent li:nth-child(n+2) { display: none; }
+  .raid-details { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px 18px; padding: 14px 0; }
+  .raid-details .p2 { display: none; }
+}
+@container overview (max-width: 520px) {
+  .raid-panel { padding: 16px; gap: 12px; }
+  .kv .p2 { display: none; }
+  .stat-grid { grid-template-columns: repeat(2, auto); }
+}
+
+/* Height tiers */
+@container overview (max-height: 720px) {
+  .raid-header h1 { font-size: clamp(28px, 3.4vw, 40px); }
+  .raid-note { display: none; }
+  .overview-side { gap: 18px; }
+  .stat { padding: 10px 14px; }
+  .stat strong { font-size: 17px; }
+  .plain-list li { padding: 6px 0; }
+}
+@container overview (max-height: 560px) {
+  .overview { padding: 10px; gap: 10px; }
+  .raid-panel { padding: 16px 20px; gap: 12px; }
+  .raid-details { padding: 10px 0; gap: 10px 18px; }
+  .raid-details .p2 { display: none; }
+  .kv { gap: 8px; }
+  .kv .p2, .kv .p3 { display: none; }
+  .coords { margin-bottom: 10px; }
+  .overview-side .recent li:nth-child(n+6) { display: none; }
+}
+@container overview (max-height: 440px) {
+  .raid-header h1 { font-size: 26px; margin: 2px 0 0; }
+  .raid-details { display: flex; gap: 18px; padding: 6px 0; border: 0; }
+  .raid-details div { display: flex; gap: 6px; align-items: baseline; }
+  .raid-details dt { margin: 0; }
+  .overview-side .recent li:nth-child(n+4) { display: none; }
 }

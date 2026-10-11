@@ -6,6 +6,11 @@
 - **Toasts** (bottom right, app-wide): new *live* activity events (not recovered history).
 - **Data layer** `useScanner` hook: connection, snapshot, start/stop/check actions. Pages are pure views over it.
 
+## Layout principles
+- Pages fill the available space; no max-width caps.
+- When space shrinks (width **or** height), compact before scrolling: each item has a priority; lower priorities hide or condense first, lists shrink to their latest few, panels collapse into rows. Detail moves behind a click (expand or jump to the owning page). Scroll is a last resort.
+- Implemented with CSS container queries on the page host (`container-type: size`).
+
 ## Pages
 | Page | Content |
 |---|---|

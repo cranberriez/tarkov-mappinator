@@ -25,18 +25,19 @@ export function OverviewPage({ scanner, onNavigate }: { scanner: Scanner; onNavi
     ["Events", activity.length],
   ];
 
-  const details: [string, string][] = [
-    ["Started", known ? timestamp(raid.started_at) : "—"],
-    ["Duration", known && raid.lifecycle === "active" ? age(raid.started_at, now) ?? "—" : "—"],
-    ["Game mode", raid?.game_mode ?? "—"],
-    ["Role", raid?.player_role ?? "—"],
-    ["Positions", String(raidPositions.length)],
-    ["Events", String(raidEvents.length)],
-    ["Evidence", !known ? "—" : raid.recovered ? "Log history" : "Observed live"],
-    ["Raid ID", raid?.id ?? "—"],
+  const duration = known && raid.lifecycle === "active" ? age(raid.started_at, now) : null;
+  // Priority 1 survives the smallest layouts; 3 is the first to go.
+  const details: [string, string, 1 | 2 | 3][] = [
+    ["Game mode", raid?.game_mode ?? "—", 1],
+    ["Role", raid?.player_role ?? "—", 1],
+    ["Positions", String(raidPositions.length), 1],
+    ["Events", String(raidEvents.length), 2],
+    ["Started", known ? timestamp(raid.started_at) : "—", 2],
+    ["Evidence", !known ? "—" : raid.recovered ? "Log history" : "Observed live", 3],
+    ["Raid ID", raid?.id ?? "—", 3],
   ];
 
-  return <div className="overview">
+  return <div className="overview-host"><div className="overview">
     <aside className="overview-side">
       <section>
         <h2>Session</h2>
@@ -45,21 +46,21 @@ export function OverviewPage({ scanner, onNavigate }: { scanner: Scanner; onNavi
         </div>
       </section>
 
-      <section>
-        <h2>Scanner</h2>
+      <section className="scanner">
+        <h2>Scanner<button type="button" className="link" onClick={() => onNavigate("settings")}>Settings</button></h2>
         <ul className="plain-list">
-          <li><span className={`dot ${connected ? "ok" : desktop ? "bad" : ""}`} />Backend<span className="faint">{connected ? "Connected" : desktop ? "Disconnected" : "Browser preview"}</span></li>
-          <li><span className={`dot ${running ? "ok" : ""}`} />Monitoring<span className="faint">{running ? "Running" : "Stopped"}</span></li>
-          <li><span className={`dot ${sourcesOk ? "ok" : snapshot ? "warn" : ""}`} />Sources
+          <li title={connected ? "Connected" : desktop ? "Disconnected" : "Browser preview"}><span className={`dot ${connected ? "ok" : desktop ? "bad" : ""}`} />Backend<span className="faint">{connected ? "Connected" : desktop ? "Disconnected" : "Browser preview"}</span></li>
+          <li title={running ? "Running" : "Stopped"}><span className={`dot ${running ? "ok" : ""}`} />Monitoring<span className="faint">{running ? "Running" : "Stopped"}</span></li>
+          <li title={sourcesOk ? "Accessible" : "Check settings"}><span className={`dot ${sourcesOk ? "ok" : snapshot ? "warn" : ""}`} />Sources
             <button type="button" className="link" onClick={() => onNavigate("settings")}>{sourcesOk ? "Accessible" : "Check settings"}</button></li>
-          <li><span className={`dot ${diagnostics.length ? "warn" : snapshot ? "ok" : ""}`} />Diagnostics
+          <li title={`${diagnostics.length} issues`}><span className={`dot ${diagnostics.length ? "warn" : snapshot ? "ok" : ""}`} />Diagnostics
             <span className="faint">{snapshot ? diagnostics.length ? `${diagnostics.length} issue${diagnostics.length > 1 ? "s" : ""}` : "None" : "—"}</span></li>
         </ul>
       </section>
 
-      <section className="grow">
+      <section className="grow recent">
         <h2>Recent activity<button type="button" className="link" onClick={() => onNavigate("activity")}>View all</button></h2>
-        {activity.length ? <ul className="plain-list scroll">
+        {activity.length ? <ul className="plain-list scroll" onClick={() => onNavigate("activity")}>
           {activity.slice(0, 40).map((event) => <li key={event.id} className={event.recovered ? "recovered" : ""}>
             <span className={`kind-tag kind-${event.kind}`}>{event.kind}</span>{event.action}
             <span className="faint">{clock(event.event_at ?? event.logged_at)}</span>
@@ -73,13 +74,14 @@ export function OverviewPage({ scanner, onNavigate }: { scanner: Scanner; onNavi
         <span className={`hero-state ${raid?.lifecycle ?? "unknown"}`}>
           {known ? lifecycleLabel[raid.lifecycle] ?? raid.lifecycle : "Waiting for a raid"}
           {known && (raid.recovered ? " · from history" : running ? " · live" : "")}
+          {duration && <span className="duration"> · {duration}</span>}
         </span>
         <h1>{raid?.map ?? "No map"}</h1>
-        {raid?.detail && <p className="faint">{raid.detail}</p>}
+        {raid?.detail && <p className="faint raid-note">{raid.detail}</p>}
       </header>
 
       <dl className="raid-details">
-        {details.map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}
+        {details.map(([label, value, priority]) => <div key={label} className={`p${priority}`}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}
       </dl>
 
       <div className="raid-body">
@@ -95,16 +97,16 @@ export function OverviewPage({ scanner, onNavigate }: { scanner: Scanner; onNavi
               {(["X", "Y", "Z"] as const).map((axis, index) => <div key={axis}><span>{axis}</span><strong>{latest.xyz[index].toFixed(1)}</strong></div>)}
             </div>
             <dl className="kv">
-              <div><dt>Heading</dt><dd>{latest.heading_degrees === null ? "—" : `${latest.heading_degrees.toFixed(0)}°`}<span className="faint"> unverified</span></dd></div>
-              <div><dt>Received</dt><dd>{age(latest.observed_at, now)} ago</dd></div>
-              <div><dt>Captured</dt><dd>{latest.captured_at ? clock(latest.captured_at) : "—"}</dd></div>
-              <div><dt>File</dt><dd className="mono" title={latest.filename}>{latest.filename}</dd></div>
+              <div className="p1"><dt>Heading</dt><dd>{latest.heading_degrees === null ? "—" : `${latest.heading_degrees.toFixed(0)}°`}<span className="faint"> unverified</span></dd></div>
+              <div className="p1"><dt>Received</dt><dd>{age(latest.observed_at, now)} ago</dd></div>
+              <div className="p2"><dt>Captured</dt><dd>{latest.captured_at ? clock(latest.captured_at) : "—"}</dd></div>
+              <div className="p3"><dt>File</dt><dd className="mono" title={latest.filename}>{latest.filename}</dd></div>
             </dl>
           </> : <p className="faint">Take a screenshot in raid to record a position.</p>}
         </div>
       </div>
     </section>
-  </div>;
+  </div></div>;
 }
 
 /** Static plot of positions fitted to their bounds. */
