@@ -105,9 +105,62 @@ impl ScannerService {
         self.snapshot.monitoring = MonitoringStatus::Running;
         self.snapshot.latest_position = None;
         self.poll_logs(true);
-        self.diagnostic("Monitoring started. Existing screenshots excluded; minute-resolution captures from the start minute are uncertain and rejected.".into());
+        self.snapshot.recovered_positions = self.recover_raid_positions();
+        self.snapshot.latest_position = self.snapshot.recovered_positions.last().cloned();
+        if !self.snapshot.recovered_positions.is_empty() {
+            let count = self.snapshot.recovered_positions.len();
+            self.diagnostic(format!("Recovered {count} existing screenshot(s) captured since the active raid started."));
+        }
+        self.diagnostic("Monitoring started. Other existing screenshots excluded; minute-resolution captures from the start minute are uncertain and rejected.".into());
         self.snapshot.revision += 1;
         self.snapshot()
+    }
+    fn raid_start(&self) -> Option<NaiveDateTime> {
+        self.snapshot
+            .raid
+            .started_at
+            .as_ref()
+            .and_then(|v| NaiveDateTime::parse_from_str(v, "%Y-%m-%d %H:%M:%S%.f").ok())
+    }
+
+    /// Baselined screenshots captured during the active raid, oldest first, at most `MAX_RECOVERED`.
+    /// Same rule as live captures: the capture minute must not precede the raid start.
+    fn recover_raid_positions(&self) -> Vec<PositionObservation> {
+        const MAX_RECOVERED: usize = 200;
+        if self.snapshot.raid.lifecycle != "active" {
+            return Vec::new();
+        }
+        let Some(started) = self.raid_start() else {
+            return Vec::new();
+        };
+        let now = Local::now().naive_local();
+        let observed_at = Local::now().to_rfc3339();
+        let mut found: Vec<(NaiveDateTime, String, parsers::ParsedPosition)> = self
+            .seen
+            .iter()
+            .filter_map(|path| {
+                let name = path.file_name()?.to_string_lossy().into_owned();
+                let position = parsers::position_filename(&name).ok()?;
+                (position.captured >= started && position.captured <= now)
+                    .then(|| (position.captured, name, position))
+            })
+            .collect();
+        found.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
+        let skip = found.len().saturating_sub(MAX_RECOVERED);
+        found
+            .into_iter()
+            .skip(skip)
+            .map(|(_, name, position)| PositionObservation {
+                xyz: position.xyz,
+                raw_quaternion: position.quaternion,
+                heading_degrees: position.heading_degrees,
+                heading_convention: parsers::HEADING_CONVENTION.into(),
+                observed_at: observed_at.clone(),
+                captured_at: Some(position.captured.to_string()),
+                raid_id: self.snapshot.raid.id.clone(),
+                filename: name,
+            })
+            .collect()
     }
     pub fn stop(&mut self) -> ScannerSnapshot {
         self.snapshot.monitoring = MonitoringStatus::Stopped;
@@ -168,11 +221,7 @@ impl ScannerService {
                         && position.captured <= Local::now().naive_local() =>
                 {
                     let within_raid = self
-                        .snapshot
-                        .raid
-                        .started_at
-                        .as_ref()
-                        .and_then(|v| NaiveDateTime::parse_from_str(v, "%Y-%m-%d %H:%M:%S%.f").ok())
+                        .raid_start()
                         .map(|v| position.captured >= v)
                         .unwrap_or(false);
                     let raid_id = if within_raid && self.snapshot.raid.lifecycle == "active" {
@@ -926,6 +975,35 @@ mod tests {
         fs::write(&file, vec![b'x'; record.len()]).unwrap();
         service.poll();
         assert_eq!(service.snapshot.raid.lifecycle, "unknown");
+    }
+    #[test]
+    fn start_in_active_raid_recovers_existing_screenshots_since_raid_start() {
+        let fixture = include_str!("../../../fixtures/logs/pve-customs-started.log");
+        let dir = tempfile::tempdir().unwrap();
+        let session = dir.path().join("log_2026.10.11_8-55-46_1.2.0.0.47965");
+        fs::create_dir(&session).unwrap();
+        fs::write(session.join("application_000.log"), fixture).unwrap();
+        let shots = dir.path().join("shots");
+        fs::create_dir(&shots).unwrap();
+        let name = |time: &str| format!("2026-10-11[{time}]_1.00, 2.00, 3.00_0.00000, 0.00000, 0.00000, 1.00000_9.79 (0).png");
+        for time in ["09-50", "11-05", "11-07", "11-06"] {
+            fs::write(shots.join(name(time)), b"").unwrap();
+        }
+        fs::write(shots.join("not a capture.png"), b"").unwrap();
+        let mut service = ScannerService::new();
+        let snapshot = service.start(FolderConfig {
+            screenshots: shots.to_string_lossy().into(),
+            logs: dir.path().to_string_lossy().into(),
+        });
+        assert_eq!(snapshot.raid.lifecycle, "active");
+        let recovered: Vec<_> = snapshot.recovered_positions.iter().map(|p| p.filename.clone()).collect();
+        // The raid started at 11:05:50; the 11-05 capture is within the uncertain start minute.
+        assert_eq!(recovered, vec![name("11-06"), name("11-07")]);
+        assert!(snapshot.recovered_positions.iter().all(|p| p.raid_id == snapshot.raid.id));
+        assert_eq!(snapshot.latest_position.unwrap().filename, name("11-07"));
+        // Recovered files stay baselined: polling does not count them as new.
+        service.poll();
+        assert_eq!(service.snapshot.screenshots_seen, 0);
     }
     #[test]
     fn new_position_requires_stable_stat_and_strict_capture_boundary_but_not_raid() {

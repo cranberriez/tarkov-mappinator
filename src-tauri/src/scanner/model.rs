@@ -93,6 +93,9 @@ pub struct ScannerSnapshot {
     pub logs: SourceHealth,
     pub raid: RaidState,
     pub latest_position: Option<PositionObservation>,
+    /// Screenshots that already existed when monitoring started but were captured after the
+    /// start of the raid the logs show as active, oldest first. Set only when monitoring starts.
+    pub recovered_positions: Vec<PositionObservation>,
     pub diagnostics: Vec<String>,
     pub screenshots_seen: u32,
     pub screenshots_rejected: u32,
@@ -127,6 +130,7 @@ impl ScannerSnapshot {
                 raw_game_mode: None,
             },
             latest_position: None,
+            recovered_positions: Vec::new(),
             diagnostics: Vec::new(),
             screenshots_seen: 0,
             screenshots_rejected: 0,

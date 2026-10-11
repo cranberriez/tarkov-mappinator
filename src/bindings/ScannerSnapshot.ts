@@ -7,4 +7,9 @@ import type { PositionObservation } from "./PositionObservation";
 import type { RaidState } from "./RaidState";
 import type { SourceHealth } from "./SourceHealth";
 
-export type ScannerSnapshot = { instance_id: string, revision: number, config: FolderConfig, monitoring: MonitoringStatus, screenshots: SourceHealth, logs: SourceHealth, raid: RaidState, latest_position: PositionObservation | null, diagnostics: Array<string>, screenshots_seen: number, screenshots_rejected: number, activity: Array<ActivityEvent>, activity_dropped: number, log_coverage: Array<LogCoverage>, };
+export type ScannerSnapshot = { instance_id: string, revision: number, config: FolderConfig, monitoring: MonitoringStatus, screenshots: SourceHealth, logs: SourceHealth, raid: RaidState, latest_position: PositionObservation | null, 
+/**
+ * Screenshots that already existed when monitoring started but were captured after the
+ * start of the raid the logs show as active, oldest first. Set only when monitoring starts.
+ */
+recovered_positions: Array<PositionObservation>, diagnostics: Array<string>, screenshots_seen: number, screenshots_rejected: number, activity: Array<ActivityEvent>, activity_dropped: number, log_coverage: Array<LogCoverage>, };

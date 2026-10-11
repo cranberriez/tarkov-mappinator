@@ -25,6 +25,11 @@ export function useScanner() {
     const accepted = acceptSnapshot(current.current, next);
     current.current = accepted;
     setSnapshot(accepted);
+    // Screenshots from the active raid that predate monitoring; merging is idempotent across snapshots.
+    if (accepted.recovered_positions.length) {
+      const recovered = accepted.recovered_positions;
+      setPositions((history) => mergePositions(history, recovered));
+    }
     if (accepted.latest_position) {
       const position = accepted.latest_position;
       setPositions((history) => appendPosition(history, position));
