@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { appendPosition, freshness, positionsForRaid, toPlane } from "./positions.ts";
+import { appendPosition, freshness, mergePositions, positionsForRaid, toPlane } from "./positions.ts";
 
 const at = (filename, observed_at, raid_id = "r1", xyz = [1, 2, 3]) => ({ filename, observed_at, raid_id, xyz });
 
@@ -27,4 +27,12 @@ test("freshness decays linearly and clamps", () => {
 
 test("world Z maps to screen up", () => {
   assert.deepEqual(toPlane(at("a", "t", "r", [10, 5, 20])), { x: 10, y: -20 });
+});
+
+test("imported positions skip known files and land in capture order", () => {
+  const live = { ...at("b.png", "2026-10-11T12:05:00Z"), captured_at: "2026-10-11 12:05:00" };
+  const older = { ...at("a.png", "2026-10-11T12:00:00Z"), captured_at: "2026-10-11 12:00:00" };
+  const merged = mergePositions([live], [older, { ...live, observed_at: "other" }]);
+  assert.deepEqual(merged.map((p) => p.filename), ["a.png", "b.png"]);
+  assert.equal(mergePositions(merged, [older]), merged);
 });

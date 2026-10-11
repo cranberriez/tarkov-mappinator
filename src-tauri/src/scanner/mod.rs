@@ -1,4 +1,5 @@
 mod activity;
+pub mod import;
 mod model;
 mod parsers;
 mod sources;
@@ -477,11 +478,7 @@ impl ScannerService {
                 self.snapshot.raid.id = None;
                 self.snapshot.raid.raw_game_mode = None;
                 self.snapshot.raid.raw_raid_mode = None;
-                self.snapshot.raid.map = Some(match scene.as_str() {
-                    "customs_preset" => "Customs".into(),
-                    "shopping_mall" => "Interchange".into(),
-                    _ => scene,
-                });
+                self.snapshot.raid.map = Some(parsers::scene_map_name(scene));
                 self.snapshot.latest_position = None;
             }
             LogEvent::Loading {
@@ -558,7 +555,7 @@ impl ScannerService {
         }
     }
 }
-fn files(path: &Path) -> Vec<PathBuf> {
+pub(crate) fn files(path: &Path) -> Vec<PathBuf> {
     fs::read_dir(path)
         .into_iter()
         .flatten()
@@ -756,6 +753,8 @@ mod tests {
     fn export_frontend_contract() {
         use ts_rs::TS;
         ScannerSnapshot::export_all_to(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/bindings"))
+            .unwrap();
+        import::ImportEvent::export_all_to(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/bindings"))
             .unwrap();
     }
     #[test]
@@ -1015,7 +1014,7 @@ mod tests {
     }
 }
 
-fn session_key(path: &Path) -> (Option<NaiveDateTime>, SystemTime) {
+pub(crate) fn session_key(path: &Path) -> (Option<NaiveDateTime>, SystemTime) {
     let name = path.file_name().unwrap_or_default().to_string_lossy();
     let parts: Vec<_> = name.split('_').collect();
     let date = if parts.len() >= 3 && parts[0] == "log" {

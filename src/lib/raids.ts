@@ -1,5 +1,6 @@
 import type { ActivityEvent } from "../bindings/ActivityEvent";
 import type { RaidState } from "../bindings/RaidState";
+import type { ImportedRaid } from "../bindings/ImportedRaid";
 
 export type RaidRecord = {
   id: string;
@@ -11,7 +12,7 @@ export type RaidRecord = {
   ended_at: string | null;
 };
 
-const MAX_RAIDS = 100;
+const MAX_RAIDS = 500;
 const SAME_MOMENT_MS = 1500;
 
 /** Log timestamps are naive local "YYYY-MM-DD HH:MM:SS.fff"; RFC 3339 also accepted. */
@@ -64,6 +65,30 @@ export function observeRaids(records: RaidRecord[], raid: RaidState | undefined,
   });
 
   return next.slice(0, MAX_RAIDS);
+}
+
+/** Folds imported raids in; IDs match live ones, start time catches backfilled placeholders. */
+export function mergeImportedRaids(records: RaidRecord[], imported: ImportedRaid[]): RaidRecord[] {
+  const next = records.map((record) => ({ ...record }));
+  for (const raid of imported) {
+    const time = parseTime(raid.started_at);
+    const existing = next.find((record) => record.id === raid.id || Math.abs(parseTime(record.started_at) - time) < SAME_MOMENT_MS);
+    if (existing) {
+      existing.id = raid.id;
+      existing.map ??= raid.map;
+      existing.game_mode ??= raid.game_mode;
+      existing.ended_at ??= raid.ended_at;
+    } else {
+      next.push({ id: raid.id, map: raid.map, game_mode: raid.game_mode, player_role: null, started_at: raid.started_at, ended_at: raid.ended_at });
+    }
+  }
+  return next.sort((a, b) => parseTime(b.started_at) - parseTime(a.started_at)).slice(0, MAX_RAIDS);
+}
+
+/** Raid IDs are "local:<session>:<start timestamp>". */
+export function raidStartFromId(id: string): string | null {
+  const parts = id.split(":");
+  return parts.length >= 3 && parts[0] === "local" ? parts.slice(2).join(":") : null;
 }
 
 export type RaidStatus = "active" | "ended" | "unknown";

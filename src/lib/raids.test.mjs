@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { observeRaids, raidColor, raidPalette, raidStatus } from "./raids.ts";
+import { mergeImportedRaids, observeRaids, raidColor, raidPalette, raidStartFromId, raidStatus } from "./raids.ts";
 
 const event = (action, logged_at) => ({ kind: "raid", action, logged_at });
 const raid = (patch) => ({ id: null, lifecycle: "unknown", map: null, game_mode: null, player_role: null, started_at: null, ...patch });
@@ -45,4 +45,18 @@ test("an older raid without an observed end is unknown, not active", () => {
 test("30 pastel colours, stable per start time", () => {
   assert.equal(new Set(raidPalette).size, 30);
   assert.equal(raidColor({ started_at: "2026-10-11 12:00:00.000" }), raidColor({ started_at: "2026-10-11 12:00:00.000" }));
+});
+
+test("imported raids fill placeholders by start time and adopt the live ID scheme", () => {
+  const placeholder = observeRaids([], undefined, [event("started", "2026-10-11 12:00:00.000")]);
+  const merged = mergeImportedRaids(placeholder, [
+    { id: "local:s:2026-10-11 12:00:00.000", session: "s", map: "Woods", game_mode: "Pve", raw_game_mode: null, started_at: "2026-10-11 12:00:00.000", ended_at: "2026-10-11 12:30:00.000" },
+    { id: "local:s:2026-10-11 08:00:00.000", session: "s", map: "Customs", game_mode: null, raw_game_mode: null, started_at: "2026-10-11 08:00:00.000", ended_at: null },
+  ]);
+  assert.deepEqual(merged.map((r) => [r.id, r.map, r.ended_at]), [
+    ["local:s:2026-10-11 12:00:00.000", "Woods", "2026-10-11 12:30:00.000"],
+    ["local:s:2026-10-11 08:00:00.000", "Customs", null],
+  ]);
+  assert.equal(raidStartFromId("local:s:2026-10-11 08:00:00.000"), "2026-10-11 08:00:00.000");
+  assert.equal(raidStartFromId("log:x"), null);
 });

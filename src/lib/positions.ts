@@ -2,7 +2,7 @@ import type { PositionObservation } from "../bindings/PositionObservation";
 
 export type PositionHistory = PositionObservation[];
 
-const MAX_POSITIONS = 3000;
+const MAX_POSITIONS = 5000;
 const key = (position: PositionObservation) => `${position.filename}|${position.observed_at}`;
 
 /** The backend only exposes the latest position, so history accumulates client-side. */
@@ -28,3 +28,15 @@ export function freshness(observedAt: string, now: number, window = 120_000): nu
 
 /** Map plane: world X → right, world Z → up (screen Y is inverted). */
 export const toPlane = (position: PositionObservation) => ({ x: position.xyz[0], y: -position.xyz[2] });
+
+const captureOrder = (position: PositionObservation) =>
+  Date.parse((position.captured_at ?? position.observed_at).replace(" ", "T")) || 0;
+
+/** Adds imported captures not already known (by filename), keeping history in capture order. */
+export function mergePositions(history: PositionHistory, incoming: PositionHistory): PositionHistory {
+  const known = new Set(history.map((position) => position.filename));
+  const fresh = incoming.filter((position) => !known.has(position.filename));
+  if (!fresh.length) return history;
+  const next = [...history, ...fresh].sort((a, b) => captureOrder(a) - captureOrder(b));
+  return next.length > MAX_POSITIONS ? next.slice(next.length - MAX_POSITIONS) : next;
+}

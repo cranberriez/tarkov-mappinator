@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
-import { ActivityIcon, MapIcon, OverviewIcon, SettingsIcon, SidebarIcon, TimelineIcon } from "./Icons";
+import { ActivityIcon, ImportIcon, MapIcon, OverviewIcon, SettingsIcon, SidebarIcon, TimelineIcon } from "./Icons";
 
-export type Page = "overview" | "map" | "timeline" | "activity" | "settings";
+export type Page = "overview" | "map" | "timeline" | "activity" | "import" | "settings";
 
 const items: { page: Page; label: string; icon: ReactNode }[] = [
   { page: "overview", label: "Overview", icon: <OverviewIcon /> },
   { page: "map", label: "Map", icon: <MapIcon /> },
   { page: "timeline", label: "Timeline", icon: <TimelineIcon /> },
   { page: "activity", label: "Activity", icon: <ActivityIcon /> },
+  { page: "import", label: "Import", icon: <ImportIcon /> },
 ];
 
 export function Sidebar({ page, onNavigate, collapsed, onToggle }: {

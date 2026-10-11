@@ -3,8 +3,9 @@ import {
   acceptSnapshot, checkFolders, getSnapshot, isTauri, onSnapshot, startScanner, stopScanner,
   type FolderConfig, type ScannerSnapshot,
 } from "./scanner";
-import { appendPosition, type PositionHistory } from "./positions";
-import { observeRaids, type RaidRecord } from "./raids";
+import { appendPosition, mergePositions, type PositionHistory } from "./positions";
+import { mergeImportedRaids, observeRaids, type RaidRecord } from "./raids";
+import type { ImportResult } from "../bindings/ImportResult";
 import { keys, load, save } from "./persist";
 
 export type ScannerAction = "check" | "start" | "stop";
@@ -83,6 +84,10 @@ export function useScanner() {
     running: snapshot?.monitoring === "running",
     retry: () => setAttempt((value) => value + 1),
     clearHistory: () => { setPositions([]); setRaids([]); },
+    importHistory: (result: ImportResult) => {
+      setRaids((records) => mergeImportedRaids(records, result.raids));
+      setPositions((history) => mergePositions(history, result.positions));
+    },
   };
 }
 

@@ -1,7 +1,10 @@
 mod scanner;
 
-use scanner::{FolderConfig, ScannerService, ScannerSnapshot};
-use std::sync::Mutex;
+use scanner::{import, FolderConfig, ScannerService, ScannerSnapshot};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 use tauri::{Emitter, Manager, State};
 
 #[tauri::command]
@@ -25,9 +28,44 @@ fn check_folders(
     Ok(snapshot)
 }
 
+#[derive(Default)]
+struct ImportControl {
+    running: Arc<AtomicBool>,
+    cancel: Arc<AtomicBool>,
+}
+
+/// Starts a one-off, read-only import in the background; progress arrives as `import:event`.
+#[tauri::command]
+fn start_import(config: FolderConfig, app: tauri::AppHandle, control: State<'_, ImportControl>) -> Result<(), String> {
+    if control.running.swap(true, Ordering::SeqCst) {
+        return Err("An import is already running.".into());
+    }
+    control.cancel.store(false, Ordering::SeqCst);
+    // Thumbnails load the screenshots themselves through the asset protocol.
+    if !config.screenshots.is_empty() {
+        if let Err(error) = app.asset_protocol_scope().allow_directory(&config.screenshots, false) {
+            eprintln!("Unable to allow screenshot previews: {error}");
+        }
+    }
+    let (running, cancel) = (control.running.clone(), control.cancel.clone());
+    std::thread::spawn(move || {
+        import::run(&config, &cancel, |event| {
+            let _ = app.emit("import:event", event);
+        });
+        running.store(false, Ordering::SeqCst);
+    });
+    Ok(())
+}
+
+#[tauri::command]
+fn cancel_import(control: State<'_, ImportControl>) {
+    control.cancel.store(true, Ordering::SeqCst);
+}
+
 pub fn run() {
     tauri::Builder::default()
         .manage(Mutex::new(ScannerService::new()))
+        .manage(ImportControl::default())
         .setup(|app| {
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
@@ -45,7 +83,9 @@ pub fn run() {
             scanner_snapshot,
             check_folders,
             start_scanner,
-            stop_scanner
+            stop_scanner,
+            start_import,
+            cancel_import
         ])
         .run(tauri::generate_context!())
         .expect("Unable to launch Tarkov Mappinator");
