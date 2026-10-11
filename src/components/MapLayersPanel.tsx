@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { mapIcons } from "../maps";
+import { iconSrc } from "../lib/tiles";
 import { layers, layerState, sameFilters, toggleLayer, type Filters } from "../lib/mapLayers";
 import { keys, load, save } from "../lib/persist";
 import { CaretIcon, PinIcon, ResetIcon } from "./Icons";
@@ -77,7 +77,8 @@ export function MapLayersPanel({ filters, defaults, counts, open, onOpen, onChan
             const on = state.groups[group.key];
             return <button key={group.key} type="button" className={`layer-row group ${on ? "" : "off"}`} aria-pressed={on}
               title={group.label} onClick={() => setGroup(layer.key, group.key, !on)}>
-              <img src={mapIcons[group.icon]} alt="" />
+              <img src={iconSrc(group.icon)} alt="" className={group.tint ? "tinted" : undefined}
+                style={group.tint ? { "--tint": group.tint } as CSSProperties : undefined} />
               <span className="group-name">{group.label}</span>
               <span className="faint">{counts[`${layer.key}.${group.key}`]}</span>
             </button>;

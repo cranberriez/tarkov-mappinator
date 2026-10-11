@@ -17,6 +17,8 @@ use std::{
 use ts_rs::TS;
 
 pub const TILE_HOST: &str = "https://assets.tarkov.dev/maps/";
+/// Item icons share the cache under `items/<id>-512.webp`; the host serves them from its root.
+const ASSET_HOST: &str = "https://assets.tarkov.dev/";
 const TILE_LIMIT: u64 = 8 * 1024 * 1024;
 const PREFETCH_WORKERS: usize = 6;
 
@@ -138,7 +140,10 @@ impl TileCache {
     }
 
     fn fetch(&self, path: &str, file: &Path) -> Result<Tile, String> {
-        let url = format!("{TILE_HOST}{path}");
+        let url = match path.strip_prefix("items/") {
+            Some(icon) => format!("{ASSET_HOST}{icon}"),
+            None => format!("{TILE_HOST}{path}"),
+        };
         let mut response = self
             .agent
             .get(&url)
@@ -325,6 +330,11 @@ mod tests {
         assert!(!valid_path("customs\\6\\40\\20.png"));
         assert!(!valid_path("customs/6/40/20.json"));
         assert!(!valid_path("customs//20.png"));
+    }
+
+    #[test]
+    fn item_icon_paths_are_valid() {
+        assert!(valid_path("items/6a31807f17005505b70d5827-512.webp"));
     }
 
     #[test]

@@ -415,6 +415,11 @@ input:disabled { opacity: .55; }
 .overlay-marker.spawns img { width: 14px; height: 14px; opacity: .85; }
 .overlay-marker.containers, .overlay-marker.access, .overlay-marker.other { transform: translate(-8px, -50%); }
 .overlay-marker.containers img, .overlay-marker.access img, .overlay-marker.other img { width: 16px; height: 16px; }
+/* Item icons that need to stand out sit on a round gradient of their colour. */
+img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fit: contain;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tint) 75%, transparent), color-mix(in srgb, var(--tint) 20%, transparent) 75%); }
+.overlay-marker.documents { transform: translate(-10px, -50%); }
+.overlay-marker.documents img { width: 20px; height: 20px; }
 .overlay-marker.loose { transform: translate(-5px, -50%); }
 .overlay-marker.loose img { width: 10px; height: 10px; opacity: .8; }
 .overlay-marker.hazards img { width: 18px; height: 18px; opacity: .9; }

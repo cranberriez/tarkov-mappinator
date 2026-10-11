@@ -4,12 +4,26 @@
 // groups, and shows when any of its groups is on.
 import type { GameMapData, Vec3 } from "../tarkov-data/types.ts";
 
-type GroupDef = { key: string; label: string; icon: string; /** Hidden until switched on. */ off?: boolean };
+/** `icon` is a file stem in `src/maps/assets/icons`, or `item:<tarkov.dev item id>`. */
+type GroupDef = { key: string; label: string; icon: string; /** Colour behind the icon. */ tint?: string; /** Hidden until switched on. */ off?: boolean };
 export type LayerDef = {
   key: string; label: string; icon: string; groups: GroupDef[];
   /** All groups hidden until switched on. */ off?: boolean;
   /** Folded in the panel until opened. */ folded?: boolean;
 };
+
+/** Battle Pass document items (tarkov.dev ids) by group; each map spawns two of these. */
+const documentTypes = [
+  { key: "financial", label: "Financial", item: "6a31807f17005505b70d5827", tint: "#7cc39a" },
+  { key: "project", label: "Project", item: "6a3181f178450ec91c0ea1aa", tint: "#dbb36b" },
+  { key: "blueprints", label: "Blueprints", item: "6a31824878450ec91c0ea1ae", tint: "#6fa8dc" },
+  { key: "test", label: "Test", item: "6a31828557705071410ca00e", tint: "#a78bd6" },
+  { key: "user", label: "User", item: "6a3182b72fd891345e047eef", tint: "#5fc4c0" },
+  { key: "medical", label: "Medical", item: "6a3182dc6cd8de21cf0a3a7d", tint: "#e37b6c" },
+  { key: "technical", label: "Technical", item: "6a31830dde69ceafd805afa0", tint: "#e8985a" },
+  { key: "personnel", label: "PMC personnel", item: "6a317b9692cfdcddcb02a58e", tint: "#d98fb3" },
+];
+const documentGroup = new Map(documentTypes.map(({ key, item }) => [item, key]));
 
 export const layers: LayerDef[] = [
   { key: "extracts", label: "Extracts", icon: "extract_pmc", groups: [
@@ -50,6 +64,7 @@ export const layers: LayerDef[] = [
     { key: "stationary", label: "Stationary guns", icon: "stationarygun" },
     { key: "btr", label: "BTR stops", icon: "btr_stop" },
   ] },
+  { key: "documents", label: "Battle Pass documents", icon: "quest_item", groups: documentTypes.map(({ key, label, item, tint }) => ({ key, label, tint, icon: `item:${item}` })) },
   { key: "loose", label: "Loose loot", icon: "loose_loot", off: true, folded: true, groups: [
     { key: "loose", label: "Loose loot", icon: "loose_loot" },
   ] },
@@ -295,20 +310,35 @@ function pointMarkers(data: GameMapData, lookups: Lookups): MapMarker[] {
     id: `btr:${index}`, layer: "other", groups: ["btr"], position: { x: stop.x, y: stop.y, z: stop.z },
     icon: "btr_stop", label: stop.name, tags: ["BTR stop"],
   }));
-  (data.lootLoose ?? []).forEach((loot, index) => markers.push({
-    id: `loose:${index}`, layer: "loose", groups: ["loose"], position: loot.position, icon: "loose_loot",
-    tags: ["Loose loot", `${loot.items.length} possible item${loot.items.length === 1 ? "" : "s"}`],
-  }));
+  (data.lootLoose ?? []).forEach((loot, index) => {
+    // A spawn point that can hold a Battle Pass document is a document marker, not loose loot.
+    const documents = [...new Set(loot.items.flatMap((item) => documentGroup.get(item) ?? []))];
+    if (documents.length) {
+      const labels = documents.map((key) => documentTypes.find((type) => type.key === key)!.label);
+      markers.push({ id: `document:${index}`, layer: "documents", groups: documents, position: loot.position,
+        tags: [`${labels.join(" / ")} document`] });
+      return;
+    }
+    markers.push({ id: `loose:${index}`, layer: "loose", groups: ["loose"], position: loot.position, icon: "loose_loot",
+      tags: ["Loose loot", `${loot.items.length} possible item${loot.items.length === 1 ? "" : "s"}`] });
+  });
   return markers;
 }
 
-/** Icon file stem for a marker, given which of its groups are currently shown. */
+/** Icon key for a marker (a file stem, or `item:<id>` for an item icon), given which of its groups are currently shown. */
 export function markerIcon(marker: MapMarker, filters: Filters): string {
   if (marker.icon) return marker.icon;
   const shown = marker.groups.filter((group) => filters[marker.layer]?.groups[group]);
+  if (marker.layer === "documents") return `item:${documentTypes.find((type) => type.key === shown[0])?.item}`;
   if (marker.layer === "spawns") return shown.includes("pmc") ? "spawn_pmc" : "spawn_scav";
   if (shown.includes("transit")) return "extract_transit";
   return shown.includes("pmc") && shown.includes("scav") ? "extract_shared" : shown.includes("scav") ? "extract_scav" : "extract_pmc";
+}
+
+/** Colour behind a marker's icon, from the first of its groups that is shown. */
+export function markerTint(marker: MapMarker, filters: Filters): string | undefined {
+  const shown = marker.groups.find((group) => filters[marker.layer]?.groups[group]);
+  return layers.find((layer) => layer.key === marker.layer)?.groups.find((group) => group.key === shown)?.tint;
 }
 
 /** Marker count per layer and per layer group, for the filter panel. */

@@ -1,6 +1,7 @@
-import { memo } from "react";
+import { memo, type CSSProperties } from "react";
 import { mapIcons, type MapProjection } from "../maps";
-import { markerIcon, type Filters, type MapMarker } from "../lib/mapLayers";
+import { iconSrc } from "../lib/tiles";
+import { markerIcon, markerTint, type Filters, type MapMarker } from "../lib/mapLayers";
 
 /**
  * Data markers placed in plane units, relative to the plane origin. The caller translates this layer
@@ -27,12 +28,14 @@ export const MapOverlay = memo(function MapOverlay({ markers, filters, projectio
     </g></svg>}
     {markers.map((marker) => {
       const { x, y } = at(marker.position);
+      const tint = markerTint(marker, filters);
       const hover = [marker.label, ...marker.tags].filter(Boolean).join(" · ");
       // Only extracts keep their name on the map; everything else names itself on hover.
       const named = labelled && marker.layer === "extracts" && !!marker.label;
       return <div key={marker.id} className={`overlay-marker ${marker.layer} ${otherFloor(marker) ? "other-floor" : ""}`}
         style={{ left: `calc(${x}px * var(--s))`, top: `calc(${y}px * var(--s))` }}>
-        <img src={mapIcons[markerIcon(marker, filters)] ?? mapIcons.container_crate} alt="" draggable={false} />
+        <img src={iconSrc(markerIcon(marker, filters)) ?? mapIcons.container_crate} alt="" draggable={false}
+          className={tint ? "tinted" : undefined} style={tint ? { "--tint": tint } as CSSProperties : undefined} />
         {named && <span className="overlay-label">{marker.label}</span>}
         {hover && <span className={`overlay-label overlay-hover ${named ? "replaces" : ""}`}>{hover}</span>}
       </div>;

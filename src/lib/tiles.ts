@@ -1,6 +1,6 @@
 import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { TILE_HOST, tileRange, tileSets, type MapCalibration } from "../maps";
+import { TILE_HOST, mapIcons, tileRange, tileSets, type MapCalibration } from "../maps";
 import type { CacheStats } from "../bindings/CacheStats";
 import type { PrefetchStatus } from "../bindings/PrefetchStatus";
 import type { TileJob } from "../bindings/TileJob";
@@ -10,6 +10,10 @@ export type { CacheStats, PrefetchStatus };
 // In the desktop app tiles go through the backend disk cache (`tiles` URI scheme); elsewhere straight to the host.
 const base = isTauri() ? convertFileSrc("", "tiles") : TILE_HOST;
 export const tileUrl = (path: string) => base + path;
+/** Item icon (cached like tiles); the host serves `<id>-512.webp` from its root, the cache keys it under `items/`. */
+const itemIconUrl = (id: string) => isTauri() ? `${base}items/${id}-512.webp` : `https://assets.tarkov.dev/${id}-512.webp`;
+/** Image URL for a layer icon key: a bundled file stem, or `item:<id>`. */
+export const iconSrc = (icon: string): string | undefined => icon.startsWith("item:") ? itemIconUrl(icon.slice(5)) : mapIcons[icon];
 
 /** Every tile of a map: each tile set at each zoom, limited to the map bounds. */
 export function tileJobs(map: MapCalibration): TileJob[] {
