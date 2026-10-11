@@ -5,6 +5,12 @@ import type { SourceHealth } from "../bindings/SourceHealth";
 import { LogCoveragePanel } from "../components/LogCoveragePanel";
 import { syncData, useDataStatus } from "../tarkov-data";
 import { age } from "../lib/format";
+import { games, maps, tileCount, type MapCalibration } from "../maps";
+import {
+  cancelPrefetch, clearTileCache, getCacheStats, getCoverage, getPrefetchStatus, onPrefetch, prefetchTiles, tileJobs,
+  type CacheStats, type PrefetchStatus,
+} from "../lib/tiles";
+import { isTauri } from "../lib/scanner";
 
 const statusLabel: Record<SourceHealth["status"], string> = {
   not_configured: "Not set", available: "Accessible", missing: "Missing", not_directory: "Not a folder", unreadable: "No access",
@@ -67,6 +73,7 @@ export function SettingsPage({ scanner }: { scanner: Scanner }) {
     </section>
 
     <MapDataSection />
+    <TileSection />
 
     <section className="settings-section">
       <h2>Log coverage</h2>
@@ -92,6 +99,70 @@ function MapDataSection() {
       <button type="button" className="secondary" disabled={!status || syncing} onClick={() => void syncData()}>
         {syncing ? "Syncing…" : "Check now"}</button>
       <span className="faint">From tarkov.dev, checked every 6 hours.</span>
+    </div>
+  </section>;
+}
+
+const tiled = Object.values(maps).filter((map) => map.tilePath);
+const artName = (map: MapCalibration) => games.find((game) => game.art === map.key)?.name ?? map.key;
+const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+
+function TileSection() {
+  const desktop = isTauri();
+  const [prefetch, setPrefetch] = useState<PrefetchStatus | null>(null);
+  const [stats, setStats] = useState<CacheStats | null>(null);
+  const [coverage, setCoverage] = useState<Record<string, number>>({});
+  const [error, setError] = useState<string | null>(null);
+  const running = !!prefetch?.running;
+
+  const refresh = () => {
+    getCacheStats().then(setStats, () => {});
+    for (const map of tiled) getCoverage(map).then((count) => setCoverage((current) => ({ ...current, [map.key]: count })), () => {});
+  };
+  useEffect(() => {
+    if (!desktop) return;
+    let live = true;
+    getPrefetchStatus().then((status) => { if (live) setPrefetch(status); }, () => {});
+    const stop = onPrefetch((status) => {
+      if (!live) return;
+      setPrefetch(status);
+      if (!status.running) refresh();
+    });
+    refresh();
+    return () => { live = false; void stop.then((unlisten) => unlisten()); };
+  }, []);
+
+  const act = (action: Promise<unknown>) => { setError(null); action.then(refresh, (reason) => setError(String(reason))); };
+
+  return <section className="settings-section">
+    <h2>Map tiles</h2>
+    <p className="faint section-note">Detailed tiles load from tarkov.dev as you view them and are kept on disk.
+      Download a map to use it offline.</p>
+    {error && <p className="diagnostics">{error}</p>}
+    <div className="table-scroll"><table className="table">
+      <thead><tr><th>Map</th><th className="num">Cached</th><th className="num">Tiles</th><th /></tr></thead>
+      <tbody>{tiled.map((map) => {
+        const total = tileCount(map), have = coverage[map.key];
+        const active = running && prefetch?.label === map.key;
+        return <tr key={map.key}>
+          <td>{artName(map)}</td>
+          <td className="num">{active ? `${Math.round(prefetch.done / prefetch.total * 100)}%`
+            : have === undefined ? "—" : `${Math.floor(have / total * 100)}%`}</td>
+          <td className="num">{total.toLocaleString()}</td>
+          <td className="num">{active
+            ? <button type="button" className="link" onClick={() => void cancelPrefetch()}>Stop</button>
+            : <button type="button" className="link" disabled={!desktop || running || have === total}
+              onClick={() => act(prefetchTiles(map.key, tileJobs(map)))}>{have === total ? "Done" : "Download"}</button>}</td>
+        </tr>;
+      })}</tbody>
+    </table></div>
+    {prefetch && !prefetch.running && prefetch.label && <p className="faint section-note">
+      {prefetch.cancelled ? "Stopped" : "Finished"} {artName(maps[prefetch.label] ?? { key: prefetch.label } as MapCalibration)}:
+      {" "}{prefetch.downloaded.toLocaleString()} downloaded{prefetch.failed ? `, ${prefetch.failed.toLocaleString()} failed` : ""}.</p>}
+    <div className="form-actions">
+      <span className="faint">{stats ? `${megabytes(stats.bytes)} on disk` : desktop ? "—" : "Desktop app only."}</span>
+      <button type="button" className="secondary" disabled={!desktop || running || !stats?.files}
+        onClick={() => act(clearTileCache())}>Clear tiles</button>
     </div>
   </section>;
 }

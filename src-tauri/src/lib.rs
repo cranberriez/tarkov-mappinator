@@ -1,9 +1,11 @@
 mod scanner;
 mod tarkov_data;
+mod tile_cache;
 
 use scanner::{import, FolderConfig, ScannerService, ScannerSnapshot};
 use serde_json::value::RawValue;
 use tarkov_data::{DataStatus, TarkovData};
+use tile_cache::{CacheStats, PrefetchStatus, Tile, TileCache, TileJob};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
@@ -100,6 +102,66 @@ fn tarkov_data_mobs(data: State<'_, Arc<TarkovData>>) -> Result<Box<RawValue>, S
     raw(data.mobs_json()?)
 }
 
+#[tauri::command(async)]
+fn tile_cache_stats(tiles: State<'_, Arc<TileCache>>) -> CacheStats {
+    tiles.stats()
+}
+
+#[tauri::command(async)]
+fn tile_cache_coverage(jobs: Vec<TileJob>, tiles: State<'_, Arc<TileCache>>) -> u64 {
+    tiles.coverage(&jobs)
+}
+
+#[tauri::command]
+fn tile_prefetch_status(tiles: State<'_, Arc<TileCache>>) -> PrefetchStatus {
+    tiles.prefetch_status()
+}
+
+/// Downloads the given tiles in the background; progress arrives as `tiles:prefetch`.
+#[tauri::command]
+fn tile_prefetch(
+    label: String,
+    jobs: Vec<TileJob>,
+    app: tauri::AppHandle,
+    tiles: State<'_, Arc<TileCache>>,
+) -> Result<(), String> {
+    if tiles.prefetch_status().running {
+        return Err("A tile download is already running.".into());
+    }
+    let tiles = tiles.inner().clone();
+    std::thread::spawn(move || {
+        tiles.prefetch(label, jobs, |status| {
+            let _ = app.emit("tiles:prefetch", status);
+        });
+    });
+    Ok(())
+}
+
+#[tauri::command]
+fn tile_prefetch_cancel(tiles: State<'_, Arc<TileCache>>) {
+    tiles.cancel_prefetch();
+}
+
+#[tauri::command(async)]
+fn tile_cache_clear(tiles: State<'_, Arc<TileCache>>) -> Result<(), String> {
+    tiles.clear()
+}
+
+/// `tiles://localhost/<path>` (`http://tiles.localhost/<path>` on Windows): cached tile, else fetched.
+fn serve_tile(tiles: Arc<TileCache>, path: String) -> tauri::http::Response<Vec<u8>> {
+    let response = tauri::http::Response::builder().header("Access-Control-Allow-Origin", "*");
+    match tiles.get(&path) {
+        Ok(Tile::Hit(bytes)) => response
+            .status(200)
+            .header("Content-Type", tile_cache::content_type(&path))
+            .header("Cache-Control", "max-age=604800")
+            .body(bytes),
+        Ok(Tile::Missing) => response.status(404).header("Cache-Control", "max-age=604800").body(Vec::new()),
+        Err(error) => response.status(502).body(error.into_bytes()),
+    }
+    .expect("static response parts")
+}
+
 /// Checks tarkov.dev at startup and whenever the last check is older than `tarkov_data::MAX_AGE`.
 fn spawn_data_sync(app: tauri::AppHandle, data: Arc<TarkovData>) {
     std::thread::spawn(move || loop {
@@ -115,6 +177,14 @@ fn spawn_data_sync(app: tauri::AppHandle, data: Arc<TarkovData>) {
 
 pub fn run() {
     tauri::Builder::default()
+        .register_asynchronous_uri_scheme_protocol("tiles", |context, request, responder| {
+            let path = request.uri().path().trim_start_matches('/').to_owned();
+            let Some(tiles) = context.app_handle().try_state::<Arc<TileCache>>().map(|tiles| tiles.inner().clone()) else {
+                responder.respond(tauri::http::Response::builder().status(503).body(Vec::new()).unwrap());
+                return;
+            };
+            std::thread::spawn(move || responder.respond(serve_tile(tiles, path)));
+        })
         .manage(Mutex::new(ScannerService::new()))
         .manage(ImportControl::default())
         .setup(|app| {
@@ -122,6 +192,8 @@ pub fn run() {
             let data = Arc::new(TarkovData::open(store));
             app.manage(data.clone());
             spawn_data_sync(app.handle().clone(), data);
+            let tiles = app.path().app_data_dir()?.join("tile-cache");
+            app.manage(Arc::new(TileCache::open(tiles)));
 
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
@@ -146,7 +218,13 @@ pub fn run() {
             tarkov_data_sync,
             tarkov_data_map,
             tarkov_data_common,
-            tarkov_data_mobs
+            tarkov_data_mobs,
+            tile_cache_stats,
+            tile_cache_coverage,
+            tile_prefetch_status,
+            tile_prefetch,
+            tile_prefetch_cancel,
+            tile_cache_clear
         ])
         .run(tauri::generate_context!())
         .expect("Unable to launch Tarkov Mappinator");

@@ -16,6 +16,7 @@ export const CrosshairIcon = () => <Icon size={16}><circle cx="12" cy="12" r="7"
 export const PlayIcon = () => <Icon size={14}><path d="M7 5v14l11-7z" fill="currentColor" /></Icon>;
 export const StopIcon = () => <Icon size={14}><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" /></Icon>;
 export const PlusIcon = () => <Icon size={16}><path d="M12 5v14M5 12h14" /></Icon>;
+export const LayersIcon = () => <Icon size={16}><path d="m12 3 9 5-9 5-9-5z" /><path d="m3 13 9 5 9-5" /></Icon>;
 export const MinusIcon = () => <Icon size={16}><path d="M5 12h14" /></Icon>;
 
 export const WindowMinimize = () => <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 5h10" stroke="currentColor" /></svg>;

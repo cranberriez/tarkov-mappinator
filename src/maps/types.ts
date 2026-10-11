@@ -5,18 +5,19 @@ export type FloorExtent = { height: [number, number]; bounds?: WorldBounds[] };
 
 export type MapFloor = {
   name: string;
-  /** Id of the top-level `<g>` in the SVG. */
-  svgLayer: string;
+  /** Id of the top-level `<g>` in the SVG, when the vector art has this floor. */
+  svgLayer?: string;
+  /** Tile path template for this floor, when tiles exist for it. */
+  tilePath?: string;
   show: boolean;
   extents?: FloorExtent[];
 };
 
 export type MapLabel = { position: [number, number]; text: string; rotation?: number; size?: number; top?: number; bottom?: number };
 
-/** Per-map calibration, from tarkov.dev's interactive map definitions. */
+/** Per-art calibration, from tarkov.dev's interactive map definitions. Several game maps can share one. */
 export type MapCalibration = {
   key: string;
-  svg: string;
   /** Leaflet transformation [scaleX, offsetX, scaleY, offsetY] applied after rotation. */
   transform: [number, number, number, number];
   /** Degrees; world (x, z) is rotated by this before scaling. */
@@ -24,13 +25,32 @@ export type MapCalibration = {
   bounds: WorldBounds;
   /** Where the SVG artwork sits, when it differs from `bounds`. */
   svgBounds?: WorldBounds;
-  /** Base floor group id. */
-  svgLayer: string;
   heightRange?: [number, number];
+  /** Vector art file, when one exists. */
+  svg?: string;
+  /** Base floor group id in the SVG. */
+  svgLayer?: string;
+  /** Base tile path template `<dir>/{z}/{x}/{y}.png`, relative to the tile host, when tiles exist. */
+  tilePath?: string;
+  tileSize?: number;
+  /** Highest zoom with native tiles; tiles exist from zoom 0. */
+  maxZoom?: number;
   layers: MapFloor[];
   labels: MapLabel[];
-  /** Lower-case names that resolve to this map: tarkov.dev keys, game ids, scene names, English names. */
-  aliases: string[];
+};
+
+/** A game map as the game and tarkov.dev identify it. */
+export type GameMap = {
+  /** tarkov.dev `normalizedName`, e.g. "customs". */
+  key: string;
+  /** English display name. */
+  name: string;
+  /** Location id in logs and the API, e.g. "bigmap". */
+  nameId: string;
+  /** Scene bundle in logs, e.g. "customs_preset". */
+  scene: string;
+  /** Calibration key for its art, or null when no map art exists. */
+  art: string | null;
 };
 
 export type WorldPoint = { x: number; y?: number; z: number };

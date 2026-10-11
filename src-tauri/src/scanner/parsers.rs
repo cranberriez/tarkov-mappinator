@@ -83,15 +83,6 @@ pub fn log_record(line: &str) -> Option<(String, LogEvent)> {
     Some((header[1].to_owned(), event))
 }
 
-/// Display name for a scene bundle; unknown scenes keep their raw identifier.
-pub fn scene_map_name(scene: String) -> String {
-    match scene.as_str() {
-        "customs_preset" => "Customs".into(),
-        "shopping_mall" => "Interchange".into(),
-        _ => scene,
-    }
-}
-
 pub const HEADING_CONVENTION: &str = "UNVERIFIED: assumed Unity x,y,z,w quaternion, +Z forward yaw atan2(x,z) in degrees about +Y; game/map compass calibration unknown";
 
 #[derive(Debug)]

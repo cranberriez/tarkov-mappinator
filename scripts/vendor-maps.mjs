@@ -1,6 +1,6 @@
 // Refreshes the vendored map library in src/maps from pinned upstream commits.
 //   node scripts/vendor-maps.mjs [svgCommit] [tarkovDevCommit]
-// Writes src/maps/assets/{svg,icons}/* and src/maps/calibration.json. Review the diff before committing.
+// Writes src/maps/assets/{svg,icons}/* and src/maps/calibration.json (game identities, art calibration, tile paths). Review the diff before committing.
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,36 +29,52 @@ const groups = await get(raw(DEV_REPO, devCommit, "src/data/maps.json"), "json")
 const [apiMaps, apiNames] = await Promise.all([get(`${API}/maps`, "json"), get(`${API}/maps_en`, "json")]);
 const gameMaps = Object.values(apiMaps.data.maps);
 
-// Only SVG-backed interactive maps; tile-only maps (Labs, Labyrinth, Icebreaker) have no vector art here.
-const interactive = groups.flatMap((group) => group.maps).filter((map) => map.projection === "interactive" && map.svgPath);
+const TILE_HOST = "https://assets.tarkov.dev/maps/";
+const tilePath = (url) => {
+  if (!url) return undefined;
+  if (!url.startsWith(TILE_HOST)) throw new Error(`Unexpected tile host: ${url}`);
+  return url.slice(TILE_HOST.length);
+};
+
+// Interactive maps with vector art and/or Leaflet tiles.
+const interactive = groups.flatMap((group) => group.maps)
+  .filter((map) => map.projection === "interactive" && (map.svgPath || map.tilePath));
 
 const calibration = {};
+const artFor = new Map();
 const svgFiles = new Set();
 for (const map of interactive) {
-  const svg = map.svgPath.split("/").pop();
-  svgFiles.add(svg);
-  const keys = [map.key, ...(map.altMaps ?? [])];
-  const aliases = new Set(keys);
-  for (const game of gameMaps.filter((game) => keys.includes(game.normalizedName))) {
-    aliases.add(game.nameId);
-    aliases.add(game.scenePath.replace(/^maps\//, "").replace(/\.bundle$/, ""));
-    const name = apiNames.data[game.name];
-    if (name) aliases.add(name);
-  }
+  const svg = map.svgPath?.split("/").pop();
+  if (svg) svgFiles.add(svg);
+  for (const key of [map.key, ...(map.altMaps ?? [])]) artFor.set(key, map.key);
   calibration[map.key] = {
     key: map.key,
-    svg,
     transform: map.transform,
     coordinateRotation: map.coordinateRotation ?? 0,
     bounds: map.bounds,
     ...(map.svgBounds && { svgBounds: map.svgBounds }),
-    svgLayer: map.svgLayer,
     ...(map.heightRange && { heightRange: map.heightRange }),
-    layers: (map.layers ?? []).filter((layer) => layer.svgLayer).map(({ name, svgLayer, show, extents }) => ({ name, svgLayer, show: !!show, extents })),
+    ...(svg && { svg, svgLayer: map.svgLayer }),
+    ...(map.tilePath && { tilePath: tilePath(map.tilePath), tileSize: map.tileSize ?? 256, maxZoom: map.maxZoom }),
+    layers: (map.layers ?? []).filter((layer) => layer.svgLayer || layer.tilePath).map((layer) => ({
+      name: layer.name,
+      ...(layer.svgLayer && { svgLayer: layer.svgLayer }),
+      ...(layer.tilePath && { tilePath: tilePath(layer.tilePath) }),
+      show: !!layer.show,
+      ...(layer.extents && { extents: layer.extents }),
+    })),
     labels: map.labels ?? [],
-    aliases: [...new Set([...aliases].map((alias) => alias.toLowerCase()))].sort(),
   };
 }
+
+// Every game map, keyed by tarkov.dev normalizedName, with both identifiers seen in game logs.
+const games = gameMaps.map((game) => ({
+  key: game.normalizedName,
+  name: apiNames.data[game.name] ?? game.normalizedName,
+  nameId: game.nameId,
+  scene: game.scenePath.replace(/^maps\//, "").replace(/\.bundle$/, ""),
+  art: artFor.get(game.normalizedName) ?? null,
+})).sort((a, b) => a.key.localeCompare(b.key));
 
 await replaceDir(join(root, "assets", "svg"));
 for (const file of svgFiles) {
@@ -74,8 +90,10 @@ for (const entry of listing.filter((entry) => entry.name.endsWith(".png"))) {
 
 await writeFile(join(root, "calibration.json"), JSON.stringify({
   source: { svg: `${SVG_REPO}@${svgCommit}`, calibration: `${DEV_REPO}@${devCommit}`, aliases: `${API}/maps` },
+  games,
   maps: calibration,
 }, null, 1) + "\n");
 
 console.log(`maps: ${Object.keys(calibration).join(", ")}`);
+console.log(`games without art: ${games.filter((game) => !game.art).map((game) => game.key).join(", ") || "none"}`);
 console.log(`svg: ${svgFiles.size}, icons: ${(await readdir(join(root, "assets", "icons"))).length}`);

@@ -2,10 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { Scanner } from "../lib/useScanner";
 import { freshness, positionsForRaid } from "../lib/positions";
 import type { PositionObservation } from "../bindings/PositionObservation";
-import { artRect, floorAt, MapArt, metricProjection, projectionFor, resolveMap, type MapProjection, type PlaneRect } from "../maps";
+import { artRect, floorAt, MapArt, MapTiles, mapName, metricProjection, projectionFor, resolveMap, tileBounds, type MapProjection, type PlaneRect } from "../maps";
+import { tileUrl } from "../lib/tiles";
+import { keys, load, save } from "../lib/persist";
 import { age, clock } from "../lib/format";
 import { useNow } from "../lib/useNow";
-import { CrosshairIcon, MinusIcon, PlusIcon } from "../components/Icons";
+import { CrosshairIcon, LayersIcon, MinusIcon, PlusIcon } from "../components/Icons";
 
 /** Centre in plane units; scale in screen pixels per plane unit. */
 type View = { cx: number; cy: number; scale: number };
@@ -13,6 +15,8 @@ type View = { cx: number; cy: number; scale: number };
 const MIN_PX_PER_M = 0.05, MAX_PX_PER_M = 40, DEFAULT_PX_PER_M = 2;
 const clampScale = (scale: number, unitsPerMetre: number) =>
   Math.min(MAX_PX_PER_M, Math.max(MIN_PX_PER_M, scale * unitsPerMetre)) / unitsPerMetre;
+
+type ArtStyle = "svg" | "tiles";
 
 const world = (position: PositionObservation) => ({ x: position.xyz[0], y: position.xyz[1], z: position.xyz[2] });
 
@@ -47,10 +51,15 @@ export function MapPage({ scanner }: { scanner: Scanner }) {
 
   const calibration = resolveMap(raid?.map);
   const projection = useMemo(() => calibration ? projectionFor(calibration) : metricProjection, [calibration]);
-  const art = useMemo(() => calibration ? artRect(calibration, projection) : null, [calibration, projection]);
+  // Vector art by default; tiles when chosen or when the map has no vector art.
+  const [preferred, setPreferred] = useState<ArtStyle>(() => load(keys.mapStyle, "svg"));
+  useEffect(() => save(keys.mapStyle, preferred), [preferred]);
+  const svgMap = calibration?.svg ? calibration as typeof calibration & { svg: string } : null;
+  const tileMap = calibration?.tilePath ? calibration as typeof calibration & { tilePath: string } : null;
+  const style: ArtStyle | null = svgMap && (preferred === "svg" || !tileMap) ? "svg" : tileMap ? "tiles" : null;
+  const art = useMemo(() => svgMap ? artRect(svgMap, projection) : tileMap ? tileBounds(tileMap) : null, [calibration, projection]);
   const toPlane = (position: PositionObservation) => projection.toPlane(world(position));
   const floor = calibration && newest ? floorAt(calibration, world(newest)) : null;
-  const floorName = floor ? calibration?.layers.find((layer) => layer.svgLayer === floor)?.name : null;
 
   const frame = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -159,11 +168,12 @@ export function MapPage({ scanner }: { scanner: Scanner }) {
         const rect = event.currentTarget.getBoundingClientRect();
         zoomAt(2, event.clientX - rect.left, event.clientY - rect.top);
       }}>
-      {calibration && art ? (() => {
+      {style === "svg" && svgMap && art ? (() => {
         const corner = toScreen(art.x, art.y);
-        return <MapArt map={calibration} floor={floor} className="map-art"
+        return <MapArt map={svgMap} floor={floor?.svgLayer ?? null} className="map-art"
           style={{ left: corner.left, top: corner.top, width: art.width * view.scale, height: art.height * view.scale }} />;
-      })() : <>
+      })() : style === "tiles" && tileMap ? <MapTiles map={tileMap} floor={floor} tileUrl={tileUrl}
+        view={{ ...view, width: size.width, height: size.height }} /> : <>
         <div className="map-axis x" style={{ top: origin.top }} />
         <div className="map-axis y" style={{ left: origin.left }} />
       </>}
@@ -183,13 +193,16 @@ export function MapPage({ scanner }: { scanner: Scanner }) {
 
     <div className={`map-chip ${status}`}>
       <span className="dot" />
-      {raid?.map ?? (status === "online" ? "No map" : status === "offline" ? "Disconnected" : "Preview")}
-      {floorName && <span className="faint">{floorName}</span>}
+      {mapName(raid?.map) ?? (status === "online" ? "No map" : status === "offline" ? "Disconnected" : "Preview")}
+      {floor && <span className="faint">{floor.name}</span>}
     </div>
 
     <div className="map-tools">
       <button type="button" className={`icon-button ${follow ? "active" : ""}`} aria-pressed={follow}
         title="Follow newest position" onClick={() => setFollow((value) => !value)}><CrosshairIcon /></button>
+      {svgMap && tileMap && <button type="button" className={`icon-button ${style === "tiles" ? "active" : ""}`}
+        aria-pressed={style === "tiles"} title={style === "tiles" ? "Show vector map" : "Show detailed tiles"}
+        onClick={() => setPreferred(style === "tiles" ? "svg" : "tiles")}><LayersIcon /></button>}
       <button type="button" className="icon-button" title="Zoom in" onClick={() => zoomAt(1.5)}><PlusIcon /></button>
       <button type="button" className="icon-button" title="Zoom out" onClick={() => zoomAt(1 / 1.5)}><MinusIcon /></button>
       {newest && <span className="map-readout">

@@ -1,4 +1,4 @@
-import type { MapCalibration, PlanePoint, PlaneRect, WorldBounds, WorldPoint } from "./types.ts";
+import type { MapCalibration, MapFloor, PlanePoint, PlaneRect, WorldBounds, WorldPoint } from "./types.ts";
 
 /**
  * World → map plane. The plane is screen-oriented (x right, y down) in the map's own units,
@@ -59,18 +59,18 @@ const within = (bounds: WorldBounds, { x, z }: WorldPoint) => {
 };
 
 /**
- * The floor (SVG layer id) a world position is on, or null for the base floor.
+ * The floor a world position is on, or null for the base floor.
  * Later floors win when several match, as tarkov.dev lists them bottom to top.
  */
-export function floorAt(map: MapCalibration, point: WorldPoint): string | null {
+export function floorAt(map: MapCalibration, point: WorldPoint): MapFloor | null {
   if (point.y === undefined) return null;
   const height = point.y;
-  let match: string | null = null;
+  let match: MapFloor | null = null;
   for (const floor of map.layers) {
     const hit = floor.extents?.some((extent) =>
       height >= extent.height[0] && height < extent.height[1]
       && (!extent.bounds || extent.bounds.some((bounds) => within(bounds, point))));
-    if (hit) match = floor.svgLayer;
+    if (hit) match = floor;
   }
   return match;
 }

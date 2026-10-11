@@ -4,4 +4,8 @@ export type ImportedRaid = {
 /**
  * Same scheme as live monitoring, so imported and live raids coincide.
  */
-id: string, session: string, map: string | null, game_mode: string | null, raw_game_mode: string | null, started_at: string, ended_at: string | null, };
+id: string, session: string, 
+/**
+ * Raw game map identifier, as for `RaidState::map`.
+ */
+map: string | null, game_mode: string | null, raw_game_mode: string | null, started_at: string, ended_at: string | null, };

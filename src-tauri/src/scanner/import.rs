@@ -66,6 +66,7 @@ pub struct ImportedRaid {
     /// Same scheme as live monitoring, so imported and live raids coincide.
     pub id: String,
     pub session: String,
+    /// Raw game map identifier, as for `RaidState::map`.
     pub map: Option<String>,
     pub game_mode: Option<String>,
     pub raw_game_mode: Option<String>,
@@ -102,7 +103,7 @@ pub fn raids_from_events(session: &str, mut events: Vec<(String, LogEvent)>) -> 
             LogEvent::Mode(mode) => game_mode = Some(mode),
             LogEvent::Scene(scene) => {
                 raids.extend(current.take());
-                map = Some(parsers::scene_map_name(scene));
+                map = Some(scene);
                 raw_game_mode = None;
                 loading = true;
             }
@@ -341,7 +342,7 @@ mod tests {
         let events = LOCAL_ENDS.lines().filter_map(parsers::log_record).collect();
         let raids = raids_from_events("log_s", events);
         assert_eq!(raids.len(), 2);
-        assert_eq!(raids[0].map.as_deref(), Some("Customs"));
+        assert_eq!(raids[0].map.as_deref(), Some("customs_preset"));
         assert_eq!(raids[0].game_mode.as_deref(), Some("Pve"));
         assert_eq!(raids[0].id, "local:log_s:2026-10-11 11:05:50.338");
         assert!(raids[0].ended_at.as_deref().is_some_and(|end| end.starts_with("2026-10-11 11:12")));

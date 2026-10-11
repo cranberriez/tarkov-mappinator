@@ -5,6 +5,7 @@ import { age, clock, lifecycleLabel, timestamp } from "../lib/format";
 import { useNow } from "../lib/useNow";
 import type { Page } from "../components/Sidebar";
 import { ModeChip } from "../components/ModeChip";
+import { mapName } from "../maps";
 
 export function OverviewPage({ scanner, onNavigate }: { scanner: Scanner; onNavigate: (page: Page) => void }) {
   const { snapshot, positions, running, connected, desktop } = scanner;
@@ -77,7 +78,7 @@ export function OverviewPage({ scanner, onNavigate }: { scanner: Scanner; onNavi
           {known && (raid.recovered ? " · from history" : running ? " · live" : "")}
           {duration && <span className="duration"> · {duration}</span>}
         </span>
-        <h1>{raid?.map ?? "No map"}</h1>
+        <h1>{mapName(raid?.map) ?? "No map"}</h1>
         {raid?.detail && <p className="faint raid-note">{raid.detail}</p>}
       </header>
 

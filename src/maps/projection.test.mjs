@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { artRect, floorAt, metricProjection, projectionFor } from "./projection.ts";
-import { maps, resolveMap } from "./catalog.ts";
+import { games, mapName, maps, resolveGame, resolveMap } from "./catalog.ts";
+import { tileCount, tileRange, tilesIn, tileZoom } from "./tiles.ts";
 
 const close = (actual, expected, epsilon = 1e-9) => assert.ok(Math.abs(actual - expected) < epsilon, `${actual} ≉ ${expected}`);
 
@@ -55,18 +56,54 @@ test("floors match by height and optional area", () => {
   const customs = maps.customs;
   const dorms = { x: 200, z: 150 };
   assert.equal(floorAt(customs, { ...dorms, y: 1 }), null);
-  assert.equal(floorAt(customs, { ...dorms, y: 4 }), "Second_Floor");
+  assert.equal(floorAt(customs, { ...dorms, y: 4 })?.svgLayer, "Second_Floor");
   assert.equal(floorAt(customs, { x: -340, z: 200, y: 4 }), null, "outside every 2nd-floor area");
   assert.equal(floorAt(customs, dorms), null, "no height, base floor");
 });
 
-test("map names resolve from keys, game ids, scenes and display names", () => {
-  for (const name of ["customs", "bigmap", "customs_preset", "maps/customs_preset.bundle", "Customs"]) {
-    assert.equal(resolveMap(name)?.key, "customs", name);
-  }
-  assert.equal(resolveMap("Interchange")?.key, "interchange");
-  assert.equal(resolveMap("shopping_mall")?.key, "interchange");
+// Identifiers observed in real game logs: `Location:` ids and scene bundles.
+const observed = {
+  bigmap: "customs", customs_preset: "customs", factory4_day: "factory", factory_day_preset: "factory",
+  factory4_night: "night-factory", factory_night_preset: "night-factory", TarkovStreets: "streets-of-tarkov",
+  city_preset: "streets-of-tarkov", Sandbox: "ground-zero", sandbox_preset: "ground-zero", Sandbox_high: "ground-zero-21",
+  sandbox_high_preset: "ground-zero-21", Lighthouse: "lighthouse", lighthouse_preset: "lighthouse", Shoreline: "shoreline",
+  shoreline_preset: "shoreline", Woods: "woods", woods_preset: "woods", Interchange: "interchange", shopping_mall: "interchange",
+  Icebreaker: "icebreaker", icebreaker: "icebreaker",
+};
+
+test("every identifier seen in game logs resolves to its game map", () => {
+  for (const [id, key] of Object.entries(observed)) assert.equal(resolveGame(id)?.key, key, id);
+  assert.equal(resolveGame("maps/customs_preset.bundle")?.key, "customs");
+  assert.equal(resolveGame("Customs")?.key, "customs", "legacy display names in stored history");
+  assert.equal(mapName("city_preset"), "Streets of Tarkov");
+  assert.equal(mapName("something_new"), "something_new");
+  assert.equal(resolveGame(null), null);
+});
+
+test("game maps share art where tarkov.dev does", () => {
   assert.equal(resolveMap("factory4_night")?.key, "factory");
-  assert.equal(resolveMap("laboratory"), null, "no SVG calibration");
-  assert.equal(resolveMap(null), null);
+  assert.equal(resolveMap("Sandbox_high")?.key, "ground-zero");
+  assert.equal(resolveMap("laboratory_dark")?.key, "the-lab");
+  assert.equal(resolveMap("laboratory")?.svg, undefined, "Labs is tiles only");
+  assert.ok(resolveMap("laboratory")?.tilePath);
+  assert.equal(resolveMap("Sandbox_start"), null);
+  for (const game of games) if (game.art) assert.ok(maps[game.art], game.key);
+});
+
+test("tiles cover the map bounds and follow the view zoom", () => {
+  const customs = maps.customs;
+  assert.equal(tilesIn(customs, customs.tilePath, 0)[0].path, "customs_0.16/main/0/0/0.png");
+  // A map ending exactly on a tile edge does not pull in the next tile.
+  const exact = { transform: [1, 0, 1, 0], coordinateRotation: 0, bounds: [[0, 0], [256, -512]], tileSize: 256, layers: [] };
+  assert.deepEqual(tilesIn(exact, "t/{z}/{x}/{y}", 0).map((tile) => tile.path), ["t/0/0/0", "t/0/0/1"]);
+  assert.equal(tileZoom(customs, 1), 0);
+  assert.equal(tileZoom(customs, 8), 3);
+  assert.equal(tileZoom(customs, 1000), customs.maxZoom);
+  assert.equal(tileZoom(customs, 0.01), 0);
+  assert.equal(tileRange(customs, 3, { x: -1000, y: -1000, width: 10, height: 10 }), null, "outside the map");
+  const part = tilesIn(customs, customs.tilePath, 4, { x: 100, y: 80, width: 20, height: 10 });
+  assert.ok(part.length > 0 && part.length < 10);
+  assert.ok(part.every((tile) => tile.rect.width === 16));
+  assert.ok(tileCount(customs) > 1000);
+  assert.equal(tileCount(maps.terminal), 0, "SVG only");
 });

@@ -4,10 +4,130 @@
   "calibration": "the-hideout/tarkov-dev@97ff6e7a43d03c10f3f7a3165c8dbcdf2193d6b9",
   "aliases": "https://json.tarkov.dev/pve/maps"
  },
+ "games": [
+  {
+   "key": "customs",
+   "name": "Customs",
+   "nameId": "bigmap",
+   "scene": "customs_preset",
+   "art": "customs"
+  },
+  {
+   "key": "factory",
+   "name": "Factory",
+   "nameId": "factory4_day",
+   "scene": "factory_day_preset",
+   "art": "factory"
+  },
+  {
+   "key": "ground-zero",
+   "name": "Ground Zero",
+   "nameId": "Sandbox",
+   "scene": "sandbox_preset",
+   "art": "ground-zero"
+  },
+  {
+   "key": "ground-zero-21",
+   "name": "Ground Zero 21+",
+   "nameId": "Sandbox_high",
+   "scene": "sandbox_high_preset",
+   "art": "ground-zero"
+  },
+  {
+   "key": "ground-zero-tutorial",
+   "name": "Ground Zero Tutorial",
+   "nameId": "Sandbox_start",
+   "scene": "sandbox_start_preset",
+   "art": null
+  },
+  {
+   "key": "icebreaker",
+   "name": "Icebreaker",
+   "nameId": "Icebreaker",
+   "scene": "icebreaker",
+   "art": "icebreaker"
+  },
+  {
+   "key": "interchange",
+   "name": "Interchange",
+   "nameId": "Interchange",
+   "scene": "shopping_mall",
+   "art": "interchange"
+  },
+  {
+   "key": "lighthouse",
+   "name": "Lighthouse",
+   "nameId": "Lighthouse",
+   "scene": "lighthouse_preset",
+   "art": "lighthouse"
+  },
+  {
+   "key": "night-factory",
+   "name": "Night Factory",
+   "nameId": "factory4_night",
+   "scene": "factory_night_preset",
+   "art": "factory"
+  },
+  {
+   "key": "reserve",
+   "name": "Reserve",
+   "nameId": "RezervBase",
+   "scene": "rezerv_base_preset",
+   "art": "reserve"
+  },
+  {
+   "key": "shoreline",
+   "name": "Shoreline",
+   "nameId": "Shoreline",
+   "scene": "shoreline_preset",
+   "art": "shoreline"
+  },
+  {
+   "key": "streets-of-tarkov",
+   "name": "Streets of Tarkov",
+   "nameId": "TarkovStreets",
+   "scene": "city_preset",
+   "art": "streets-of-tarkov"
+  },
+  {
+   "key": "terminal",
+   "name": "Terminal",
+   "nameId": "Terminal",
+   "scene": "terminal_preset",
+   "art": "terminal"
+  },
+  {
+   "key": "the-lab",
+   "name": "The Lab",
+   "nameId": "laboratory",
+   "scene": "laboratory_preset",
+   "art": "the-lab"
+  },
+  {
+   "key": "the-lab-dark",
+   "name": "The Lab (Dark)",
+   "nameId": "laboratory_dark",
+   "scene": "laboratory_dark_preset",
+   "art": "the-lab"
+  },
+  {
+   "key": "the-labyrinth",
+   "name": "The Labyrinth",
+   "nameId": "Labyrinth",
+   "scene": "labyrinth_preset",
+   "art": "the-labyrinth"
+  },
+  {
+   "key": "woods",
+   "name": "Woods",
+   "nameId": "Woods",
+   "scene": "woods_preset",
+   "art": "woods"
+  }
+ ],
  "maps": {
   "streets-of-tarkov": {
    "key": "streets-of-tarkov",
-   "svg": "StreetsOfTarkov.svg",
    "transform": [
     0.38,
     0,
@@ -25,11 +145,12 @@
      532
     ]
    ],
-   "svgLayer": "Ground_Level",
    "heightRange": [
     -6,
     10
    ],
+   "svg": "StreetsOfTarkov.svg",
+   "svgLayer": "Ground_Level",
    "layers": [
     {
      "name": "2nd Floor",
@@ -475,17 +596,10 @@
      "text": "Bilbo Coffee",
      "size": 60
     }
-   ],
-   "aliases": [
-    "city_preset",
-    "streets of tarkov",
-    "streets-of-tarkov",
-    "tarkovstreets"
    ]
   },
   "ground-zero": {
    "key": "ground-zero",
-   "svg": "GroundZero.svg",
    "transform": [
     0.524,
     167.3,
@@ -503,15 +617,20 @@
      364
     ]
    ],
-   "svgLayer": "Ground_Level",
    "heightRange": [
     -1000,
     28
    ],
+   "svg": "GroundZero.svg",
+   "svgLayer": "Ground_Level",
+   "tilePath": "groundzero/main_summer/{z}/{x}/{y}.png",
+   "tileSize": 256,
+   "maxZoom": 6,
    "layers": [
     {
      "name": "2nd Floor",
      "svgLayer": "Second_Floor",
+     "tilePath": "groundzero/2nd/{z}/{x}/{y}.png",
      "show": false,
      "extents": [
       {
@@ -544,6 +663,7 @@
     {
      "name": "3rd Floor",
      "svgLayer": "Third_Floor",
+     "tilePath": "groundzero/3rd/{z}/{x}/{y}.png",
      "show": false,
      "extents": [
       {
@@ -557,6 +677,7 @@
     {
      "name": "Garage",
      "svgLayer": "Underground_Level",
+     "tilePath": "groundzero/garage/{z}/{x}/{y}.png",
      "show": false,
      "extents": [
       {
@@ -696,21 +817,10 @@
      "bottom": 28,
      "size": 60
     }
-   ],
-   "aliases": [
-    "ground zero",
-    "ground zero 21+",
-    "ground-zero",
-    "ground-zero-21",
-    "sandbox",
-    "sandbox_high",
-    "sandbox_high_preset",
-    "sandbox_preset"
    ]
   },
   "customs": {
    "key": "customs",
-   "svg": "Customs.svg",
    "transform": [
     0.239,
     168.65,
@@ -728,15 +838,20 @@
      237
     ]
    ],
-   "svgLayer": "Ground_Level",
    "heightRange": [
     -1000,
     1000
    ],
+   "svg": "Customs.svg",
+   "svgLayer": "Ground_Level",
+   "tilePath": "customs_0.16/main/{z}/{x}/{y}.png",
+   "tileSize": 256,
+   "maxZoom": 6,
    "layers": [
     {
      "name": "2nd Floor",
      "svgLayer": "Second_Floor",
+     "tilePath": "customs_0.16/2nd/{z}/{x}/{y}.png",
      "show": false,
      "extents": [
       {
@@ -979,6 +1094,7 @@
     {
      "name": "3rd Floor",
      "svgLayer": "Third_Floor",
+     "tilePath": "customs_0.16/3rd/{z}/{x}/{y}.png",
      "show": false,
      "extents": [
       {
@@ -1060,8 +1176,35 @@
      ]
     },
     {
+     "name": "4th Floor",
+     "tilePath": "customs_0.16/4th/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        11.2,
+        54.7
+       ],
+       "bounds": [
+        [
+         [
+          279,
+          -79
+         ],
+         [
+          246,
+          -1.4
+         ],
+         "oilrig & panda"
+        ]
+       ]
+      }
+     ]
+    },
+    {
      "name": "Underground",
      "svgLayer": "Underground_Level",
+     "tilePath": "customs_0.16/underground/{z}/{x}/{y}.png",
      "show": false,
      "extents": [
       {
@@ -1323,16 +1466,10 @@
      "text": "Warehouse 17",
      "size": 90
     }
-   ],
-   "aliases": [
-    "bigmap",
-    "customs",
-    "customs_preset"
    ]
   },
   "factory": {
    "key": "factory",
-   "svg": "Factory.svg",
    "transform": [
     1.629,
     119.9,
@@ -1350,15 +1487,20 @@
      67.4
     ]
    ],
-   "svgLayer": "Ground_Floor",
    "heightRange": [
     -1,
     3
    ],
+   "svg": "Factory.svg",
+   "svgLayer": "Ground_Floor",
+   "tilePath": "factory/main/{z}/{x}/{y}.png",
+   "tileSize": 256,
+   "maxZoom": 6,
    "layers": [
     {
      "name": "2nd Floor",
      "svgLayer": "Second_Floor",
+     "tilePath": "factory/2nd/{z}/{x}/{y}.png",
      "show": false,
      "extents": [
       {
@@ -1372,6 +1514,7 @@
     {
      "name": "3rd Floor",
      "svgLayer": "Third_Floor",
+     "tilePath": "factory/3rd/{z}/{x}/{y}.png",
      "show": false,
      "extents": [
       {
@@ -1385,6 +1528,7 @@
     {
      "name": "Tunnels",
      "svgLayer": "Basement",
+     "tilePath": "factory/tunnels/{z}/{x}/{y}.png",
      "show": false,
      "extents": [
       {
@@ -1664,20 +1808,248 @@
      "bottom": 6,
      "top": 10000
     }
-   ],
-   "aliases": [
-    "factory",
-    "factory4_day",
-    "factory4_night",
-    "factory_day_preset",
-    "factory_night_preset",
-    "night factory",
-    "night-factory"
    ]
+  },
+  "icebreaker": {
+   "key": "icebreaker",
+   "transform": [
+    2,
+    125,
+    3.5,
+    91
+   ],
+   "coordinateRotation": 180,
+   "bounds": [
+    [
+     77,
+     -64.5
+    ],
+    [
+     -65.5,
+     67.4
+    ]
+   ],
+   "heightRange": [
+    18.92,
+    19.56
+   ],
+   "tilePath": "icebreaker/06_infirmary/{z}/{x}/{y}.png",
+   "tileSize": 256,
+   "maxZoom": 5,
+   "layers": [
+    {
+     "name": "Infirmary",
+     "tilePath": "icebreaker/06_infirmary/{z}/{x}/{y}.png",
+     "show": true,
+     "extents": [
+      {
+       "height": [
+        18.92,
+        19.56
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Helipad",
+     "tilePath": "icebreaker/07_helipad/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        19.57,
+        22.1
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Gym/Canteen",
+     "tilePath": "icebreaker/08_gym-canteen/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        22.2,
+        25.2
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Accommodation (lower)",
+     "tilePath": "icebreaker/09_accommodation_lower/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        25.3,
+        28.2
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Accommodation (mid)",
+     "tilePath": "icebreaker/10_accommodation_mid/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        28.3,
+        31.3
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Accommodation (upper)",
+     "tilePath": "icebreaker/11_accommodation_upper/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        31.4,
+        34.4
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Officers' Deck",
+     "tilePath": "icebreaker/12_officers_deck/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        34.5,
+        37.5
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Stairs (blocked)",
+     "tilePath": "icebreaker/13_stairs_blocked/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        37.6,
+        40.6
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Bridge",
+     "tilePath": "icebreaker/14_bridge/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        40.7,
+        43.7
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Bridge Roof",
+     "tilePath": "icebreaker/15_bridge_roof/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        43.8,
+        10000
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Control Room",
+     "tilePath": "icebreaker/00_control_room/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        -10000,
+        3.5
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Engine Room",
+     "tilePath": "icebreaker/01_engine_room/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        3.6,
+        5.6
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Engine Room (upper)",
+     "tilePath": "icebreaker/02_engine_room_upper/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        5.7,
+        8.7
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Fuel Pumps (lower)",
+     "tilePath": "icebreaker/03_fuel_pumps_lower/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        8.8,
+        11.8
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Fuel Pumps",
+     "tilePath": "icebreaker/04_fuel_pumps/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        11.9,
+        14.9
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Storage/Security",
+     "tilePath": "icebreaker/05_storage_ecurity/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        15,
+        18.93
+       ]
+      }
+     ]
+    }
+   ],
+   "labels": []
   },
   "interchange": {
    "key": "interchange",
-   "svg": "Interchange.svg",
    "transform": [
     0.265,
     150.6,
@@ -1695,7 +2067,11 @@
      426
     ]
    ],
+   "svg": "Interchange.svg",
    "svgLayer": "Ground_Level",
+   "tilePath": "interchange/main/{z}/{x}/{y}.png",
+   "tileSize": 256,
+   "maxZoom": 6,
    "layers": [
     {
      "name": "2nd Floor",
@@ -2520,15 +2896,414 @@
      "top": 999,
      "size": 65
     }
-   ],
-   "aliases": [
-    "interchange",
-    "shopping_mall"
    ]
+  },
+  "the-lab": {
+   "key": "the-lab",
+   "transform": [
+    0.575,
+    281.2,
+    0.575,
+    193.7
+   ],
+   "coordinateRotation": 270,
+   "bounds": [
+    [
+     -80,
+     -477
+    ],
+    [
+     -287,
+     -193
+    ]
+   ],
+   "heightRange": [
+    -0.9,
+    3
+   ],
+   "tilePath": "labs_v4/1st/{z}/{x}/{y}.png",
+   "tileSize": 175,
+   "maxZoom": 6,
+   "layers": [
+    {
+     "name": "Second Level",
+     "tilePath": "labs_v4/2nd/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        3,
+        10000
+       ],
+       "bounds": [
+        [
+         [
+          -101,
+          -422
+         ],
+         [
+          -271,
+          -270
+         ]
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Technical",
+     "tilePath": "labs_v4/technical/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        -10000,
+        -0.9
+       ]
+      }
+     ]
+    }
+   ],
+   "labels": [
+    {
+     "position": [
+      -230,
+      -400
+     ],
+     "text": "Parking",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -246,
+      -379
+     ],
+     "text": "Vestibules #1",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -216,
+      -379
+     ],
+     "text": "Vestibules #2",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -172,
+      -342
+     ],
+     "text": "Main Working Area",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -148,
+      -398
+     ],
+     "text": "Negotiation Room",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -130,
+      -398
+     ],
+     "text": "Infirmary Lvl 1",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -130,
+      -356
+     ],
+     "text": "Test Room",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -125,
+      -308
+     ],
+     "text": "Server Room",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -116,
+      -266
+     ],
+     "text": "Warehouse Tunnels",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -163,
+      -269
+     ],
+     "text": "Warehouse",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -170,
+      -248
+     ],
+     "text": "Warehouse Gate",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -207,
+      -305
+     ],
+     "text": "Lecture Hall",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -221,
+      -343
+     ],
+     "text": "Recreation Area",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -236,
+      -302
+     ],
+     "text": "Gym",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -241,
+      -280
+     ],
+     "text": "Men's Locker Room",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -232,
+      -280
+     ],
+     "text": "Women's Locker Room",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -259,
+      -366
+     ],
+     "text": "Boiler Room",
+     "top": 2,
+     "bottom": -1000,
+     "size": 90
+    },
+    {
+     "position": [
+      -260,
+      -319
+     ],
+     "text": "Security Barracks",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -260,
+      -342
+     ],
+     "text": "Reception",
+     "top": 2,
+     "bottom": -0.8,
+     "size": 90
+    },
+    {
+     "position": [
+      -260,
+      -364
+     ],
+     "text": "Administrative Office",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    },
+    {
+     "position": [
+      -254,
+      -320
+     ],
+     "text": "Security Office",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    },
+    {
+     "position": [
+      -244,
+      -378
+     ],
+     "text": "Security #1",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    },
+    {
+     "position": [
+      -215,
+      -379
+     ],
+     "text": "Security #2",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    },
+    {
+     "position": [
+      -229,
+      -343
+     ],
+     "text": "Conference Room",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    },
+    {
+     "position": [
+      -219,
+      -302
+     ],
+     "text": "Cafeteria",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    },
+    {
+     "position": [
+      -189,
+      -401
+     ],
+     "text": "Offices #1",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    },
+    {
+     "position": [
+      -149,
+      -401
+     ],
+     "text": "Offices #2",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    },
+    {
+     "position": [
+      -130,
+      -401
+     ],
+     "text": "Infirmary Lvl 2",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    },
+    {
+     "position": [
+      -130,
+      -361
+     ],
+     "text": "Sterile Laboratory",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    },
+    {
+     "position": [
+      -169,
+      -288
+     ],
+     "text": "Control Room",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    },
+    {
+     "position": [
+      -250,
+      -281
+     ],
+     "text": "Corridor To Building #2",
+     "top": 1000,
+     "bottom": 3,
+     "size": 90
+    }
+   ]
+  },
+  "the-labyrinth": {
+   "key": "the-labyrinth",
+   "transform": [
+    2.115,
+    85.5,
+    2.115,
+    128
+   ],
+   "coordinateRotation": 270,
+   "bounds": [
+    [
+     -52,
+     -37
+    ],
+    [
+     53,
+     76
+    ]
+   ],
+   "tilePath": "labyrinth/main/{z}/{x}/{y}.png",
+   "tileSize": 256,
+   "maxZoom": 6,
+   "layers": [],
+   "labels": []
   },
   "lighthouse": {
    "key": "lighthouse",
-   "svg": "Lighthouse.svg",
    "transform": [
     0.2,
     0,
@@ -2546,6 +3321,7 @@
      725
     ]
    ],
+   "svg": "Lighthouse.svg",
    "svgLayer": "Ground_Level",
    "layers": [],
    "labels": [
@@ -2703,15 +3479,10 @@
      ],
      "text": "Crash Site"
     }
-   ],
-   "aliases": [
-    "lighthouse",
-    "lighthouse_preset"
    ]
   },
   "reserve": {
    "key": "reserve",
-   "svg": "Reserve.svg",
    "transform": [
     0.395,
     122,
@@ -2739,15 +3510,483 @@
      272
     ]
    ],
-   "svgLayer": "Ground_Level",
    "heightRange": [
     -7,
     10000
    ],
+   "svg": "Reserve.svg",
+   "svgLayer": "Ground_Level",
+   "tilePath": "reserve/main/{z}/{x}/{y}.png",
+   "tileSize": 256,
+   "maxZoom": 6,
    "layers": [
+    {
+     "name": "2nd Floor",
+     "tilePath": "reserve/2nd/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        22.1,
+        25.7
+       ],
+       "bounds": [
+        [
+         [
+          1,
+          164
+         ],
+         [
+          -17,
+          199
+         ],
+         "dome"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -3.5,
+        -0.64
+       ],
+       "bounds": [
+        [
+         [
+          -77,
+          26
+         ],
+         [
+          -177,
+          106
+         ],
+         "pawns"
+        ],
+        [
+         [
+          62,
+          59
+         ],
+         [
+          51,
+          108
+         ],
+         "checkpoint fence tower"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -3.5,
+        -0.64
+       ],
+       "bounds": [
+        [
+         [
+          -104,
+          -37
+         ],
+         [
+          -177,
+          5
+         ],
+         "black bishop"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -3.9,
+        -0.6
+       ],
+       "bounds": [
+        [
+         [
+          -47,
+          -47
+         ],
+         [
+          -85,
+          -18
+         ],
+         "white bishop"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -4.3,
+        -2.2
+       ],
+       "bounds": [
+        [
+         [
+          -19.91,
+          -13
+         ],
+         [
+          -78,
+          39
+         ],
+         "white king"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -3.8,
+        -1.1
+       ],
+       "bounds": [
+        [
+         [
+          99,
+          -50
+         ],
+         [
+          -2,
+          7
+         ],
+         "knights"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -1.9,
+        11.3
+       ],
+       "bounds": [
+        [
+         [
+          191,
+          -175
+         ],
+         [
+          137,
+          -120
+         ],
+         "train depot"
+        ]
+       ]
+      },
+      {
+       "height": [
+        1,
+        8
+       ],
+       "bounds": [
+        [
+         [
+          -109,
+          -156
+         ],
+         [
+          -119,
+          -147
+         ],
+         "towers"
+        ],
+        [
+         [
+          289,
+          -92
+         ],
+         [
+          299,
+          -82
+         ],
+         "towers"
+        ],
+        [
+         [
+          3,
+          -210
+         ],
+         [
+          -7,
+          -200
+         ],
+         "towers"
+        ],
+        [
+         [
+          195,
+          -260
+         ],
+         [
+          185,
+          -250
+         ],
+         "towers"
+        ],
+        [
+         [
+          276,
+          17
+         ],
+         [
+          266,
+          27
+         ],
+         "towers"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -4.1,
+        -1.2
+       ],
+       "bounds": [
+        [
+         [
+          -128,
+          -139
+         ],
+         [
+          -146,
+          -120
+         ],
+         "scav lands"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "name": "3rd Floor",
+     "tilePath": "reserve/3rd/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        25.7,
+        29.3
+       ],
+       "bounds": [
+        [
+         [
+          1,
+          164
+         ],
+         [
+          -17,
+          199
+         ],
+         "dome"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -0.64,
+        2.23
+       ],
+       "bounds": [
+        [
+         [
+          -77,
+          26
+         ],
+         [
+          -177,
+          106
+         ],
+         "pawns"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -0.64,
+        2.23
+       ],
+       "bounds": [
+        [
+         [
+          -104,
+          -37
+         ],
+         [
+          -177,
+          5
+         ],
+         "black bishop"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -0.6,
+        10
+       ],
+       "bounds": [
+        [
+         [
+          -47,
+          -47
+         ],
+         [
+          -85,
+          -18
+         ],
+         "white bishop"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -2.2,
+        2.14
+       ],
+       "bounds": [
+        [
+         [
+          -19.91,
+          -13
+         ],
+         [
+          -78,
+          39
+         ],
+         "white king"
+        ]
+       ]
+      },
+      {
+       "height": [
+        -1.1,
+        1.6
+       ],
+       "bounds": [
+        [
+         [
+          99,
+          -50
+         ],
+         [
+          -2,
+          7
+         ],
+         "knights"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "name": "4th Floor",
+     "tilePath": "reserve/4th/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        29.3,
+        36
+       ],
+       "bounds": [
+        [
+         [
+          1,
+          164
+         ],
+         [
+          -17,
+          199
+         ],
+         "dome"
+        ]
+       ]
+      },
+      {
+       "height": [
+        2.23,
+        5
+       ],
+       "bounds": [
+        [
+         [
+          -77,
+          26
+         ],
+         [
+          -177,
+          106
+         ],
+         "pawns"
+        ]
+       ]
+      },
+      {
+       "height": [
+        2.15,
+        6.6
+       ],
+       "bounds": [
+        [
+         [
+          -19.91,
+          -13
+         ],
+         [
+          -78,
+          39
+         ],
+         "white king"
+        ]
+       ]
+      },
+      {
+       "height": [
+        1.6,
+        4.7
+       ],
+       "bounds": [
+        [
+         [
+          99,
+          -50
+         ],
+         [
+          -2,
+          7
+         ],
+         "knights"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "name": "5th Floor",
+     "tilePath": "reserve/5th/{z}/{x}/{y}.png",
+     "show": false,
+     "extents": [
+      {
+       "height": [
+        5,
+        9.5
+       ],
+       "bounds": [
+        [
+         [
+          -77,
+          26
+         ],
+         [
+          -177,
+          106
+         ],
+         "pawns"
+        ]
+       ]
+      }
+     ]
+    },
     {
      "name": "Bunkers",
      "svgLayer": "Bunkers",
+     "tilePath": "reserve/bunkers/{z}/{x}/{y}.png",
      "show": false,
      "extents": [
       {
@@ -3118,16 +4357,10 @@
      "size": 80,
      "bottom": -6
     }
-   ],
-   "aliases": [
-    "reserve",
-    "rezerv_base_preset",
-    "rezervbase"
    ]
   },
   "shoreline": {
    "key": "shoreline",
-   "svg": "Shoreline.svg",
    "transform": [
     0.16,
     83.2,
@@ -3145,11 +4378,15 @@
      618
     ]
    ],
-   "svgLayer": "Ground_Level",
    "heightRange": [
     -1000,
     -1
    ],
+   "svg": "Shoreline.svg",
+   "svgLayer": "Ground_Level",
+   "tilePath": "shoreline/main_summer/{z}/{x}/{y}.png",
+   "tileSize": 256,
+   "maxZoom": 6,
    "layers": [
     {
      "name": "2nd Floor",
@@ -3397,15 +4634,10 @@
      "bottom": -100,
      "top": 100
     }
-   ],
-   "aliases": [
-    "shoreline",
-    "shoreline_preset"
    ]
   },
   "terminal": {
    "key": "terminal",
-   "svg": "Terminal.svg",
    "transform": [
     0.2,
     0,
@@ -3423,17 +4655,13 @@
      475
     ]
    ],
+   "svg": "Terminal.svg",
    "svgLayer": "Ground_Level",
    "layers": [],
-   "labels": [],
-   "aliases": [
-    "terminal",
-    "terminal_preset"
-   ]
+   "labels": []
   },
   "woods": {
    "key": "woods",
-   "svg": "Woods.svg",
    "transform": [
     0.1855,
     112.95,
@@ -3451,7 +4679,11 @@
      442
     ]
    ],
+   "svg": "Woods.svg",
    "svgLayer": "Ground_Level",
+   "tilePath": "woods/main_0.16/{z}/{x}/{y}.png",
+   "tileSize": 256,
+   "maxZoom": 6,
    "layers": [],
    "labels": [
     {
@@ -3576,10 +4808,6 @@
      "text": "Convoy",
      "size": 70
     }
-   ],
-   "aliases": [
-    "woods",
-    "woods_preset"
    ]
   }
  }

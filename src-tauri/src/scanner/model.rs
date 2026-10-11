@@ -34,6 +34,9 @@ pub enum MonitoringStatus {
 pub struct RaidState {
     pub id: Option<String>,
     pub lifecycle: String,
+    /// Raw game map identifier, whichever the logs gave last: the scene bundle
+    /// (`customs_preset`, while loading) or the location id (`bigmap`, once matched).
+    /// Both are tarkov.dev fields (`scenePath`, `nameId`); resolve with `resolveGame` in `src/maps`.
     pub map: Option<String>,
     pub game_mode: Option<String>,
     pub player_role: Option<String>,

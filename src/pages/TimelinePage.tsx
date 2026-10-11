@@ -6,6 +6,7 @@ import { parseTime, raidColor, raidStatus, type RaidRecord, type RaidStatus } fr
 import { longSpan, span } from "../lib/format";
 import { ModeChip } from "../components/ModeChip";
 import { useNow } from "../lib/useNow";
+import { mapName } from "../maps";
 
 const endLabel: Record<RaidStatus, string> = { active: "In raid", ended: "Raid ended", unknown: "End not observed" };
 
@@ -59,7 +60,7 @@ export function TimelinePage({ scanner }: { scanner: Scanner }) {
           </div>
           <div className="tl-node">
             <span className="tl-dot start" />
-            <strong>{raid.map ?? "Unknown map"}</strong>
+            <strong>{mapName(raid.map) ?? "Unknown map"}</strong>
             <ModeChip mode={raid.game_mode} />
             <span className="faint">{[raid.player_role, `Started ${when(raid.started_at)}`].filter(Boolean).join(" · ")}</span>
           </div>
@@ -82,7 +83,7 @@ function RaidTrack({ raid, positions }: { raid: RaidRecord; positions: PositionH
   // Zero-length round-capped strokes give pixel-sized dots regardless of zoom.
   const dot = (p: { x: number; y: number }) => `M${p.x} ${p.y}h0`;
   return <svg className="tl-map" viewBox={`${cx - width / 2} ${cy - height / 2} ${width} ${height}`}
-    preserveAspectRatio="xMidYMid meet" aria-label={`${positions.length} positions on ${raid.map ?? "unknown map"}`}>
+    preserveAspectRatio="xMidYMid meet" aria-label={`${positions.length} positions on ${mapName(raid.map) ?? "unknown map"}`}>
     <path d={line} className="tl-path" />
     {points.slice(1, -1).map((p, i) => <path key={i} d={dot(p)} className="tl-point" />)}
     <path d={dot(points[0])} className="tl-point first" />

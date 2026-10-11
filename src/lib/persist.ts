@@ -16,4 +16,4 @@ export function save(key: string, value: unknown) {
   }
 }
 
-export const keys = { positions: "history:positions:v1", raids: "history:raids:v1" } as const;
+export const keys = { positions: "history:positions:v1", raids: "history:raids:v1", mapStyle: "map:style:v1" } as const;

@@ -478,7 +478,7 @@ impl ScannerService {
                 self.snapshot.raid.id = None;
                 self.snapshot.raid.raw_game_mode = None;
                 self.snapshot.raid.raw_raid_mode = None;
-                self.snapshot.raid.map = Some(parsers::scene_map_name(scene));
+                self.snapshot.raid.map = Some(scene);
                 self.snapshot.latest_position = None;
             }
             LogEvent::Loading {
@@ -792,7 +792,7 @@ mod tests {
         let fixture = include_str!("../../../fixtures/logs/pve-customs-started.log");
         let (dir, mut service) = setup_logs(fixture);
         assert_eq!(service.snapshot.raid.lifecycle, "active");
-        assert_eq!(service.snapshot.raid.map.as_deref(), Some("Customs"));
+        assert_eq!(service.snapshot.raid.map.as_deref(), Some("customs_preset"));
         assert_eq!(service.snapshot.raid.game_mode.as_deref(), Some("Pve"));
         assert!(service.snapshot.raid.player_role.is_none());
         assert!(service.snapshot.raid.recovered);

@@ -1,6 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Scanner } from "../lib/useScanner";
 import { lifecycleLabel } from "../lib/format";
+import { mapName } from "../maps";
 import { PlayIcon, StopIcon, WindowClose, WindowMaximize, WindowMinimize } from "./Icons";
 
 const appWindow = () => getCurrentWindow();
@@ -10,7 +11,7 @@ export function TitleBar({ scanner }: { scanner: Scanner }) {
   const raid = snapshot?.raid;
   const live = running && raid?.lifecycle === "active";
   const raidText = raid && raid.lifecycle !== "unknown"
-    ? [raid.map, lifecycleLabel[raid.lifecycle] ?? raid.lifecycle].filter(Boolean).join(" · ")
+    ? [mapName(raid.map), lifecycleLabel[raid.lifecycle] ?? raid.lifecycle].filter(Boolean).join(" · ")
     : null;
 
   return <div className="titlebar" data-tauri-drag-region>

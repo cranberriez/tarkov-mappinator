@@ -24,12 +24,12 @@ const SHADOW_CSS = `
 `;
 
 /**
- * Vector artwork for one map, filling its box (place it over `artRect`).
+ * Vector artwork for a map that has an `svg`, filling its box (place it over `artRect`).
  * `floor` is an SVG layer id; null or the base layer shows the base floor alone,
  * any other floor is drawn over a dimmed base floor.
  */
 export function MapArt({ map, floor = null, className, style }: {
-  map: MapCalibration; floor?: string | null; className?: string; style?: CSSProperties;
+  map: MapCalibration & { svg: string }; floor?: string | null; className?: string; style?: CSSProperties;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<SVGSVGElement | null>(null);
