@@ -1,0 +1,12 @@
+2026-10-11 09:11:12.211|1.2.0.0.47965|Info|application|scene preset path:maps/shopping_mall.bundle rcid:Shopping_Mall.ScenesPreset.asset
+2026-10-11 09:11:32.101|1.2.0.0.47965|Info|application|LocationLoaded:14.39 real:20.74 diff:6.34
+2026-10-11 09:11:32.518|1.2.0.0.47965|Debug|application|TRACE-NetworkGameCreate profileStatus: 'Profileid: <PROFILE>, Status: Busy, RaidMode: Online, Ip: <IP>, Port: 17001, Location: Interchange, Sid: <SESSION>, GameMode: deathmatch, shortId: <SHORT>
+2026-10-11 09:13:27.995|1.2.0.0.47965|Info|application|PlayerSpawnEvent:126.62(0.44) real:136.63(0.38) diff:10.01
+2026-10-11 09:13:40.254|1.2.0.0.47965|Info|application|GameStarted:137.58(137.58) real:148.89(148.89) diff:11.3
+2026-10-11 09:29:55.874|1.2.0.0.47965|Warn|output|Calling Animator.GotoState on Synchronize layer
+EFT.Player:DestroyHandsController()
+EFT.<OnGameSessionEnd>d__1405:MoveNext()
+EFT.Player:OnGameSessionEnd(ExitStatus, Single, String, String)
+EFT.<OnGameSessionEnd>d__194:MoveNext()
+EFT.ClientPlayer:OnGameSessionEnd(ExitStatus, Single, String, String)
+2026-10-11 09:29:55.917|1.2.0.0.47965|Info|output|Connection.Disconnect() TransportId:0 address:<IP> Reason:Stop game

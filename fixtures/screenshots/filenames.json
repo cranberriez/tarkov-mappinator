@@ -1,0 +1,23 @@
+{
+  "schema": "tarkov-screenshot-filename-fixture/v1",
+  "provenanceNote": "The user reported taking a screenshot while in a PVE scav raid on Customs. The newest file below is matched by timestamp; image pixels were not inspected.",
+  "timestampZone": "America/Los_Angeles (Windows local time)",
+  "sourceDirectory": "<Windows Documents>\\Escape from Tarkov\\Screenshots",
+  "sanitization": "Replaced the user-specific source directory with a known-folder placeholder. Game filenames and capture metadata are unchanged.",
+  "captures": [
+    {
+      "basename": "2026-10-11[11-06]_176.89, 4.38, 164.86_-0.00534, 0.99448, -0.06416, -0.08281_9.79 (0).png",
+      "creationTimeLocal": "2026-10-11 11:06:50",
+      "lastWriteTimeLocal": "2026-10-11 11:06:50",
+      "sizeBytes": 2222697,
+      "relation": "Newest file observed; temporally matched to the user-reported Customs PVE scav screenshot."
+    },
+    {
+      "basename": "2026-10-11[09-50]_74.02, 28.58, 172.16_-0.08290, 0.18895, -0.01575, -0.97835_12.91 (0).png",
+      "creationTimeLocal": "2026-10-11 09:50:40",
+      "lastWriteTimeLocal": "2026-10-11 09:50:40",
+      "sizeBytes": 3510190,
+      "relation": "Earlier capture; distinct from the newly reported Customs screenshot."
+    }
+  ]
+}

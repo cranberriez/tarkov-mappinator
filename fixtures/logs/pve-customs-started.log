@@ -1,0 +1,11 @@
+2026-10-11 11:03:17.774|1.2.0.0.47965|Info|application|Session mode: PvpSeason
+2026-10-11 11:04:05.718|1.2.0.0.47965|Info|application|Session mode: Pve
+2026-10-11 11:04:34.704|1.2.0.0.47965|Info|application|scene preset path:maps/customs_preset.bundle rcid:bigmap.scenespreset.asset
+2026-10-11 11:05:02.234|1.2.0.0.47965|Info|application|LocationLoaded:23.11 real:28.08 diff:4.96
+2026-10-11 11:05:05.150|1.2.0.0.47965|Info|application|GameCreated:26.09(2.29) real:31(2.29) diff:4.91
+2026-10-11 11:05:11.498|1.2.0.0.47965|Info|application|PlayerSpawnEvent:29.05(29.05) real:37.35(37.34) diff:8.29
+2026-10-11 11:05:50.338|1.2.0.0.47965|Info|application|GameRunned:60.69(12.53) real:76.19(18.7) diff:15.5
+2026-10-11 11:05:50.338|1.2.0.0.47965|Info|application|GameSpawn:60.69(0) real:76.19(0) diff:15.5
+2026-10-11 11:05:50.338|1.2.0.0.47965|Info|application|GameSpawned:60.69(31.64) real:76.19(38.84) diff:15.5
+2026-10-11 11:05:50.338|1.2.0.0.47965|Info|application|GameStarting:60.69(0) real:76.19(0) diff:15.5
+2026-10-11 11:05:50.338|1.2.0.0.47965|Info|application|GameStarted:60.69(0) real:76.19(0) diff:15.5
