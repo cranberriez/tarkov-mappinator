@@ -1,0 +1,84 @@
+2026-10-11 11:30:17.900|1.2.0.0.47965|Info|push-notifications|Got notification | ChatMessageReceived
+{
+  "type": "new_message",
+  "eventId": "<REDACTED_ID>",
+  "dialogId": "<REDACTED_ID>",
+  "message": {
+    "_id": "<REDACTED_ID>",
+    "uid": "<REDACTED_ID>",
+    "type": 10,
+    "dt": 1791743417,
+    "text": "quest started",
+    "templateId": "5fd9fad9c1ce6b1a3b486d00 description",
+    "items": {
+      "stash": "<REDACTED_ID>",
+      "data": []
+    },
+    "maxStorageTime": 0,
+    "profileChangeEvents": [],
+    "hasRewards": 0
+  }
+}
+2026-10-11 11:30:35.390|1.2.0.0.47965|Info|push-notifications|Got notification | ChatMessageReceived
+{
+  "type": "new_message",
+  "eventId": "<REDACTED_ID>",
+  "dialogId": "<REDACTED_ID>",
+  "message": {
+    "_id": "<REDACTED_ID>",
+    "uid": "<REDACTED_ID>",
+    "type": 10,
+    "dt": 1791743433,
+    "text": "quest started",
+    "templateId": "596a0e1686f7741ddf17dbee description",
+    "items": {
+      "stash": "<REDACTED_ID>",
+      "data": []
+    },
+    "maxStorageTime": 0,
+    "profileChangeEvents": [],
+    "hasRewards": 0
+  }
+}
+2026-10-11 11:30:40.465|1.2.0.0.47965|Info|push-notifications|Got notification | ChatMessageReceived
+{
+  "type": "new_message",
+  "eventId": "<REDACTED_ID>",
+  "dialogId": "<REDACTED_ID>",
+  "message": {
+    "_id": "<REDACTED_ID>",
+    "uid": "<REDACTED_ID>",
+    "type": 12,
+    "dt": 1791743440,
+    "text": "quest started",
+    "templateId": "5967733e86f774602332fc84 successMessageText",
+    "items": {
+      "stash": "<REDACTED_ID>",
+      "data": []
+    },
+    "maxStorageTime": 0,
+    "profileChangeEvents": [],
+    "hasRewards": 0
+  }
+}
+2026-10-11 11:31:03.561|1.2.0.0.47965|Info|push-notifications|Got notification | ChatMessageReceived
+{
+  "type": "new_message",
+  "eventId": "<REDACTED_ID>",
+  "dialogId": "<REDACTED_ID>",
+  "message": {
+    "_id": "<REDACTED_ID>",
+    "uid": "<REDACTED_ID>",
+    "type": 10,
+    "dt": 1791743463,
+    "text": "quest started",
+    "templateId": "675c03d1f7da9792a405549a description",
+    "items": {
+      "stash": "<REDACTED_ID>",
+      "data": []
+    },
+    "maxStorageTime": 0,
+    "profileChangeEvents": [],
+    "hasRewards": 0
+  }
+}

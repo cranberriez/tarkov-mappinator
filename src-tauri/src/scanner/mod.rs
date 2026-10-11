@@ -1,13 +1,14 @@
+mod activity;
 mod model;
 mod parsers;
 mod sources;
 
 use chrono::{Local, NaiveDateTime};
 pub use model::{FolderConfig, ScannerSnapshot};
-use model::{MonitoringStatus, PositionObservation};
+use model::{LogCoverage, MonitoringStatus, PositionObservation};
 use parsers::LogEvent;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     fs,
     io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
@@ -20,6 +21,7 @@ struct Tail {
     created: Option<SystemTime>,
     modified: Option<SystemTime>,
     prefix: Vec<u8>,
+    notification: Option<(String, String)>,
 }
 pub struct ScannerService {
     snapshot: ScannerSnapshot,
@@ -29,6 +31,8 @@ pub struct ScannerService {
     session: Option<PathBuf>,
     last_event: String,
     pending_screenshots: HashMap<PathBuf, (u64, SystemTime)>,
+    activity_seen: HashSet<u64>,
+    activity_order: VecDeque<u64>,
 }
 impl ScannerService {
     pub fn new() -> Self {
@@ -48,6 +52,8 @@ impl ScannerService {
             session: None,
             last_event: String::new(),
             pending_screenshots: HashMap::new(),
+            activity_seen: HashSet::new(),
+            activity_order: VecDeque::new(),
         }
     }
     pub fn snapshot(&self) -> ScannerSnapshot {
@@ -58,6 +64,11 @@ impl ScannerService {
             self.stop();
             self.snapshot.raid = ScannerSnapshot::initial(String::new()).raid;
             self.snapshot.latest_position = None;
+            self.snapshot.activity.clear();
+            self.snapshot.log_coverage.clear();
+            self.snapshot.activity_dropped = 0;
+            self.activity_seen.clear();
+            self.activity_order.clear();
         }
         self.snapshot.screenshots = sources::probe_directory(&config.screenshots);
         self.snapshot.logs = sources::probe_directory(&config.logs);
@@ -83,6 +94,11 @@ impl ScannerService {
             .into_iter()
             .collect();
         self.tails.clear();
+        self.snapshot.activity.clear();
+        self.snapshot.log_coverage.clear();
+        self.snapshot.activity_dropped = 0;
+        self.activity_seen.clear();
+        self.activity_order.clear();
         self.session = None;
         self.pending_screenshots.clear();
         self.snapshot.monitoring = MonitoringStatus::Running;
@@ -237,15 +253,19 @@ impl ScannerService {
         let mut paths = files(&session);
         paths.sort();
         let mut records = Vec::new();
-        for path in paths {
+        // A fixed upper bound on file count and per-file read size bounds each poll.
+        for path in paths
+            .into_iter()
+            .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("log")))
+            .take(32)
+        {
             let name = path
                 .file_name()
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_lowercase();
-            if !name.contains("application") && !name.contains("output") {
-                continue;
-            }
+            let source = activity::source_class(&name);
+            let lifecycle_source = matches!(source, "application" | "output" | "backend");
             let Ok(mut file) = fs::File::open(&path) else {
                 self.diagnostic("Unable to read a session log.".into());
                 continue;
@@ -266,6 +286,7 @@ impl ScannerService {
                 created,
                 modified,
                 prefix: prefix.clone(),
+                notification: None,
             });
             if len < tail.offset
                 || created != tail.created
@@ -274,9 +295,12 @@ impl ScannerService {
             {
                 tail.offset = 0;
                 tail.pending.clear();
-                self.snapshot.latest_position = None;
-                self.snapshot.raid = ScannerSnapshot::initial(String::new()).raid;
-                self.last_event.clear();
+                tail.notification = None;
+                if lifecycle_source {
+                    self.snapshot.latest_position = None;
+                    self.snapshot.raid = ScannerSnapshot::initial(String::new()).raid;
+                    self.last_event.clear();
+                }
                 self.snapshot
                     .diagnostics
                     .push("Log truncated or replaced; prior raid context invalidated.".into());
@@ -312,6 +336,10 @@ impl ScannerService {
             };
             let complete = tail.pending[..=last].to_owned();
             tail.pending = tail.pending[last + 1..].to_owned();
+            let activity_records = activity::assemble(&complete, &mut tail.notification);
+            for record in activity_records {
+                self.observe_activity(&record, source, startup);
+            }
             for line in complete.lines() {
                 if let Some(record) = parsers::log_record(line) {
                     records.push(record);
@@ -335,6 +363,92 @@ impl ScannerService {
                     .map(|v| v < self.boundary)
                     .unwrap_or(true);
             self.reduce(timestamp, event, recovered);
+        }
+    }
+    fn observe_activity(&mut self, line: &str, source: &str, startup: bool) {
+        let Some(record) = activity::record(line) else {
+            return;
+        };
+        use std::hash::{Hash, Hasher};
+        let recovered = startup
+            || NaiveDateTime::parse_from_str(record.timestamp, "%Y-%m-%d %H:%M:%S%.f")
+                .map(|v| v < self.boundary)
+                .unwrap_or(true);
+        let mut event = activity::event(line, source, String::new(), recovered);
+        if let Some(event) = event.as_mut() {
+            if let Some(time) = event
+                .event_at
+                .as_ref()
+                .and_then(|v| chrono::DateTime::parse_from_rfc3339(v).ok())
+            {
+                event.recovered =
+                    startup || time.with_timezone(&Local).naive_local() < self.boundary;
+            }
+        }
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        // Semantic fingerprint deliberately ignores filename: a replay/rotation copy
+        // must not duplicate either feed entries or coverage counts.
+        if let Some(event) = event
+            .as_ref()
+            .filter(|e| e.evidence == "quest_notification")
+        {
+            event.kind.hash(&mut hasher);
+            event.action.hash(&mut hasher);
+            event.entity_id.hash(&mut hasher);
+            event.event_at.hash(&mut hasher);
+        } else {
+            self.session.hash(&mut hasher);
+            source.hash(&mut hasher);
+            line.hash(&mut hasher);
+        }
+        let fingerprint = hasher.finish();
+        if !self.activity_seen.insert(fingerprint) {
+            return;
+        }
+        self.activity_order.push_back(fingerprint);
+        if self.activity_order.len() > 20_000 {
+            if let Some(old) = self.activity_order.pop_front() {
+                self.activity_seen.remove(&old);
+            }
+        }
+        if let Some(event) = event.as_mut() {
+            event.id = format!("event:{fingerprint:016x}");
+        }
+        let category = activity::safe_category(record.category);
+        if let Some(counter) = self
+            .snapshot
+            .log_coverage
+            .iter_mut()
+            .find(|c| c.source == source && c.category == category && c.level == record.level)
+        {
+            counter.records = counter.records.saturating_add(1);
+            counter.unclassified = counter
+                .unclassified
+                .saturating_add(u32::from(event.is_none()));
+            if record.timestamp > counter.last_record_at.as_str() {
+                counter.last_record_at = record.timestamp.into();
+            }
+        } else {
+            self.snapshot.log_coverage.push(LogCoverage {
+                source: source.into(),
+                category: category.into(),
+                level: record.level.into(),
+                records: 1,
+                unclassified: u32::from(event.is_none()),
+                last_record_at: record.timestamp.into(),
+            });
+        }
+        if let Some(event) = event {
+            self.snapshot.activity.push(event);
+            self.snapshot.activity.sort_by(|a, b| {
+                activity::sort_time(b)
+                    .cmp(&activity::sort_time(a))
+                    .then_with(|| a.id.cmp(&b.id))
+            });
+            if self.snapshot.activity.len() > 200 {
+                self.snapshot.activity.pop();
+                self.snapshot.activity_dropped = self.snapshot.activity_dropped.saturating_add(1);
+            }
         }
     }
     fn reduce(&mut self, timestamp: String, event: LogEvent, recovered: bool) {
@@ -430,6 +544,17 @@ impl ScannerService {
                 .into();
                 self.snapshot.latest_position = None;
             }
+            LogEvent::LocalEndReported => {
+                self.snapshot.raid.recovered = recovered;
+                self.snapshot.raid.lifecycle = "ended".into();
+                self.snapshot.raid.detail = if recovered {
+                    "Recovered client report of local raid end; outcome and backend acknowledgment unknown."
+                } else {
+                    "Client reported local raid end; outcome and backend acknowledgment unknown."
+                }
+                .into();
+                self.snapshot.latest_position = None;
+            }
         }
     }
 }
@@ -445,6 +570,188 @@ fn files(path: &Path) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn real_multiline_notifications_wait_for_complete_json_and_redelivery_deduplicates() {
+        let (dir, mut service) = setup_logs(include_str!(
+            "../../../fixtures/logs/pve-customs-started.log"
+        ));
+        let push = include_str!("../../../fixtures/activity/push-notifications.log");
+        let path = dir.path().join("log_2026.10.11_8-55-46_1.2.0.0.47965/2026.10.11_8-55-46_1.2.0.0.47965 push-notifications_000.log");
+        let split = push.find("successMessageText").unwrap();
+        fs::write(&path, &push[..split]).unwrap();
+        service.poll();
+        assert_eq!(
+            service
+                .snapshot
+                .activity
+                .iter()
+                .filter(|e| e.kind == "quest")
+                .count(),
+            2
+        );
+        use std::io::Write;
+        fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap()
+            .write_all(push[split..].as_bytes())
+            .unwrap();
+        service.poll();
+        let quests: Vec<_> = service
+            .snapshot
+            .activity
+            .iter()
+            .filter(|e| e.kind == "quest")
+            .collect();
+        assert_eq!(quests.len(), 4);
+        assert!(quests.iter().all(|e| e.recovered && e.event_at.is_some()));
+        let ids: HashSet<_> = quests.iter().map(|e| e.id.clone()).collect();
+        let redelivery = push
+            .replace("11:30:17.900", "12:30:17.900")
+            .replace("11:30:40.465", "12:30:40.465")
+            .replace("11:31:03.561", "12:31:03.561");
+        fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap()
+            .write_all(redelivery.as_bytes())
+            .unwrap();
+        service.poll();
+        assert_eq!(
+            service
+                .snapshot
+                .activity
+                .iter()
+                .filter(|e| e.kind == "quest")
+                .map(|e| e.id.clone())
+                .collect::<HashSet<_>>(),
+            ids
+        );
+        assert_eq!(
+            service
+                .snapshot
+                .activity
+                .iter()
+                .filter(|e| e.kind == "quest")
+                .count(),
+            4
+        );
+    }
+    #[test]
+    fn activity_quest_requests_are_independent_partial_deduplicated_and_private() {
+        let quest = include_str!("../../../fixtures/activity/quest-actions.log");
+        let started = "2026-10-11 11:30:50.338|1.2.0.0.47965|Info|application|GameStarted:60.69(0) real:76.19(0) diff:15.5\n";
+        let (dir, mut service) = setup_logs(started);
+        let backend = dir
+            .path()
+            .join("log_2026.10.11_8-55-46_1.2.0.0.47965/backend_000.log");
+        let request = quest.lines().next().unwrap();
+        fs::write(&backend, request).unwrap();
+        service.poll();
+        assert_eq!(service.snapshot.activity.len(), 1);
+        use std::io::Write;
+        fs::OpenOptions::new()
+            .append(true)
+            .open(&backend)
+            .unwrap()
+            .write_all(b"\n")
+            .unwrap();
+        service.poll();
+        assert_eq!(service.snapshot.raid.lifecycle, "active");
+        let event = service
+            .snapshot
+            .activity
+            .iter()
+            .find(|e| e.kind == "quest")
+            .unwrap();
+        assert_eq!(event.action, "fail_requested");
+        assert_eq!(event.evidence, "requested");
+        assert!(event.entity_id.is_none());
+        assert!(event.recovered);
+        let event_id = event.id.clone();
+        fs::write(&backend, quest).unwrap();
+        service.poll();
+        assert_eq!(service.snapshot.activity.len(), 2);
+        assert_eq!(
+            service
+                .snapshot
+                .activity
+                .iter()
+                .filter(|e| e.kind == "quest")
+                .count(),
+            1
+        );
+        let sensitive = "2026-10-11 11:31:50.000|1.2.0.0.47965|Error|private-account-token|https://secret.invalid/token?session=SECRET /Users/private/profile\n";
+        fs::write(
+            dir.path()
+                .join("log_2026.10.11_8-55-46_1.2.0.0.47965/errors_000.log"),
+            sensitive,
+        )
+        .unwrap();
+        service.poll();
+        let safe =
+            serde_json::to_string(&(&service.snapshot.activity, &service.snapshot.log_coverage))
+                .unwrap();
+        for forbidden in [
+            "SECRET",
+            "secret.invalid",
+            "private-account-token",
+            "example.invalid",
+            "responseText",
+            "AcceptQuest",
+        ] {
+            assert!(!safe.contains(forbidden));
+        }
+        let config = service.snapshot.config.clone();
+        service.stop();
+        service.start(config);
+        assert_eq!(
+            service
+                .snapshot
+                .activity
+                .iter()
+                .filter(|e| e.kind == "quest")
+                .count(),
+            1
+        );
+        assert_eq!(
+            service
+                .snapshot
+                .activity
+                .iter()
+                .find(|e| e.kind == "quest")
+                .unwrap()
+                .id,
+            event_id
+        );
+    }
+    #[test]
+    fn activity_caps_feed_and_ancillary_rotation_preserves_raid() {
+        let (_dir, mut service) = setup_logs(include_str!(
+            "../../../fixtures/logs/pve-customs-started.log"
+        ));
+        let initial = service.snapshot.activity.len();
+        for i in 0..250 {
+            service.observe_activity(&format!("2026-10-11 12:00:{:02}.{:03}|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [{i}]: URL: https://example.invalid/client/quest/fail. ", i / 1000, i % 1000), "backend", false);
+        }
+        assert_eq!(service.snapshot.activity.len(), 200);
+        assert_eq!(service.snapshot.activity_dropped as usize, initial + 50);
+        assert!(service
+            .snapshot
+            .activity
+            .windows(2)
+            .all(|e| e[0].logged_at >= e[1].logged_at));
+        let auxiliary = service.session.as_ref().unwrap().join("ai_000.log");
+        fs::write(
+            &auxiliary,
+            "2026-10-11 12:01:00.000|1.2.0.0.47965|Debug|ai|private data\n",
+        )
+        .unwrap();
+        service.poll();
+        fs::write(&auxiliary, "").unwrap();
+        service.poll();
+        assert_eq!(service.snapshot.raid.lifecycle, "active");
+    }
     #[test]
     fn export_frontend_contract() {
         use ts_rs::TS;
@@ -524,6 +831,74 @@ mod tests {
         );
         assert!(service.snapshot.raid.id.is_none());
         assert_eq!(service.snapshot.raid.lifecycle, "unknown");
+    }
+    #[test]
+    fn local_end_fixture_recovers_latest_raid_and_live_partial_backend_append_ends_it() {
+        let fixture = include_str!("../../../fixtures/logs/pve-local-ends.log");
+        let (_dir, service) = setup_logs(fixture);
+        assert_eq!(service.snapshot.raid.lifecycle, "ended");
+        assert!(service.snapshot.raid.recovered);
+        assert!(service
+            .snapshot
+            .raid
+            .detail
+            .contains("acknowledgment unknown"));
+        assert_eq!(
+            service.snapshot.raid.started_at.as_deref(),
+            Some("2026-10-11 11:18:43.310")
+        );
+
+        let request_start = fixture.rfind("2026-10-11 11:25:05.320").unwrap();
+        let (before_end, end) = fixture.split_at(request_start);
+        let (dir, mut service) = setup_logs(before_end);
+        assert_eq!(service.snapshot.raid.lifecycle, "active");
+        let raid = service.snapshot.raid.clone();
+        service.boundary =
+            NaiveDateTime::parse_from_str("2026-10-11 11:18:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        service.snapshot.latest_position = Some(PositionObservation {
+            xyz: [1., 2., 3.],
+            raw_quaternion: [0., 0., 0., 1.],
+            heading_degrees: None,
+            observed_at: "test observation".into(),
+            captured_at: None,
+            raid_id: raid.id.clone(),
+            filename: "test.png".into(),
+            heading_convention: "test".into(),
+        });
+        let backend = dir
+            .path()
+            .join("log_2026.10.11_8-55-46_1.2.0.0.47965/backend_000.log");
+        let split = end.find('\n').unwrap();
+        fs::write(&backend, &end[..split]).unwrap();
+        service.poll();
+        assert_eq!(service.snapshot.raid.lifecycle, "active");
+        assert!(service.snapshot.latest_position.is_some());
+        use std::io::Write;
+        fs::OpenOptions::new()
+            .append(true)
+            .open(&backend)
+            .unwrap()
+            .write_all(end[split..].as_bytes())
+            .unwrap();
+        service.poll();
+        assert_eq!(service.snapshot.raid.lifecycle, "ended");
+        assert!(!service.snapshot.raid.recovered);
+        assert_eq!(service.snapshot.raid.id, raid.id);
+        assert_eq!(service.snapshot.raid.map, raid.map);
+        assert_eq!(service.snapshot.raid.started_at, raid.started_at);
+        assert!(service.snapshot.latest_position.is_none());
+        assert!(service
+            .snapshot
+            .raid
+            .detail
+            .contains("outcome and backend acknowledgment unknown"));
+        service.reduce("2026-10-11 11:30:00.000".into(), LogEvent::Started, false);
+        service.reduce(
+            "2026-10-11 11:25:05.320".into(),
+            LogEvent::LocalEndReported,
+            false,
+        );
+        assert_eq!(service.snapshot.raid.lifecycle, "active");
     }
     #[test]
     fn partial_record_waits_for_newline_and_truncation_invalidates_context() {
@@ -608,6 +983,35 @@ mod tests {
             snapshot.latest_position.is_some()
         );
         assert_eq!(snapshot.monitoring, MonitoringStatus::Running);
+    }
+    #[test]
+    #[ignore = "Opt-in metadata-only activity smoke; set MAPPINATOR_LOGS and MAPPINATOR_SCREENSHOTS"]
+    fn live_activity_smoke() {
+        let mut service = ScannerService::new();
+        let snapshot = service.start(FolderConfig {
+            logs: std::env::var("MAPPINATOR_LOGS").unwrap(),
+            screenshots: std::env::var("MAPPINATOR_SCREENSHOTS").unwrap(),
+        });
+        println!(
+            "activity={} dropped={} source_buckets={}",
+            snapshot.activity.len(),
+            snapshot.activity_dropped,
+            snapshot.log_coverage.len()
+        );
+        for event in snapshot.activity.iter().filter(|e| e.kind == "quest") {
+            println!(
+                "quest action={} catalog_id={:?} evidence={} recovered={} event_at={:?}",
+                event.action, event.entity_id, event.evidence, event.recovered, event.event_at
+            );
+        }
+        assert!(snapshot
+            .log_coverage
+            .iter()
+            .any(|c| c.source == "push-notifications"));
+        assert!(snapshot
+            .activity
+            .iter()
+            .any(|e| e.evidence == "quest_notification" && e.entity_id.is_some()));
     }
 }
 

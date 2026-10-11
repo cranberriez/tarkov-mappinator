@@ -4,6 +4,7 @@ import {
   type FolderConfig, type ScannerSnapshot,
 } from "./lib/scanner";
 import type { SourceHealth } from "./bindings/SourceHealth";
+import { ActivityPanel } from "./components/ActivityPanel";
 
 const emptyFolders: FolderConfig = { screenshots: "", logs: "" };
 const labels: Record<SourceHealth["status"], string> = {
@@ -192,8 +193,9 @@ export function App() {
           <span>Last received <strong>{receivedAge === null ? "Unknown" : ageLabel(receivedAge)}</strong></span></div>
         <p className="muted">Filename capture times have minute precision. Freshness reflects time since the scanner received the file; after 30 seconds the receipt is marked old. Positions update only on screenshots and do not track movement between captures.</p>
       </section>
+      <ActivityPanel snapshot={snapshot} />
       <section className="panel diagnostics">
-        <div className="section-heading"><span className="number">04</span><h2>Scanner diagnostics</h2></div>
+        <div className="section-heading"><span className="number">05</span><h2>Scanner diagnostics</h2></div>
         <div className="position-meta"><span>Screenshots seen <strong>{snapshot?.screenshots_seen ?? "Unknown"}</strong></span>
           <span>Rejected captures <strong>{snapshot?.screenshots_rejected ?? "Unknown"}</strong></span></div>
         {snapshot?.diagnostics.length ? <ul>{snapshot.diagnostics.map((detail, index) => <li key={index}>{detail}</li>)}</ul> : <p className="muted">{snapshot ? "No scanner issues reported." : "No backend evidence available."}</p>}

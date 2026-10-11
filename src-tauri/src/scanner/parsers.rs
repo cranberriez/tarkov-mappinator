@@ -12,6 +12,7 @@ pub enum LogEvent {
     },
     Started,
     Ended,
+    LocalEndReported,
     Mode(String),
     Scene(String),
 }
@@ -20,7 +21,7 @@ pub enum LogEvent {
 pub fn log_record(line: &str) -> Option<(String, LogEvent)> {
     static HEADER: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-        r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:[0-5][0-9]\.\d{3})\|\d+\.\d+\.\d+\.\d+\.\d+\|(Info|Debug|Warn|Error)\|(application|output)\|([^\r\n|]+)$"
+        r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:[0-5][0-9]\.\d{3})\|\d+\.\d+\.\d+\.\d+\.\d+\|(Info|Debug|Warn|Error)\|(application|output|backend)\|([^\r\n|]+)$"
     ).unwrap()
     });
     static SCENE: LazyLock<Regex> = LazyLock::new(|| {
@@ -38,6 +39,11 @@ pub fn log_record(line: &str) -> Option<(String, LogEvent)> {
     });
     static MODE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"^Session mode: ([A-Za-z][A-Za-z0-9_]*)$").unwrap());
+    // The local-end request is a client termination report. It does not establish
+    // a successful backend acknowledgment or the player's extraction outcome.
+    static LOCAL_END: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^---> Request HTTPS, id \[\d+\]: URL: https://[A-Za-z0-9.-]+(?::\d+)?/client/match/local/end\. ?$").unwrap()
+    });
     let header = HEADER.captures(line)?;
     NaiveDateTime::parse_from_str(&header[1], "%Y-%m-%d %H:%M:%S%.f").ok()?;
     let level = &header[2];
@@ -45,6 +51,8 @@ pub fn log_record(line: &str) -> Option<(String, LogEvent)> {
     let message = &header[4];
     let event = if category == "output" && level == "Info" && END.is_match(message) {
         LogEvent::Ended
+    } else if category == "backend" && level == "Info" && LOCAL_END.is_match(message) {
+        LogEvent::LocalEndReported
     } else if category != "application" {
         return None;
     } else if level == "Debug" && message.starts_with("TRACE-NetworkGameCreate profileStatus: '") {
@@ -155,6 +163,48 @@ mod tests {
     use super::*;
     const PVE: &str = include_str!("../../../fixtures/logs/pve-customs-started.log");
     const ONLINE: &str = include_str!("../../../fixtures/logs/online-interchange-ended.log");
+    const LOCAL_ENDS: &str = include_str!("../../../fixtures/logs/pve-local-ends.log");
+
+    #[test]
+    fn real_local_end_requests_are_strict_standalone_client_reports() {
+        let ends: Vec<_> = LOCAL_ENDS
+            .lines()
+            .filter_map(log_record)
+            .filter(|(_, event)| *event == LogEvent::LocalEndReported)
+            .collect();
+        assert_eq!(ends.len(), 2);
+        let request = LOCAL_ENDS
+            .lines()
+            .find(|line| {
+                line.contains("---> Request HTTPS") && line.contains("/client/match/local/end.")
+            })
+            .unwrap();
+        assert_eq!(
+            log_record(request.trim_end()).unwrap().1,
+            LogEvent::LocalEndReported
+        );
+        for invalid in [
+            request.replace("|backend|", "|application|"),
+            request.replace("|Info|", "|Error|"),
+            request.replace("/local/end.", "/local/end/other."),
+            request.replace("/local/end.", "/local/end?retry=1."),
+            request.replace("---> Request HTTPS", "<--- Response HTTPS"),
+            request.replace("URL: https://", "URL: http://"),
+            format!("{request} extra"),
+            format!("nested error: {request}"),
+            format!("{request}\nEFT.BaseLocalGame:GameEnd()"),
+            request.replace("2026-10-11", "2026-02-30"),
+        ] {
+            assert!(log_record(&invalid).is_none());
+        }
+        for line in LOCAL_ENDS.lines().filter(|line| {
+            line.contains("GameEnd(")
+                || line.contains("OnGameSessionEnd(")
+                || line.contains("<--- Response HTTPS")
+        }) {
+            assert!(log_record(line).is_none());
+        }
+    }
 
     #[test]
     fn real_screenshots_preserve_metadata_and_minute() {

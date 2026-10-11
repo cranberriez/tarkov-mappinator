@@ -1,0 +1,30 @@
+2026-10-11 11:04:05.718|1.2.0.0.47965|Info|application|Session mode: Pve
+2026-10-11 11:04:34.704|1.2.0.0.47965|Info|application|scene preset path:maps/customs_preset.bundle rcid:bigmap.scenespreset.asset
+2026-10-11 11:05:02.234|1.2.0.0.47965|Info|application|LocationLoaded:23.11 real:28.08 diff:4.96
+2026-10-11 11:05:50.338|1.2.0.0.47965|Info|application|GameStarted:60.69(0) real:76.19(0) diff:15.5
+2026-10-11 11:12:09.929|1.2.0.0.47965|Warn|output|Calling Animator.GotoState on Synchronize layer
+WeaponPrefab:ResetStatesToDefault(Boolean)
+WeaponPrefab:ReturnToPool()
+EFT.AssetsManager.AssetPoolObject:ReturnToPool(AssetPoolObject)
+EFT.Player:DestroyHandsController()
+EFT.Player:Dispose()
+EFT.BaseLocalGame`1:CleanUp(IDictionary`2)
+EFT.<GameEnd>d__95:MoveNext()
+System.Runtime.CompilerServices.AsyncTaskMethodBuilder:Start(TStateMachine&)
+EFT.BaseLocalGame`1:GameEnd(String, ExitStatus, String, Single)
+EFT.<>c__DisplayClass92_0:<Stop>b__0()
+EFT.UI.<Co_ShowBlackImage>d__99:MoveNext()
+UnityEngine.SetupCoroutine:InvokeMoveNext(IEnumerator, IntPtr)
+2026-10-11 11:12:10.142|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [1001]: URL: https://example.invalid/client/match/local/end. 
+2026-10-11 11:12:10.691|1.2.0.0.47965|Info|backend|<--- Response HTTPS, id [1001]: URL: https://example.invalid/client/match/local/end, DownloadSeconds: 0.537, ParseSeconds: 0.012, SumSeconds: 0.549, responseText:
+2026-10-11 11:17:57.117|1.2.0.0.47965|Info|application|scene preset path:maps/factory_day_preset.bundle rcid:factory_day.scenespreset.asset
+2026-10-11 11:18:16.982|1.2.0.0.47965|Info|application|LocationLoaded:15.16 real:20.85 diff:5.69
+2026-10-11 11:18:43.310|1.2.0.0.47965|Info|application|GameStarted:36.41(0) real:47.17(0) diff:10.75
+2026-10-11 11:25:04.743|1.2.0.0.47965|Info|output|Load texture at : https://example.invalid/pve/files/quest/icon/<ID>.png
+EFT.Quests.QuestControllerClientLocalGame:ManageQuestStatusesForPveOfflineGameEnd()
+EFT.Quests.ConditionalController`1:CheckExitConditionCounters(ExitStatus, Single, String, String, HealthEffects, List`1)
+EFT.Player:OnGameSessionEnd(ExitStatus, Single, String, String)
+EFT.LocalPlayer:OnGameSessionEnd(ExitStatus, Single, String, String)
+EFT.BaseLocalGame`1:GameEnd(String, ExitStatus, String, Single)
+2026-10-11 11:25:05.320|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [1002]: URL: https://example.invalid/client/match/local/end. 
+2026-10-11 11:25:06.094|1.2.0.0.47965|Info|backend|<--- Response HTTPS, id [1002]: URL: https://example.invalid/client/match/local/end, DownloadSeconds: 0.763, ParseSeconds: 0.012, SumSeconds: 0.775, responseText:

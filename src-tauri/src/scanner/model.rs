@@ -57,6 +57,30 @@ pub struct PositionObservation {
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, TS)]
+pub struct ActivityEvent {
+    pub id: String,
+    pub logged_at: String,
+    pub event_at: Option<String>,
+    pub kind: String,
+    pub action: String,
+    pub entity_id: Option<String>,
+    pub source: String,
+    pub evidence: String,
+    pub recovered: bool,
+    pub summary: String,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, TS)]
+pub struct LogCoverage {
+    pub source: String,
+    pub category: String,
+    pub level: String,
+    pub records: u32,
+    pub unclassified: u32,
+    pub last_record_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, TS)]
 pub struct ScannerSnapshot {
     pub instance_id: String,
     pub revision: u32,
@@ -69,6 +93,9 @@ pub struct ScannerSnapshot {
     pub diagnostics: Vec<String>,
     pub screenshots_seen: u32,
     pub screenshots_rejected: u32,
+    pub activity: Vec<ActivityEvent>,
+    pub activity_dropped: u32,
+    pub log_coverage: Vec<LogCoverage>,
 }
 
 impl ScannerSnapshot {
@@ -100,6 +127,9 @@ impl ScannerSnapshot {
             diagnostics: Vec::new(),
             screenshots_seen: 0,
             screenshots_rejected: 0,
+            activity: Vec::new(),
+            activity_dropped: 0,
+            log_coverage: Vec::new(),
         }
     }
 }

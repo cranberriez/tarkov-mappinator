@@ -1,0 +1,11 @@
+2026-10-11 11:04:06.593|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9001]: URL: https://example.invalid/client/quest/getMainQuestsList. 
+2026-10-11 11:04:06.594|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9002]: URL: https://example.invalid/client/quest/getMainQuestNotesList. 
+2026-10-11 11:04:19.991|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9003]: URL: https://example.invalid/client/quest/list. 
+2026-10-11 11:04:22.209|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9004]: URL: https://example.invalid/client/quest/chains. 
+2026-10-11 11:04:20.004|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9005]: URL: https://example.invalid/client/achievement/list?completed=True. 
+2026-10-11 11:04:19.991|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9006]: URL: https://example.invalid/client/achievement/statistic. 
+2026-10-11 11:04:18.560|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9007]: URL: https://example.invalid/client/hideout/settings. 
+2026-10-11 11:04:18.561|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9008]: URL: https://example.invalid/client/hideout/areas. 
+2026-10-11 11:04:18.561|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9009]: URL: https://example.invalid/client/hideout/production/recipes. 
+2026-10-11 11:04:20.870|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9010]: URL: https://example.invalid/client/mail/dialog/list. 
+2026-10-11 11:12:34.245|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9011]: URL: https://example.invalid/client/game/profile/items/moving. 

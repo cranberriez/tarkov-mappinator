@@ -1,0 +1,14 @@
+2026-10-11 11:25:04.764|1.2.0.0.47965|Info|backend|---> Request HTTPS, id [9001]: URL: https://example.invalid/client/quest/fail. 
+2026-10-11 11:25:05.114|1.2.0.0.47965|Info|backend|<--- Response HTTPS, id [9001]: URL: https://example.invalid/client/quest/fail. DownloadSeconds: 0.332, ParseSeconds: 0.016, SumSeconds: 0.348, responseText: 
+# Four timestamp contexts in output_000.log contain this client call stack at
+# 11:29:36.248, 11:30:17.932, 11:30:35.429, and 11:31:03.626.
+EFT.InventoryLogic.ItemManipulator:AcceptQuest(Quest, QuestController, Boolean)
+EFT.Quests.QuestController:AcceptQuest(Quest, Boolean)
+EFT.Quests.<AcceptQuest>d__12:MoveNext()
+EFT.Quests.QuestControllerClient:AcceptQuest(Quest, Boolean)
+EFT.InventoryLogic.Operations.QuestAcceptOperation:ExecuteAsync()
+EFT.InventoryLogic.ItemManipulator:AcceptQuest(Quest, QuestController, Boolean)
+EFT.Quests.QuestController:AcceptQuest(Quest, Boolean)
+EFT.Quests.<AcceptQuest>d__12:MoveNext()
+EFT.Quests.QuestControllerClient:AcceptQuest(Quest, Boolean)
+EFT.InventoryLogic.Operations.QuestAcceptOperation:ExecuteAsync()
