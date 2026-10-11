@@ -33,11 +33,13 @@
 - Thumbnail generation in Rust if full-size PNG previews prove too heavy.
 - Backend position history (currently the frontend accumulates `latest_position` per session; lost on reload).
 - Verified heading (map art + calibration landed via `src/maps`). Manual floor selection; map art on Overview/Timeline plots.
-- Map overlays from `src/tarkov-data`: extracts, loot containers, spawns, hazards.
+- Map overlays from `src/tarkov-data`: extracts, transits and player spawns ✅ (`src/lib/mapLayers.ts`); next per `docs/map-data-survey.md`: loot containers, hazards, artillery, stationary guns, BTR, switches, locks, bosses, loose loot.
 - Persisted folder config.
 - Raid outcome, quest names (IDs only today).
 
 ## Assumptions recorded
 - Map shows positions for the current raid only (by `raid_id`); positions without a raid ID are shown when no raid is known.
 - "Stale" for the newest marker: full emphasis at receipt, fading over ~2 min to a resting "latest" style.
+- Map layers: tiered filter top left (layer → groups), remembered per player role. Role defaults hide the other faction; Scav also hides transits. `player_role` is not detected yet, so the unknown-role defaults (everything on) apply for now.
+- Extracts without a faction count as shared; a same-named PMC and Scav extract within 10 m is one marker. Markers on a floor other than the current one are dimmed.
 - Toasts only for events received live (`recovered: false`), max 4 visible, auto-dismiss after 6 s.

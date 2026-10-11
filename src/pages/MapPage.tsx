@@ -2,7 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { Scanner } from "../lib/useScanner";
 import { freshness, positionsForRaid } from "../lib/positions";
 import type { PositionObservation } from "../bindings/PositionObservation";
-import { artRect, floorAt, MapArt, MapTiles, mapName, metricProjection, projectionFor, resolveMap, tileBounds, type MapProjection, type PlaneRect } from "../maps";
+import { artRect, floorAt, MapArt, mapIcons, MapTiles, mapName, metricProjection, projectionFor, resolveGame, resolveMap, tileBounds, type MapProjection, type PlaneRect } from "../maps";
+import { dataMode, useDataStatus, useMapData } from "../tarkov-data";
+import { buildMarkers, countMarkers, defaultFilters, isVisible, markerIcon, roleOf, withDefaults, type Filters, type MapMarker, type Role } from "../lib/mapLayers";
+import { MapLayersPanel } from "../components/MapLayersPanel";
 import { tileUrl } from "../lib/tiles";
 import { keys, load, save } from "../lib/persist";
 import { age, clock } from "../lib/format";
@@ -13,6 +16,8 @@ import { CrosshairIcon, LayersIcon, MinusIcon, PlusIcon } from "../components/Ic
 type View = { cx: number; cy: number; scale: number };
 /** Zoom limits and default in screen pixels per world metre. */
 const MIN_PX_PER_M = 0.05, MAX_PX_PER_M = 40, DEFAULT_PX_PER_M = 2;
+/** Extract names are drawn from this zoom in; below it they are hover-only. */
+const LABEL_PX_PER_M = 1.2;
 const clampScale = (scale: number, unitsPerMetre: number) =>
   Math.min(MAX_PX_PER_M, Math.max(MIN_PX_PER_M, scale * unitsPerMetre)) / unitsPerMetre;
 
@@ -60,6 +65,21 @@ export function MapPage({ scanner }: { scanner: Scanner }) {
   const art = useMemo(() => svgMap ? artRect(svgMap, projection) : tileMap ? tileBounds(tileMap) : null, [calibration, projection]);
   const toPlane = (position: PositionObservation) => projection.toPlane(world(position));
   const floor = calibration && newest ? floorAt(calibration, world(newest)) : null;
+
+  // Overlay markers for the raid's map and mode; filters are remembered per player role.
+  const dataStatus = useDataStatus();
+  const mapData = useMapData(resolveGame(raid?.map)?.key, dataStatus, dataMode(raid?.game_mode));
+  const overlay = useMemo(() => mapData ? buildMarkers(mapData) : [], [mapData]);
+  const counts = useMemo(() => countMarkers(overlay), [overlay]);
+  const overlayFloors = useMemo(() => new Map(overlay.map((marker) =>
+    [marker.id, calibration ? floorAt(calibration, marker.position)?.name ?? null : null])), [overlay, calibration]);
+  const role = roleOf(raid?.player_role);
+  const [storedFilters, setStoredFilters] = useState<Partial<Record<Role, Filters>>>(() => load(keys.mapLayers, {}));
+  useEffect(() => save(keys.mapLayers, storedFilters), [storedFilters]);
+  const filters = useMemo(() => withDefaults(storedFilters[role], role), [storedFilters, role]);
+  const [layersOpen, setLayersOpen] = useState(() => load(keys.mapLayersOpen, true));
+  useEffect(() => save(keys.mapLayersOpen, layersOpen), [layersOpen]);
+  const shownOverlay = useMemo(() => overlay.filter((marker) => isVisible(marker, filters)), [overlay, filters]);
 
   const frame = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -177,6 +197,12 @@ export function MapPage({ scanner }: { scanner: Scanner }) {
         <div className="map-axis x" style={{ top: origin.top }} />
         <div className="map-axis y" style={{ left: origin.left }} />
       </>}
+      {shownOverlay.map((marker) => {
+        const { x, y } = projection.toPlane(marker.position);
+        const other = overlayFloors.get(marker.id) !== (floor?.name ?? null);
+        return <OverlayMarker key={marker.id} marker={marker} at={toScreen(x, y)} icon={markerIcon(marker, filters)}
+          labelled={pxPerMetre >= LABEL_PX_PER_M} otherFloor={other} />;
+      })}
       {markers.slice(0, -1).map((position, index, older) => {
         const { x, y } = toPlane(position);
         const recency = (index + 1) / (older.length + 1);
@@ -190,6 +216,9 @@ export function MapPage({ scanner }: { scanner: Scanner }) {
       })()}
       {!newest && <p className="map-empty">Take a screenshot in raid to place a position</p>}
     </div>
+
+    <MapLayersPanel filters={filters} defaults={defaultFilters(role)} counts={counts} open={layersOpen} onOpen={setLayersOpen}
+      onChange={(next) => setStoredFilters((current) => ({ ...current, [role]: next }))} />
 
     <div className={`map-chip ${status}`}>
       <span className="dot" />
@@ -220,4 +249,15 @@ function Marker({ at, heading, className, style, title }: {
   const pointer = heading !== null;
   return <div className={`${className} ${pointer ? "pointer" : ""}`} title={title}
     style={{ ...style, left: at.left, top: at.top, "--rot": `${(heading ?? 0) + 45}deg` } as CSSProperties} />;
+}
+
+function OverlayMarker({ marker, at, icon, labelled, otherFloor }: {
+  marker: MapMarker; at: { left: number; top: number }; icon: string; labelled: boolean; otherFloor: boolean;
+}) {
+  const title = [marker.label, ...marker.tags].filter(Boolean).join(" · ") || undefined;
+  return <div className={`overlay-marker ${marker.layer} ${otherFloor ? "other-floor" : ""}`} title={title}
+    style={{ left: at.left, top: at.top }}>
+    <img src={mapIcons[icon]} alt="" draggable={false} />
+    {labelled && marker.label && <span className="overlay-label">{marker.label}</span>}
+  </div>;
 }
