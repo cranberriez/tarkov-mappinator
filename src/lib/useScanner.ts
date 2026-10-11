@@ -4,13 +4,16 @@ import {
   type FolderConfig, type ScannerSnapshot,
 } from "./scanner";
 import { appendPosition, type PositionHistory } from "./positions";
+import { observeRaids, type RaidRecord } from "./raids";
+import { keys, load, save } from "./persist";
 
 export type ScannerAction = "check" | "start" | "stop";
 
 export function useScanner() {
   const desktop = isTauri();
   const [snapshot, setSnapshot] = useState<ScannerSnapshot | null>(null);
-  const [positions, setPositions] = useState<PositionHistory>([]);
+  const [positions, setPositions] = useState<PositionHistory>(() => load(keys.positions, []));
+  const [raids, setRaids] = useState<RaidRecord[]>(() => load(keys.raids, []));
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState<ScannerAction | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +28,14 @@ export function useScanner() {
       const position = accepted.latest_position;
       setPositions((history) => appendPosition(history, position));
     }
+    setRaids((records) => {
+      const next = observeRaids(records, accepted.raid, accepted.activity);
+      return JSON.stringify(next) === JSON.stringify(records) ? records : next;
+    });
   }, []);
+
+  useEffect(() => save(keys.positions, positions), [positions]);
+  useEffect(() => save(keys.raids, raids), [raids]);
 
   useEffect(() => {
     if (!desktop) return;
@@ -69,9 +79,10 @@ export function useScanner() {
   }, [receive]);
 
   return {
-    desktop, snapshot, positions, connected, busy, error, perform,
+    desktop, snapshot, positions, raids, connected, busy, error, perform,
     running: snapshot?.monitoring === "running",
     retry: () => setAttempt((value) => value + 1),
+    clearHistory: () => { setPositions([]); setRaids([]); },
   };
 }
 

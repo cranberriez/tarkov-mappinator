@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
-import { ActivityIcon, MapIcon, OverviewIcon, SettingsIcon, SidebarIcon } from "./Icons";
+import { ActivityIcon, MapIcon, OverviewIcon, SettingsIcon, SidebarIcon, TimelineIcon } from "./Icons";
 
-export type Page = "overview" | "map" | "activity" | "settings";
+export type Page = "overview" | "map" | "timeline" | "activity" | "settings";
 
 const items: { page: Page; label: string; icon: ReactNode }[] = [
   { page: "overview", label: "Overview", icon: <OverviewIcon /> },
   { page: "map", label: "Map", icon: <MapIcon /> },
+  { page: "timeline", label: "Timeline", icon: <TimelineIcon /> },
   { page: "activity", label: "Activity", icon: <ActivityIcon /> },
 ];
 

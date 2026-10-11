@@ -16,6 +16,7 @@
 |---|---|
 | Overview | Raid context (map, mode, role, lifecycle, start time), scanner state, a few stats: screenshots seen/rejected, positions this raid, activity count, last position age. |
 | Map | Full-bleed pannable/zoomable grid (world X → right, world Z → up, metres). Status chip top right (connection dot + map). Position markers: newest large and accented, fading toward muted as it goes stale but staying larger; older markers small and grey. Marker = teardrop (one sharp corner) pointing along provisional heading; plain dot when heading unknown. Follow toggle auto-pans to each new position; manual pan turns follow off. |
+| Timeline | Raids newest first. Start/end dots and the connecting gutter line take a per-raid pastel colour (30-colour golden-angle palette, keyed on start time). Between them, a wide plot of that raid's positions joined in capture order. Raids and positions are reconstructed client-side (current raid + `raid` activity events) and persisted to `localStorage`. |
 | Activity | Latest activity list with kind filter + search. |
 | Settings | Source folders + status, scanner health, diagnostics, log coverage. |
 
@@ -27,6 +28,8 @@
 5. Toasts. ✅
 
 ## Later
+- Scanner raid history: expose every raid start/end (with map, mode, ID) across all log sessions, so the timeline doesn't depend on the 200-event activity window or the app being open.
+- Scanner screenshot backfill: parse existing screenshot filenames and associate them with raids by time, so past raids get tracks.
 - Backend position history (currently the frontend accumulates `latest_position` per session; lost on reload).
 - Real map images + calibration (world → image transform per map), verified heading.
 - Persisted folder config.

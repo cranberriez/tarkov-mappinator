@@ -6,6 +6,7 @@ import { Toasts } from "./components/Toasts";
 import { OverviewPage } from "./pages/OverviewPage";
 import { MapPage } from "./pages/MapPage";
 import { ActivityPage } from "./pages/ActivityPage";
+import { TimelinePage } from "./pages/TimelinePage";
 import { SettingsPage } from "./pages/SettingsPage";
 
 const COLLAPSED_KEY = "sidebar-collapsed";
@@ -23,6 +24,7 @@ export function App() {
       <main className="content">
         {page === "overview" && <OverviewPage scanner={scanner} onNavigate={setPage} />}
         {page === "map" && <MapPage scanner={scanner} />}
+        {page === "timeline" && <TimelinePage scanner={scanner} />}
         {page === "activity" && <ActivityPage scanner={scanner} />}
         {page === "settings" && <SettingsPage scanner={scanner} />}
       </main>

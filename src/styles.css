@@ -177,6 +177,32 @@ input:disabled { opacity: .55; }
 .table td { padding: 8px 12px 8px 0; border-top: 1px solid var(--line); }
 .table .num { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* Timeline */
+.secondary.danger { color: var(--bad); background: rgb(227 123 108 / 12%); }
+.timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+.timeline::before { content: ""; position: absolute; left: 7px; top: 12px; bottom: 12px; width: 2px;
+  background: repeating-linear-gradient(to bottom, var(--line) 0 4px, transparent 4px 9px); }
+.tl-raid { position: relative; padding-bottom: 22px; }
+.tl-raid::before { content: ""; position: absolute; left: 7px; top: 12px; bottom: 34px; width: 2px; background: var(--raid); }
+.tl-node { position: relative; display: flex; align-items: center; gap: 10px; min-height: 24px; padding-left: 28px; min-width: 0; }
+.tl-node strong { font-weight: 500; white-space: nowrap; }
+.tl-node .faint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-dot { position: absolute; left: 2px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--raid);
+  box-shadow: 0 0 0 3px var(--bg); }
+.tl-raid.unknown .tl-dot.end { background: var(--bg); box-shadow: inset 0 0 0 2px var(--raid), 0 0 0 3px var(--bg); }
+.tl-raid.active .tl-dot.end::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 1.5px solid var(--raid);
+  animation: tl-ping 2s ease-out infinite; }
+@keyframes tl-ping { from { transform: scale(.6); opacity: .9; } to { transform: scale(1.8); opacity: 0; } }
+.tl-span { padding: 8px 0 8px 28px; }
+.tl-map { display: block; width: 100%; height: clamp(130px, 26vh, 320px); border-radius: var(--radius); background-color: #131416;
+  background-image: linear-gradient(to right, rgb(255 255 255 / 4%) 1px, transparent 1px), linear-gradient(to bottom, rgb(255 255 255 / 4%) 1px, transparent 1px);
+  background-size: 32px 32px; }
+.tl-path { fill: none; stroke: rgb(255 255 255 / 32%); stroke-width: 1.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.tl-point { stroke: #a9a59c; stroke-width: 6; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.tl-point.first { stroke: #77746e; stroke-width: 10; }
+.tl-point.last { stroke: var(--text); stroke-width: 11; }
+.tl-empty { padding: 2px 0; font-size: 12px; }
+
 /* Map */
 .map-page { position: relative; height: 100%; overflow: hidden; }
 .map-canvas { position: absolute; inset: 0; cursor: grab; touch-action: none; user-select: none; background-color: #131416;

@@ -2,7 +2,7 @@ import type { PositionObservation } from "../bindings/PositionObservation";
 
 export type PositionHistory = PositionObservation[];
 
-const MAX_POSITIONS = 500;
+const MAX_POSITIONS = 3000;
 const key = (position: PositionObservation) => `${position.filename}|${position.observed_at}`;
 
 /** The backend only exposes the latest position, so history accumulates client-side. */

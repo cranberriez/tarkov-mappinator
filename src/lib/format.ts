@@ -23,3 +23,9 @@ export function age(value: string | null | undefined, now: number) {
 export const lifecycleLabel: Record<string, string> = {
   unknown: "No raid", loading: "Loading", active: "In raid", ended: "Raid ended",
 };
+
+export function span(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const minutes = Math.round(ms / 60000);
+  return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
