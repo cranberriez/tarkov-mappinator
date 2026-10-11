@@ -4,6 +4,7 @@ import {
   type FolderConfig, type ScannerSnapshot,
 } from "./lib/scanner";
 import type { SourceHealth } from "./bindings/SourceHealth";
+import { LogCoveragePanel } from "./components/LogCoveragePanel";
 import { ActivityPanel } from "./components/ActivityPanel";
 
 const emptyFolders: FolderConfig = { screenshots: "", logs: "" };
@@ -54,6 +55,7 @@ export function App() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   const edited = useRef(false);
   const currentSnapshot = useRef<ScannerSnapshot | null>(null);
@@ -120,17 +122,25 @@ export function App() {
 
   return <main>
     <header>
-      <div><p className="eyebrow">TARKOV MAPPINATOR / LOCAL DIAGNOSTICS</p>
-        <h1>Know what’s known.</h1><p className="intro">Passive raid context and screenshot positions, backed by local files.</p>
+      <div><p className="eyebrow">TARKOV MAPPINATOR / RAID OVERVIEW</p>
+        <h1>Your raid at a glance.</h1><p className="intro">Passive raid context and screenshot positions, backed by local files.</p>
       </div>
+      <div className="header-controls">
       <span className={`badge ${connected ? "good" : ""}`}><span className="dot" />
         {connected ? "Backend connected" : desktop ? "Backend disconnected" : "Browser preview"}
       </span>
+      <div className="header-actions">
+            <button type="button" disabled={!connected || !!busy} onClick={() => void perform(running ? "stop" : "start")}>
+              {busy === "start" ? "Starting…" : busy === "stop" ? "Stopping…" : running ? "Stop monitoring" : "Start monitoring"}
+            </button>
+        <button className="secondary" type="button" aria-expanded={diagnosticsOpen} aria-controls="diagnostics" onClick={() => { setDiagnosticsOpen(true); document.getElementById("diagnostics")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Source setup</button>
+      </div>
+      </div>
     </header>
 
     <aside className={`notice ${liveRaid ? "raid-live" : ""}`} role="status" aria-live="polite">
       <strong>{!snapshot ? "Scanner state unknown" : liveRaid ? "Raid start detected live" : recoveredRaid ? "Active raid recovered from existing logs" : running ? "Monitoring local files" : "Scanner stopped"}</strong>
-      <p>{liveRaid ? `Started ${timestamp(raid?.started_at)} · ${raid?.map ?? "Map unknown"}` : recoveredRaid ? "This state was found in log history. A new raid start has not been observed live." : running ? "Take a game screenshot to record a position. The last capture stays visible until another arrives." : snapshot ? "Any displayed raid and position are preserved observations. Start monitoring to receive new evidence." : "Choose your source folders and start monitoring to observe raid events and screenshot positions."}</p>
+      <p>{liveRaid ? `Started ${timestamp(raid?.started_at)} · ${raid?.map ?? "Map unknown"}` : recoveredRaid ? "This state was found in log history. A new raid start has not been observed live." : running ? "Take a game screenshot to record a position. The last capture stays visible until another arrives." : snapshot ? "Any displayed raid and position are preserved observations. Start monitoring to receive new evidence." : "Open Source setup to choose your folders, then start monitoring to observe raid events and screenshot positions."}</p>
     </aside>
     {!desktop && <p className="preview-note">Local file access requires the desktop app. Launch with <code>npm run tauri dev</code>. No live scanner data is available in this preview.</p>}
     {error && <div className="error" role="alert">{error}
@@ -138,31 +148,9 @@ export function App() {
     </div>}
 
     <div className="grid">
-      <section className="panel folders">
-        <div className="section-heading"><span className="number">01</span><h2>Sources</h2><span className={`badge ${running ? "good" : ""}`}>{snapshot ? running ? "Monitoring" : "Stopped" : "Unknown"}</span></div>
-        <form onSubmit={(event) => { event.preventDefault(); void perform("check"); }}>
-          <label htmlFor="screenshots">Screenshot folder</label>
-          <input id="screenshots" value={folders.screenshots} placeholder="Paste an absolute folder path"
-            spellCheck={false} disabled={locked}
-            onChange={(event) => { edited.current = true; setFolders({ ...folders, screenshots: event.target.value }); }} />
-          <label htmlFor="logs">Game log folder</label>
-          <input id="logs" value={folders.logs} placeholder="Paste the Tarkov installation’s Logs folder"
-            spellCheck={false} disabled={locked}
-            onChange={(event) => { edited.current = true; setFolders({ ...folders, logs: event.target.value }); }} />
-          <div className="actions">
-            <button type="button" disabled={!connected || !!busy} onClick={() => void perform(running ? "stop" : "start")}>
-              {busy === "start" ? "Starting…" : busy === "stop" ? "Stopping…" : running ? "Stop monitoring" : "Start monitoring"}
-            </button>
-            <button className="secondary" type="submit" disabled={locked}>{busy === "check" ? "Checking…" : "Check folders"}</button>
-          </div>
-          <p className="muted">{running ? "Stop monitoring to change source folders." : "Detected folders appear automatically when available. Settings last for this app session."}</p>
-        </form>
-        <Source title="Screenshots" health={snapshot?.screenshots} />
-        <Source title="Game logs" health={snapshot?.logs} />
-      </section>
 
-      <section className="panel">
-        <div className="section-heading"><span className="number">02</span><h2>Raid context</h2></div>
+      <section className="panel raid-context">
+        <div className="section-heading"><span className="number">01</span><h2>Raid context</h2></div>
         <span className={`badge ${liveRaid ? "good" : ""}`}>{raid ? `${running ? "" : "Last observed: "}${lifecycleLabels[raid.lifecycle] ?? raid.lifecycle}` : "Unknown"}</span>
         <dl><div><dt>Map</dt><dd>{raid?.map ?? "Unknown"}</dd></div>
           <div><dt>Game mode</dt><dd>{raid?.game_mode ?? "Unknown"}</dd></div>
@@ -174,7 +162,7 @@ export function App() {
       </section>
 
       <section className="panel position">
-        <div className="section-heading"><span className="number">03</span><h2>Last captured position</h2>
+        <div className="section-heading"><span className="number">02</span><h2>Position & orientation</h2>
           <span className={`badge ${stale ? "warning" : ""}`}>{!position ? "No observation" : !running ? "Preserved observation" : receivedAge === null ? "Receipt time unknown" : stale ? "No recent receipt" : "Recently received"}</span>
         </div>
         {position ? <>
@@ -194,12 +182,40 @@ export function App() {
         <p className="muted">Filename capture times have minute precision. Freshness reflects time since the scanner received the file; after 30 seconds the receipt is marked old. Positions update only on screenshots and do not track movement between captures.</p>
       </section>
       <ActivityPanel snapshot={snapshot} />
-      <section className="panel diagnostics">
-        <div className="section-heading"><span className="number">05</span><h2>Scanner diagnostics</h2></div>
+      <details id="diagnostics" className="panel diagnostics" open={diagnosticsOpen} onToggle={(event) => setDiagnosticsOpen(event.currentTarget.open)}>
+        <summary><span className="number">04</span><span className="diagnostics-title">Diagnostics</span><span className="diagnostics-hint">Source setup, scanner health & log coverage</span></summary>
+        <div className="diagnostics-content">
+          <div className="diagnostics-grid">
+      <section className="folders">
+        <div className="section-heading"><h3>Source folders</h3><span className={`badge ${running ? "good" : ""}`}>{snapshot ? running ? "Monitoring" : "Stopped" : "Unknown"}</span></div>
+        <form onSubmit={(event) => { event.preventDefault(); void perform("check"); }}>
+          <label htmlFor="screenshots">Screenshot folder</label>
+          <input id="screenshots" value={folders.screenshots} placeholder="Paste an absolute folder path"
+            spellCheck={false} disabled={locked}
+            onChange={(event) => { edited.current = true; setFolders({ ...folders, screenshots: event.target.value }); }} />
+          <label htmlFor="logs">Game log folder</label>
+          <input id="logs" value={folders.logs} placeholder="Paste the Tarkov installation’s Logs folder"
+            spellCheck={false} disabled={locked}
+            onChange={(event) => { edited.current = true; setFolders({ ...folders, logs: event.target.value }); }} />
+          <div className="actions">
+            <button className="secondary" type="submit" disabled={locked}>{busy === "check" ? "Checking…" : "Check folders"}</button>
+          </div>
+          <p className="muted">{running ? "Stop monitoring to change source folders." : "Detected folders appear automatically when available. Settings last for this app session."}</p>
+        </form>
+        <Source title="Screenshots" health={snapshot?.screenshots} />
+        <Source title="Game logs" health={snapshot?.logs} />
+      </section>
+
+      <section className="scanner-health">
+        <div className="section-heading"><h3>Scanner health</h3></div>
         <div className="position-meta"><span>Screenshots seen <strong>{snapshot?.screenshots_seen ?? "Unknown"}</strong></span>
           <span>Rejected captures <strong>{snapshot?.screenshots_rejected ?? "Unknown"}</strong></span></div>
         {snapshot?.diagnostics.length ? <ul>{snapshot.diagnostics.map((detail, index) => <li key={index}>{detail}</li>)}</ul> : <p className="muted">{snapshot ? "No scanner issues reported." : "No backend evidence available."}</p>}
       </section>
+          </div>
+          <LogCoveragePanel snapshot={snapshot} />
+        </div>
+      </details>
     </div>
     <footer><span>Passive files only · Screenshot-driven positions · Closing the app ends the session</span>
       <span>{snapshot ? `State revision ${snapshot.revision}` : "No scanner state"}</span></footer>

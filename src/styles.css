@@ -41,7 +41,7 @@ p { line-height: 1.55; }
 label { display: block; color: var(--text); font-size: 12px; margin: 17px 0 8px; }
 input { width: 100%; padding: 12px; border-radius: 5px; border: 1px solid var(--border-strong); background: var(--surface-inset); color: var(--text); font: 12px ui-monospace, monospace; }
 input::placeholder { color: var(--text-subtle); }
-input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+input:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 input:disabled { opacity: .65; }
 button { background: var(--accent); border: 1px solid var(--accent); border-radius: 5px; color: var(--background); padding: 10px 15px; font-weight: 650; cursor: pointer; }
 button:disabled { opacity: .45; cursor: not-allowed; }
@@ -54,7 +54,7 @@ dl { margin: 21px 0; }
 dl div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); padding: 15px 0; font-size: 13px; }
 dt { color: var(--text-muted); }
 dd { margin: 0; text-align: right; }
-.position { grid-column: 1 / -1; }
+.position { display: flex; flex-direction: column; }
 .empty { display: flex; gap: 20px; align-items: center; padding: 2px 0 22px; }
 .crosshair { font: 38px ui-monospace, monospace; color: var(--text-subtle); width: 56px; height: 56px; display: grid; place-items: center; border: 1px dashed var(--border-strong); border-radius: 50%; flex-shrink: 0; }
 .empty p { margin: 6px 0 0; color: var(--text-muted); font-size: 13px; }
@@ -83,7 +83,7 @@ dd { overflow-wrap: anywhere; min-width: 0; }
 .diagnostics ul { margin: 16px 0 0; padding-left: 18px; font-size: 12px; color: var(--text-muted); line-height: 1.7; }
 .diagnostics .position-meta { border: 0; padding: 0; }
 @media (max-width: 600px) { .coordinates { gap: 8px; } .coordinates div { padding: 12px; } .coordinates strong { font-size: 19px; } .capture-details div { flex-direction: column; gap: 8px; } .capture-details dd { text-align: left; } .section-heading { flex-wrap: wrap; gap: 10px; } .actions { flex-wrap: wrap; } }
-.grid { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+.grid { grid-template-columns: minmax(0, .85fr) minmax(0, 1.4fr); }
 .panel { min-width: 0; }
 dl dt { flex-shrink: 0; }
 dl dd { flex: 0 1 auto; overflow-wrap: anywhere; }
@@ -120,3 +120,29 @@ dl dd { flex: 0 1 auto; overflow-wrap: anywhere; }
 .coverage-table td { overflow-wrap: anywhere; }
 .coverage-table th:first-child, .coverage-table td:first-child { padding-left: 0; }
 @media (max-width: 600px) { .activity-search { flex: 1 1 100%; } .activity-event time { width: 100%; margin-left: 0; } .activity-event { padding: 14px; } }
+
+.header-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 16px; }
+.header-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.raid-context, .position { border-top: 2px solid var(--accent-border); }
+.raid-context dl div:first-child dd { font-size: 21px; color: var(--accent-light); }
+.position .empty { flex: 1; min-height: 150px; }
+.position .section-heading { flex-wrap: wrap; }
+.coordinates div { min-width: 0; }
+.coordinates strong { font-size: clamp(17px, 2.2vw, 26px); overflow-wrap: anywhere; }
+.diagnostics { padding: 0; scroll-margin-top: 20px; }
+.diagnostics summary { padding: 22px 25px; cursor: pointer; color: var(--text-muted); }
+.diagnostics summary::marker { color: var(--accent); }
+.diagnostics summary .number { margin: 0 12px 0 8px; }
+.diagnostics-title { color: var(--text); font-size: 16px; font-weight: 550; }
+.diagnostics-hint { margin-left: 20px; font-size: 12px; }
+.diagnostics-content { padding: 0 25px 25px; border-top: 1px solid var(--border); }
+.diagnostics-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 32px; padding-top: 25px; }
+.diagnostics-grid > section { min-width: 0; }
+.log-coverage { border-top: 1px solid var(--border); margin-top: 25px; }
+@media (max-width: 800px) {
+  .header-controls { align-items: flex-start; }
+  .diagnostics-grid { grid-template-columns: minmax(0, 1fr); }
+  .diagnostics summary { padding: 20px; }
+  .diagnostics-content { padding: 0 20px 20px; }
+  .diagnostics-hint { display: block; margin: 8px 0 0 26px; }
+}
