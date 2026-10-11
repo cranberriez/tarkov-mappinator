@@ -2,10 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { Scanner } from "../lib/useScanner";
 import { freshness, positionsForRaid } from "../lib/positions";
 import type { PositionObservation } from "../bindings/PositionObservation";
-import { artRect, floorAt, MapArt, mapIcons, MapTiles, mapName, metricProjection, projectionFor, resolveGame, resolveMap, tileBounds, type MapProjection, type PlaneRect } from "../maps";
-import { dataMode, useDataStatus, useMapData } from "../tarkov-data";
-import { buildMarkers, countMarkers, defaultFilters, isVisible, markerIcon, roleOf, withDefaults, type Filters, type MapMarker, type Role } from "../lib/mapLayers";
+import { artRect, floorAt, MapArt, MapTiles, mapName, metricProjection, projectionFor, resolveGame, resolveMap, tileBounds, type MapProjection, type PlaneRect } from "../maps";
+import { dataMode, useDataStatus, useMapData, useNameLookups } from "../tarkov-data";
+import { buildMarkers, countMarkers, defaultFilters, isVisible, roleOf, withDefaults, type Filters, type Role } from "../lib/mapLayers";
 import { MapLayersPanel } from "../components/MapLayersPanel";
+import { MapOverlay } from "../components/MapOverlay";
 import { tileUrl } from "../lib/tiles";
 import { keys, load, save } from "../lib/persist";
 import { age, clock } from "../lib/format";
@@ -68,8 +69,10 @@ export function MapPage({ scanner }: { scanner: Scanner }) {
 
   // Overlay markers for the raid's map and mode; filters are remembered per player role.
   const dataStatus = useDataStatus();
-  const mapData = useMapData(resolveGame(raid?.map)?.key, dataStatus, dataMode(raid?.game_mode));
-  const overlay = useMemo(() => mapData ? buildMarkers(mapData) : [], [mapData]);
+  const mode = dataMode(raid?.game_mode);
+  const mapData = useMapData(resolveGame(raid?.map)?.key, dataStatus, mode);
+  const lookups = useNameLookups(dataStatus, mode);
+  const overlay = useMemo(() => mapData ? buildMarkers(mapData, lookups ?? {}) : [], [mapData, lookups]);
   const counts = useMemo(() => countMarkers(overlay), [overlay]);
   const overlayFloors = useMemo(() => new Map(overlay.map((marker) =>
     [marker.id, calibration ? floorAt(calibration, marker.position)?.name ?? null : null])), [overlay, calibration]);
@@ -197,12 +200,13 @@ export function MapPage({ scanner }: { scanner: Scanner }) {
         <div className="map-axis x" style={{ top: origin.top }} />
         <div className="map-axis y" style={{ left: origin.left }} />
       </>}
-      {shownOverlay.map((marker) => {
-        const { x, y } = projection.toPlane(marker.position);
-        const other = overlayFloors.get(marker.id) !== (floor?.name ?? null);
-        return <OverlayMarker key={marker.id} marker={marker} at={toScreen(x, y)} icon={markerIcon(marker, filters)}
-          labelled={pxPerMetre >= LABEL_PX_PER_M} otherFloor={other} />;
-      })}
+      <div className="overlay-layer" style={{
+        transform: `translate(${size.width / 2 - view.cx * view.scale}px, ${size.height / 2 - view.cy * view.scale}px)`,
+        "--s": view.scale,
+      } as CSSProperties}>
+        <MapOverlay markers={shownOverlay} filters={filters} projection={projection}
+          floors={overlayFloors} floor={floor?.name ?? null} labelled={pxPerMetre >= LABEL_PX_PER_M} />
+      </div>
       {markers.slice(0, -1).map((position, index, older) => {
         const { x, y } = toPlane(position);
         const recency = (index + 1) / (older.length + 1);
@@ -249,15 +253,4 @@ function Marker({ at, heading, className, style, title }: {
   const pointer = heading !== null;
   return <div className={`${className} ${pointer ? "pointer" : ""}`} title={title}
     style={{ ...style, left: at.left, top: at.top, "--rot": `${(heading ?? 0) + 45}deg` } as CSSProperties} />;
-}
-
-function OverlayMarker({ marker, at, icon, labelled, otherFloor }: {
-  marker: MapMarker; at: { left: number; top: number }; icon: string; labelled: boolean; otherFloor: boolean;
-}) {
-  const title = [marker.label, ...marker.tags].filter(Boolean).join(" · ") || undefined;
-  return <div className={`overlay-marker ${marker.layer} ${otherFloor ? "other-floor" : ""}`} title={title}
-    style={{ left: at.left, top: at.top }}>
-    <img src={mapIcons[icon]} alt="" draggable={false} />
-    {labelled && marker.label && <span className="overlay-label">{marker.label}</span>}
-  </div>;
 }

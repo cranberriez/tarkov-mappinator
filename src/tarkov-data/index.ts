@@ -44,6 +44,41 @@ export function useDataStatus(): DataStatus | null {
   return status;
 }
 
+type Named = { name: string; normalizedName: string };
+/** Name tables the map documents point into, by id or mob key. */
+export type NameLookups = { containers: Record<string, Named>; weapons: Record<string, Named>; mobs: Record<string, Named> };
+
+// Mobs are several MB; keep only the names, once per mode and sync.
+const lookupCache = new Map<string, Promise<NameLookups>>();
+const names = (table: Record<string, unknown>): Record<string, Named> => Object.fromEntries(
+  Object.entries(table).map(([key, value]) => {
+    const { name, normalizedName } = value as Named;
+    return [key, { name, normalizedName }];
+  }));
+
+/** Container, stationary weapon and mob names for a mode, reloaded when the local mirror is refreshed. */
+export function useNameLookups(status: DataStatus | null, mode: DataMode = "pve"): NameLookups | null {
+  const [lookups, setLookups] = useState<NameLookups | null>(null);
+  const fetchedAt = status?.manifest?.fetched_at;
+  useEffect(() => {
+    setLookups(null);
+    if (!fetchedAt) return;
+    const key = `${mode}|${fetchedAt}`;
+    let pending = lookupCache.get(key);
+    if (!pending) {
+      pending = Promise.all([getCommonData(mode), getMobs(mode)]).then(([common, mobs]) => ({
+        containers: names(common.lootContainers), weapons: names(common.stationaryWeapons), mobs: names(mobs),
+      }));
+      pending.catch(() => lookupCache.delete(key));
+      lookupCache.set(key, pending);
+    }
+    let live = true;
+    pending.then((next) => { if (live) setLookups(next); }, () => {});
+    return () => { live = false; };
+  }, [fetchedAt, mode]);
+  return lookups;
+}
+
 /** One map's data for a mode, reloaded when the local mirror is refreshed. */
 export function useMapData(normalizedName: string | null | undefined, status: DataStatus | null, mode: DataMode = "pve"): GameMapData | null {
   const [data, setData] = useState<GameMapData | null>(null);

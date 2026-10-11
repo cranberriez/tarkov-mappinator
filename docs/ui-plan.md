@@ -33,7 +33,7 @@
 - Thumbnail generation in Rust if full-size PNG previews prove too heavy.
 - Backend position history (currently the frontend accumulates `latest_position` per session; lost on reload).
 - Verified heading (map art + calibration landed via `src/maps`). Manual floor selection; map art on Overview/Timeline plots.
-- Map overlays from `src/tarkov-data`: extracts, transits and player spawns ✅ (`src/lib/mapLayers.ts`); next per `docs/map-data-survey.md`: loot containers, hazards, artillery, stationary guns, BTR, switches, locks, bosses, loose loot.
+- Map overlays from `src/tarkov-data` ✅ (`src/lib/mapLayers.ts`): extracts, transits, player spawns, bosses, hazards + artillery zones, containers, locks, switches, stationary guns, BTR stops, loose loot. Next: item names (key/keycard split, loose loot search), clustering at low zoom.
 - Persisted folder config.
 - Raid outcome, quest names (IDs only today).
 

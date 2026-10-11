@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { mapIcons } from "../maps";
-import { layers, sameFilters, type Filters } from "../lib/mapLayers";
+import { layers, layerState, sameFilters, toggleLayer, type Filters } from "../lib/mapLayers";
 import { keys, load, save } from "../lib/persist";
 import { CaretIcon, PinIcon, ResetIcon } from "./Icons";
 
@@ -29,10 +29,8 @@ export function MapLayersPanel({ filters, defaults, counts, open, onOpen, onChan
     setPresets((current) => current.map((preset, index) => index === slot ? value : preset));
 
   const shown = layers.filter((layer) => counts[layer.key]);
-  const setLayer = (key: string, on: boolean) => onChange({ ...filters, [key]: { ...filters[key], on } });
-  // Turning a group on inside a hidden layer shows the layer too.
   const setGroup = (key: string, group: string, on: boolean) => onChange({
-    ...filters, [key]: { on: filters[key].on || on, groups: { ...filters[key].groups, [group]: on } },
+    ...filters, [key]: { groups: { ...filters[key].groups, [group]: on } },
   });
 
   return <div className={`map-layers ${open ? "open" : ""}`}>
@@ -58,22 +56,27 @@ export function MapLayersPanel({ filters, defaults, counts, open, onOpen, onChan
     </div>
     {open && (shown.length ? shown.map((layer) => {
       const state = filters[layer.key];
-      const folded = !!collapsed[layer.key];
-      return <div key={layer.key} className={`layer ${state.on ? "" : "off"}`}>
+      const folded = collapsed[layer.key] ?? !!layer.folded;
+      // The header speaks for the groups this map has.
+      const present = layer.groups.filter((group) => counts[`${layer.key}.${group.key}`]);
+      const status = layerState(state, present.map((group) => group.key));
+      return <div key={layer.key} className={`layer ${status}`}>
         <div className="layer-head">
           <button type="button" className={`caret ${folded ? "folded" : ""}`} aria-expanded={!folded}
             title={folded ? `Expand ${layer.label}` : `Collapse ${layer.label}`}
             onClick={() => setCollapsed((current) => ({ ...current, [layer.key]: !folded }))}><CaretIcon /></button>
-          <button type="button" className="layer-row" aria-pressed={state.on} aria-label={layer.label} onClick={() => setLayer(layer.key, !state.on)}>
+          <button type="button" className="layer-row" aria-pressed={status === "mixed" ? "mixed" : status === "on"} aria-label={layer.label}
+            title={status === "off" ? `Show all ${layer.label.toLowerCase()}` : `Hide all ${layer.label.toLowerCase()}`}
+            onClick={() => onChange({ ...filters, [layer.key]: toggleLayer(state, present.map((group) => group.key)) })}>
             <span className="layer-name">{layer.label}</span>
             <span className="faint">{counts[layer.key]}</span>
           </button>
         </div>
         {!folded && <div className="layer-groups">
-          {layer.groups.filter((group) => counts[`${layer.key}.${group.key}`]).map((group) => {
+          {present.map((group) => {
             const on = state.groups[group.key];
             return <button key={group.key} type="button" className={`layer-row group ${on ? "" : "off"}`} aria-pressed={on}
-              title={group.label} onClick={() => setGroup(layer.key, group.key, !(on && state.on))}>
+              title={group.label} onClick={() => setGroup(layer.key, group.key, !on)}>
               <img src={mapIcons[group.icon]} alt="" />
               <span className="group-name">{group.label}</span>
               <span className="faint">{counts[`${layer.key}.${group.key}`]}</span>

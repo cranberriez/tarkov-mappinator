@@ -36,10 +36,10 @@ test("only player spawns are kept, 'all' means both sides, duplicates collapse",
     { position: at(3, 3), sides: ["scav"], categories: ["bot", "boss"], zoneName: "z" },
     { position: at(4, 4), sides: ["none"], categories: ["player"], zoneName: "z" },
   ] }));
-  assert.deepEqual(markers.map((m) => [m.groups, m.tags]), [[["pmc"], []], [["pmc", "scav"], ["Sniper"]]]);
+  assert.deepEqual(markers.map((m) => [m.groups, m.tags]), [[["pmc"], ["PMC spawn"]], [["pmc", "scav"], ["PMC & Scav spawn", "Sniper"]]]);
 });
 
-test("visibility needs the layer and any of the marker's groups on", () => {
+test("visibility needs any of the marker's groups on", () => {
   const filters = defaultFilters("unknown");
   const shared = { layer: "extracts", groups: ["pmc", "scav"] };
   assert.equal(isVisible(shared, filters), true);
@@ -48,9 +48,17 @@ test("visibility needs the layer and any of the marker's groups on", () => {
   assert.equal(markerIcon(shared, filters), "extract_scav");
   filters.extracts.groups.scav = false;
   assert.equal(isVisible(shared, filters), false);
-  filters.extracts.groups.scav = true;
-  filters.extracts.on = false;
-  assert.equal(isVisible(shared, filters), false);
+});
+
+test("the header turns all present groups off when any is on, otherwise all on", async () => {
+  const { layerState, toggleLayer } = await import("./mapLayers.ts");
+  const present = ["pmc", "scav"];
+  const mixed = { groups: { pmc: true, scav: false, transit: true } };
+  assert.equal(layerState(mixed, present), "mixed");
+  const off = toggleLayer(mixed, present);
+  assert.deepEqual(off.groups, { pmc: false, scav: false, transit: true });
+  assert.equal(layerState(off, present), "off");
+  assert.deepEqual(toggleLayer(off, present).groups, { pmc: true, scav: true, transit: true });
 });
 
 test("role defaults hide the other faction; scavs cannot transit", () => {
@@ -62,9 +70,11 @@ test("role defaults hide the other faction; scavs cannot transit", () => {
 });
 
 test("stored filters keep user choices and gain new layers and groups", () => {
-  const merged = withDefaults({ extracts: { on: false, groups: { pmc: false } } }, "unknown");
-  assert.deepEqual(merged.extracts, { on: false, groups: { pmc: false, scav: true, transit: true } });
-  assert.equal(merged.spawns.on, true);
+  const merged = withDefaults({ extracts: { groups: { pmc: false } } }, "unknown");
+  assert.deepEqual(merged.extracts.groups, { pmc: false, scav: true, transit: true });
+  assert.deepEqual(merged.spawns.groups, { pmc: true, scav: true });
+  // Saved before layers lost their own switch: a hidden layer hides its groups.
+  assert.deepEqual(withDefaults({ spawns: { on: false, groups: { pmc: true } } }, "unknown").spawns.groups, { pmc: false, scav: false });
 });
 
 test("counts per layer and group", () => {
@@ -75,8 +85,42 @@ test("counts per layer and group", () => {
 test("filter equality ignores key order and unknown keys", async () => {
   const { sameFilters } = await import("./mapLayers.ts");
   const a = defaultFilters("unknown");
-  const b = { spawns: { groups: { scav: true, pmc: true }, on: true }, extracts: { ...a.extracts }, stale: {} };
+  const b = { ...structuredClone(a), spawns: { groups: { scav: true, pmc: true } }, stale: {} };
   assert.equal(sameFilters(a, b), true);
   b.spawns.groups.pmc = false;
   assert.equal(sameFilters(a, b), false);
+});
+
+test("other layers: containers grouped by name and deduplicated, bosses merged per point, zones keep outlines", () => {
+  const p = at(5, 5, 1);
+  const markers = buildMarkers(map({
+    lootContainers: [{ lootContainer: "c1", position: p }, { lootContainer: "c1", position: p }, { lootContainer: "c2", position: at(9, 9) }],
+    bosses: [
+      { mob: "bossKnight", spawnChance: 0.5, spawnLocations: [{ name: "Bunker", chance: 1, positions: [p] }] },
+      { mob: "sectantPriest", spawnChance: 0.3, spawnLocations: [{ name: "Bunker", chance: 0.5, positions: [p] }] },
+      { mob: "pmcUSEC", spawnChance: 1, spawnLocations: [{ name: "Road", chance: 1, positions: [at(1, 1)] }] },
+    ],
+    hazards: [{ id: "h", hazardType: "minefield", name: "Landmine", position: p, outline: [at(0, 0), at(1, 0), at(1, 1)] }],
+    artillery: { zones: [{ id: "a", position: p, outline: [at(0, 0)], botom: 1, top: 2 }] },
+    btrStops: [{ name: "Stop", x: 1, y: 2, z: 3 }],
+  }), {
+    containers: { c1: { name: "Safe", normalizedName: "safe" }, c2: { name: "PMC body", normalizedName: "pmc-body" } },
+    mobs: { bossKnight: { name: "Knight", normalizedName: "knight" }, sectantPriest: { name: "Cultist Priest", normalizedName: "cultist-priest" } },
+  });
+  const by = (layer) => markers.filter((m) => m.layer === layer);
+  assert.deepEqual(by("containers").map((m) => [m.groups[0], m.icon]), [["valuables", "container_safe"], ["bodies", "container_dead-scav"]]);
+  const [shared, pmc] = by("bosses");
+  assert.equal(shared.label, "Knight, Cultist Priest");
+  assert.deepEqual(shared.tags, ["Bunker", "Knight 50%", "Cultist Priest 15%"]);
+  assert.deepEqual(pmc.groups, ["pmcs"]);
+  assert.deepEqual(by("hazards").map((m) => [m.groups[0], m.outline.length]), [["minefield", 3], ["artillery", 1]]);
+  assert.deepEqual(by("other")[0].position, { x: 1, y: 2, z: 3 });
+});
+
+test("noisy layers and groups start hidden", () => {
+  const filters = defaultFilters("unknown");
+  assert.equal(filters.loose.groups.loose, false);
+  assert.equal(filters.containers.groups.general, false);
+  assert.equal(filters.bosses.groups.pmcs, false);
+  assert.equal(defaultFilters("scav").containers.groups.valuables, true);
 });
