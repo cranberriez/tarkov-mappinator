@@ -129,10 +129,117 @@ pub fn safe_name(name: &str) -> bool {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
+/// What another game mode changes relative to the baseline split.
+/// Fields are replaced whole: boss and spawn lists have no ids to match entries on.
+#[derive(Debug, Default, PartialEq)]
+pub struct ModeDiff {
+    /// Per map, the top-level fields whose values differ (or that the baseline lacks).
+    /// A map the baseline does not have carries all of its fields.
+    pub maps: Vec<(String, Map<String, Value>)>,
+    /// Differing `common` fields.
+    pub common: Map<String, Value>,
+    /// The mode's mobs, when they differ.
+    pub mobs: Option<Value>,
+}
+
+fn changed_fields(baseline: Option<&Value>, other: &Value) -> Map<String, Value> {
+    let Some(other) = other.as_object() else {
+        return Map::new();
+    };
+    other
+        .iter()
+        .filter(|(key, value)| baseline.and_then(|base| base.get(key.as_str())) != Some(value))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect()
+}
+
+pub fn diff(baseline: &Split, other: Split) -> ModeDiff {
+    let maps = other
+        .maps
+        .into_iter()
+        .filter_map(|(name, map)| {
+            let base = baseline
+                .maps
+                .iter()
+                .find(|(base, _)| *base == name)
+                .map(|(_, map)| map);
+            let fields = changed_fields(base, &map);
+            (!fields.is_empty()).then_some((name, fields))
+        })
+        .collect();
+    ModeDiff {
+        maps,
+        common: changed_fields(Some(&baseline.common), &other.common),
+        mobs: (other.mobs != baseline.mobs).then_some(other.mobs),
+    }
+}
+
+/// Baseline document with a mode's changed fields laid over it.
+pub fn overlay(mut baseline: Value, fields: Map<String, Value>) -> Value {
+    if let Some(object) = baseline.as_object_mut() {
+        object.extend(fields);
+        baseline
+    } else {
+        Value::Object(fields)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn mode_diff_keeps_only_changed_fields_and_overlays_back() {
+        let baseline = split(json!({ "data": {
+            "maps": {
+                "a": { "normalizedName": "customs", "bosses": [1], "lootContainers": [9], "extracts": [{ "id": "x", "faction": "pmc" }] },
+                "b": { "normalizedName": "woods", "bosses": [] }
+            },
+            "mobs": { "boss": 1 }, "lootContainers": { "c": 1 }, "goonReports": [1]
+        } })).unwrap();
+        let other = split(json!({ "data": {
+            "maps": {
+                "a": { "normalizedName": "customs", "bosses": [2], "lootContainers": [9], "extracts": [{ "id": "x", "faction": "scav" }] },
+                "b": { "normalizedName": "woods", "bosses": [] },
+                "c": { "normalizedName": "arena", "bosses": [] }
+            },
+            "mobs": { "boss": 1 }, "lootContainers": { "c": 1 }, "goonReports": [2]
+        } })).unwrap();
+        let diff = diff(&baseline, other);
+        let names: Vec<_> = diff
+            .maps
+            .iter()
+            .map(|(name, fields)| (name.as_str(), fields.keys().cloned().collect::<Vec<_>>()))
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                (
+                    "arena",
+                    vec!["bosses".to_string(), "normalizedName".to_string()]
+                ),
+                (
+                    "customs",
+                    vec!["bosses".to_string(), "extracts".to_string()]
+                ),
+            ]
+        );
+        assert_eq!(diff.common.keys().collect::<Vec<_>>(), vec!["goonReports"]);
+        assert_eq!(diff.mobs, None);
+
+        let customs = baseline
+            .maps
+            .iter()
+            .find(|(name, _)| name == "customs")
+            .unwrap()
+            .1
+            .clone();
+        let merged = overlay(customs, diff.maps[1].1.clone());
+        assert_eq!(merged["bosses"], json!([2]));
+        assert_eq!(merged["extracts"][0]["faction"], "scav");
+        assert_eq!(merged["lootContainers"], json!([9]));
+    }
 
     fn sample() -> Value {
         json!({

@@ -45,8 +45,8 @@ Monitoring reads up to 32 log files in the current session, bounded to 1 MiB per
 - `src/lib`: TypeScript IPC client and reusable presentation logic.
 - `src/App.tsx`: diagnostic interface.
 - `src/maps`: self-contained map library: game map identities (resolves the raw log ids in `RaidState.map`), vendored [tarkov-dev SVG maps](https://github.com/the-hideout/tarkov-dev-svg-maps), tarkov.dev calibration and tile paths, world → map projection, floor lookup, `<MapArt>`, `<MapTiles>`, and icons. Refresh with `node scripts/vendor-maps.mjs`; see [attribution and licenses](src/maps/ATTRIBUTION.md).
-- `src-tauri/src/tarkov_data`: background mirror of `https://json.tarkov.dev/pve/maps` in the app data folder (`tarkov-data/`), split into `manifest.json`, `common.json`, `mobs.json`, and `maps/<name>.json`. Checked at startup and every 6 hours with ETag; swapped in atomically.
-- `src/tarkov-data`: TypeScript client for the mirror: status, per-map reads, and hooks.
+- `src-tauri/src/tarkov_data`: background mirror of tarkov.dev map data in the app data folder (`tarkov-data/`). PvE (`/pve/maps`) is stored whole as `manifest.json`, `common.json`, `mobs.json`, and `maps/<name>.json`; PvP (`/regular/`) and PvP season (`/pvp-season/`) store only the top-level fields that differ, under `modes/<mode>/`, merged on read. Checked at startup and every 6 hours with per-mode ETags; any change rebuilds the store, swapped in atomically.
+- `src/tarkov-data`: TypeScript client for the mirror: status, per-map reads by mode (`dataMode(raid.game_mode)`), and hooks.
 - `src-tauri/src/tile_cache.rs`: `tiles` URI scheme serving tarkov.dev map tiles from a disk cache (`tile-cache/` in the app data folder), fetching on first view; per-map pre-download from Settings.
 
 Rust owns monitoring, deduplication, log offsets, capture eligibility, parsing, heading conventions, and raid association. TypeScript owns forms, formatting, map rendering, and coordinate-to-screen transforms. A future website consumes the same scanner contract through a separate adapter.

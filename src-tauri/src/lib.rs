@@ -87,19 +87,24 @@ fn raw(json: String) -> Result<Box<RawValue>, String> {
     RawValue::from_string(json).map_err(|error| error.to_string())
 }
 
-#[tauri::command]
-fn tarkov_data_map(name: String, data: State<'_, Arc<TarkovData>>) -> Result<Box<RawValue>, String> {
-    raw(data.map_json(&name)?)
+/// `mode` is a tarkov.dev data set (`pve`, `regular`, `pvp-season`); omitted means PvE.
+#[tauri::command(async)]
+fn tarkov_data_map(
+    name: String,
+    mode: Option<String>,
+    data: State<'_, Arc<TarkovData>>,
+) -> Result<Box<RawValue>, String> {
+    raw(data.map_json(&name, mode.as_deref())?)
 }
 
-#[tauri::command]
-fn tarkov_data_common(data: State<'_, Arc<TarkovData>>) -> Result<Box<RawValue>, String> {
-    raw(data.common_json()?)
+#[tauri::command(async)]
+fn tarkov_data_common(mode: Option<String>, data: State<'_, Arc<TarkovData>>) -> Result<Box<RawValue>, String> {
+    raw(data.common_json(mode.as_deref())?)
 }
 
-#[tauri::command]
-fn tarkov_data_mobs(data: State<'_, Arc<TarkovData>>) -> Result<Box<RawValue>, String> {
-    raw(data.mobs_json()?)
+#[tauri::command(async)]
+fn tarkov_data_mobs(mode: Option<String>, data: State<'_, Arc<TarkovData>>) -> Result<Box<RawValue>, String> {
+    raw(data.mobs_json(mode.as_deref())?)
 }
 
 #[tauri::command(async)]
