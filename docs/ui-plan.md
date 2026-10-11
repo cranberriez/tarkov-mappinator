@@ -32,7 +32,8 @@
 - Backend datastore for imported/observed history (currently frontend `localStorage`).
 - Thumbnail generation in Rust if full-size PNG previews prove too heavy.
 - Backend position history (currently the frontend accumulates `latest_position` per session; lost on reload).
-- Real map images + calibration (world → image transform per map), verified heading.
+- Verified heading (map art + calibration landed via `src/maps`). Manual floor selection; map art on Overview/Timeline plots.
+- Map overlays from `src/tarkov-data`: extracts, loot containers, spawns, hazards.
 - Persisted folder config.
 - Raid outcome, quest names (IDs only today).
 

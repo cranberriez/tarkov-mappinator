@@ -27,7 +27,7 @@ Start monitoring before taking a new in-game screenshot. Existing files are base
 
 Existing logs can recover context when starting mid-raid, explicitly marked recovered rather than a live start. Only evidenced map aliases are normalized; unknown fields remain unknown. See the [evidence matrix](fixtures/log-evidence.md): samples establish PvE and Customs, but not Scav role. A PvE `/client/match/local/end` request establishes that the client reported its local raid ended. Neither this request nor session-stop detection establishes extraction, death, or successful server processing.
 
-Preferences across app restarts, tray behavior, maps, saved markers, and HTTP remain out of scope.
+Preferences across app restarts, tray behavior, and saved markers remain out of scope.
 
 ## Log activity
 
@@ -44,8 +44,11 @@ Monitoring reads up to 32 log files in the current session, bounded to 1 MiB per
 - `src/bindings`: generated IPC data types; regenerate after changing Rust models.
 - `src/lib`: TypeScript IPC client and reusable presentation logic.
 - `src/App.tsx`: diagnostic interface.
+- `src/maps`: self-contained map library: vendored [tarkov-dev SVG maps](https://github.com/the-hideout/tarkov-dev-svg-maps), tarkov.dev calibration, world → map projection, floor lookup, `<MapArt>`, and icons. Refresh with `node scripts/vendor-maps.mjs`; see [attribution and licenses](src/maps/ATTRIBUTION.md).
+- `src-tauri/src/tarkov_data`: background mirror of `https://json.tarkov.dev/pve/maps` in the app data folder (`tarkov-data/`), split into `manifest.json`, `common.json`, `mobs.json`, and `maps/<name>.json`. Checked at startup and every 6 hours with ETag; swapped in atomically.
+- `src/tarkov-data`: TypeScript client for the mirror: status, per-map reads, and hooks.
 
-Rust owns monitoring, deduplication, log offsets, capture eligibility, parsing, heading conventions, and raid association. TypeScript owns forms and formatting; future map rendering, coordinate-to-screen transforms, and planning UI can also live there. A future website consumes the same scanner contract through a separate adapter.
+Rust owns monitoring, deduplication, log offsets, capture eligibility, parsing, heading conventions, and raid association. TypeScript owns forms, formatting, map rendering, and coordinate-to-screen transforms. A future website consumes the same scanner contract through a separate adapter.
 
 ## Verify
 

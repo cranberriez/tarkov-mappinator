@@ -1,6 +1,9 @@
 mod scanner;
+mod tarkov_data;
 
 use scanner::{import, FolderConfig, ScannerService, ScannerSnapshot};
+use serde_json::value::RawValue;
+use tarkov_data::{DataStatus, TarkovData};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
@@ -62,11 +65,64 @@ fn cancel_import(control: State<'_, ImportControl>) {
     control.cancel.store(true, Ordering::SeqCst);
 }
 
+#[tauri::command]
+fn tarkov_data_status(data: State<'_, Arc<TarkovData>>) -> DataStatus {
+    data.status()
+}
+
+/// Starts a sync now, regardless of age; progress arrives as `tarkov-data:updated`.
+#[tauri::command]
+fn tarkov_data_sync(app: tauri::AppHandle, data: State<'_, Arc<TarkovData>>) {
+    let data = data.inner().clone();
+    std::thread::spawn(move || {
+        data.sync(|status| {
+            let _ = app.emit("tarkov-data:updated", status);
+        });
+    });
+}
+
+fn raw(json: String) -> Result<Box<RawValue>, String> {
+    RawValue::from_string(json).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn tarkov_data_map(name: String, data: State<'_, Arc<TarkovData>>) -> Result<Box<RawValue>, String> {
+    raw(data.map_json(&name)?)
+}
+
+#[tauri::command]
+fn tarkov_data_common(data: State<'_, Arc<TarkovData>>) -> Result<Box<RawValue>, String> {
+    raw(data.common_json()?)
+}
+
+#[tauri::command]
+fn tarkov_data_mobs(data: State<'_, Arc<TarkovData>>) -> Result<Box<RawValue>, String> {
+    raw(data.mobs_json()?)
+}
+
+/// Checks tarkov.dev at startup and whenever the last check is older than `tarkov_data::MAX_AGE`.
+fn spawn_data_sync(app: tauri::AppHandle, data: Arc<TarkovData>) {
+    std::thread::spawn(move || loop {
+        if data.is_stale(chrono::Utc::now()) {
+            data.sync(|status| {
+                let _ = app.emit("tarkov-data:updated", status);
+            });
+        }
+        // Also the retry interval after a failed sync.
+        std::thread::sleep(std::time::Duration::from_secs(15 * 60));
+    });
+}
+
 pub fn run() {
     tauri::Builder::default()
         .manage(Mutex::new(ScannerService::new()))
         .manage(ImportControl::default())
         .setup(|app| {
+            let store = app.path().app_data_dir()?.join("tarkov-data");
+            let data = Arc::new(TarkovData::open(store));
+            app.manage(data.clone());
+            spawn_data_sync(app.handle().clone(), data);
+
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
                 std::thread::sleep(std::time::Duration::from_secs(1));
@@ -85,7 +141,12 @@ pub fn run() {
             start_scanner,
             stop_scanner,
             start_import,
-            cancel_import
+            cancel_import,
+            tarkov_data_status,
+            tarkov_data_sync,
+            tarkov_data_map,
+            tarkov_data_common,
+            tarkov_data_mobs
         ])
         .run(tauri::generate_context!())
         .expect("Unable to launch Tarkov Mappinator");

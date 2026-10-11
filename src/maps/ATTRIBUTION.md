@@ -1,0 +1,9 @@
+# Map library sources
+
+Vendored by `scripts/vendor-maps.mjs`; pinned commits are recorded in `calibration.json` under `source`.
+
+- `assets/svg/`: [the-hideout/tarkov-dev-svg-maps](https://github.com/the-hideout/tarkov-dev-svg-maps), licensed [CC BY-NC-SA 4.0](http://creativecommons.org/licenses/by-nc-sa/4.0/). The license is revoked for software that facilitates cheating (radars, ESP overlays, cheat-client maps, automation). Unmodified; only displayed.
+- `assets/icons/` and calibration in `calibration.json` (`transform`, `coordinateRotation`, `bounds`, `svgBounds`, `layers`, `labels`): [the-hideout/tarkov-dev](https://github.com/the-hideout/tarkov-dev) (`public/maps/interactive`, `src/data/maps.json`), MIT License, Copyright (c) 2019 Oskar Risberg.
+- `aliases` in `calibration.json`: derived from the [tarkov.dev API](https://json.tarkov.dev/pve/maps) (`nameId`, `scenePath`, English name).
+
+`Labs.svg` exists upstream but tarkov.dev has no SVG calibration for it, so it is not vendored. Labs, Labyrinth and Icebreaker fall back to the plain metric grid.

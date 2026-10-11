@@ -273,6 +273,8 @@ input:disabled { opacity: .55; }
   background-size: var(--major) var(--major), var(--major) var(--major), var(--minor) var(--minor), var(--minor) var(--minor);
   background-position: var(--ox) var(--oy); }
 .map-canvas:active { cursor: grabbing; }
+.map-canvas.calibrated { background-image: none; }
+.map-art { position: absolute; pointer-events: none; }
 .map-axis { position: absolute; background: rgb(205 182 139 / 12%); pointer-events: none; }
 .map-axis.x { left: 0; right: 0; height: 1px; }
 .map-axis.y { top: 0; bottom: 0; width: 1px; }

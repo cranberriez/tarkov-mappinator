@@ -3,6 +3,8 @@ import type { Scanner } from "../lib/useScanner";
 import type { FolderConfig } from "../bindings/FolderConfig";
 import type { SourceHealth } from "../bindings/SourceHealth";
 import { LogCoveragePanel } from "../components/LogCoveragePanel";
+import { syncData, useDataStatus } from "../tarkov-data";
+import { age } from "../lib/format";
 
 const statusLabel: Record<SourceHealth["status"], string> = {
   not_configured: "Not set", available: "Accessible", missing: "Missing", not_directory: "Not a folder", unreadable: "No access",
@@ -64,9 +66,32 @@ export function SettingsPage({ scanner }: { scanner: Scanner }) {
         : <p className="faint">{snapshot ? "No issues reported." : "Backend not connected."}</p>}
     </section>
 
+    <MapDataSection />
+
     <section className="settings-section">
       <h2>Log coverage</h2>
       <LogCoveragePanel snapshot={snapshot} />
     </section>
   </div>;
+}
+
+function MapDataSection() {
+  const status = useDataStatus();
+  const manifest = status?.manifest;
+  const syncing = status?.state === "syncing";
+  const ago = (value: string | undefined) => value ? `${age(value, Date.now())} ago` : "—";
+  return <section className="settings-section">
+    <h2>Map data</h2>
+    <div className="stats compact">
+      <div className="stat"><span>Maps</span><strong>{manifest?.maps.length ?? "—"}</strong></div>
+      <div className="stat"><span>Downloaded</span><strong>{ago(manifest?.fetched_at)}</strong></div>
+      <div className="stat"><span>Checked</span><strong>{syncing ? "Checking…" : ago(manifest?.checked_at)}</strong></div>
+    </div>
+    {status?.state === "failed" && <p className="faint">{status.error}</p>}
+    <div className="form-actions">
+      <button type="button" className="secondary" disabled={!status || syncing} onClick={() => void syncData()}>
+        {syncing ? "Syncing…" : "Check now"}</button>
+      <span className="faint">From tarkov.dev, checked every 6 hours.</span>
+    </div>
+  </section>;
 }
