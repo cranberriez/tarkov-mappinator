@@ -24,6 +24,15 @@ export const lifecycleLabel: Record<string, string> = {
   unknown: "No raid", loading: "Loading", active: "In raid", ended: "Raid ended",
 };
 
+/** "12 minutes", "1 hour 5 minutes". */
+export function longSpan(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const minutes = Math.round(ms / 60000);
+  const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  if (minutes < 60) return unit(minutes, "minute");
+  return minutes % 60 ? `${unit(Math.floor(minutes / 60), "hour")} ${unit(minutes % 60, "minute")}` : unit(minutes / 60, "hour");
+}
+
 export function span(ms: number) {
   if (!Number.isFinite(ms) || ms < 0) return null;
   const minutes = Math.round(ms / 60000);

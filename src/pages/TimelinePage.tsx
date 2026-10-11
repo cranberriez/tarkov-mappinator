@@ -3,7 +3,8 @@ import type { Scanner } from "../lib/useScanner";
 import type { PositionHistory } from "../lib/positions";
 import { positionsForRaid, toPlane } from "../lib/positions";
 import { parseTime, raidColor, raidStatus, type RaidRecord, type RaidStatus } from "../lib/raids";
-import { span } from "../lib/format";
+import { longSpan, span } from "../lib/format";
+import { ModeChip } from "../components/ModeChip";
 import { useNow } from "../lib/useNow";
 
 const endLabel: Record<RaidStatus, string> = { active: "In raid", ended: "Raid ended", unknown: "End not observed" };
@@ -41,7 +42,10 @@ export function TimelinePage({ scanner }: { scanner: Scanner }) {
       {raids.map((raid, index) => {
         const status = raidStatus(raid, index, snapshot?.raid);
         const end = status === "active" ? now : parseTime(raid.ended_at);
-        const duration = span(end - parseTime(raid.started_at));
+        const elapsed = end - parseTime(raid.started_at);
+        const track = inOrder(positionsForRaid(positions, raid.id));
+        // With a track the end row carries the duration; without one it fills the empty span instead.
+        const duration = track.length ? span(elapsed) : null;
         return <li key={raid.id} className={`tl-raid ${status}`} style={{ "--raid": raidColor(raid) } as CSSProperties}>
           <div className="tl-node">
             <span className="tl-dot end" />
@@ -49,12 +53,15 @@ export function TimelinePage({ scanner }: { scanner: Scanner }) {
             <span className="faint">{status === "ended" ? when(raid.ended_at) : ""}{duration && ` · ${duration}`}</span>
           </div>
           <div className="tl-span">
-            <RaidTrack raid={raid} positions={inOrder(positionsForRaid(positions, raid.id))} />
+            {track.length
+              ? <RaidTrack raid={raid} positions={track} />
+              : <p className="tl-empty">{longSpan(elapsed) ?? "Duration unknown"}<span className="faint"> · no positions</span></p>}
           </div>
           <div className="tl-node">
             <span className="tl-dot start" />
             <strong>{raid.map ?? "Unknown map"}</strong>
-            <span className="faint">{[raid.game_mode, raid.player_role, `Started ${when(raid.started_at)}`].filter(Boolean).join(" · ")}</span>
+            <ModeChip mode={raid.game_mode} />
+            <span className="faint">{[raid.player_role, `Started ${when(raid.started_at)}`].filter(Boolean).join(" · ")}</span>
           </div>
         </li>;
       })}
@@ -64,7 +71,6 @@ export function TimelinePage({ scanner }: { scanner: Scanner }) {
 }
 
 function RaidTrack({ raid, positions }: { raid: RaidRecord; positions: PositionHistory }) {
-  if (!positions.length) return <p className="tl-empty faint">No positions captured</p>;
   const points = positions.map(toPlane);
   const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);

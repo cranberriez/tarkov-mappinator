@@ -10,7 +10,7 @@ export type ImportPhase = "idle" | "discovering" | "reading_logs" | "reading_scr
 export type ImportTile = ImportFile & { raid_id: string | null; detail: string | null };
 
 /** Delay that lets the import animation play before data lands. */
-const IMPORT_ANIMATION_MS = 1100;
+const IMPORT_ANIMATION_MS = 2000;
 
 export const previewSrc = (path: string) => (isTauri() && path ? convertFileSrc(path) : undefined);
 

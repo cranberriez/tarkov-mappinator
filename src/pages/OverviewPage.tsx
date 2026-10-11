@@ -4,6 +4,7 @@ import { freshness, positionsForRaid, toPlane } from "../lib/positions";
 import { age, clock, lifecycleLabel, timestamp } from "../lib/format";
 import { useNow } from "../lib/useNow";
 import type { Page } from "../components/Sidebar";
+import { ModeChip } from "../components/ModeChip";
 
 export function OverviewPage({ scanner, onNavigate }: { scanner: Scanner; onNavigate: (page: Page) => void }) {
   const { snapshot, positions, running, connected, desktop } = scanner;
@@ -81,7 +82,7 @@ export function OverviewPage({ scanner, onNavigate }: { scanner: Scanner; onNavi
       </header>
 
       <dl className="raid-details">
-        {details.map(([label, value, priority]) => <div key={label} className={`p${priority}`}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}
+        {details.map(([label, value, priority]) => <div key={label} className={`p${priority}`}><dt>{label}</dt><dd title={value}>{label === "Game mode" && raid?.game_mode ? <ModeChip mode={raid.game_mode} /> : value}</dd></div>)}
       </dl>
 
       <div className="raid-body">

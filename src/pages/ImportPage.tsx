@@ -15,6 +15,8 @@ const sourceLabel: Record<string, string> = {
   errors: "ERR", traces: "TRC", hideout: "HIDE", ai: "AI", asserts: "ASRT",
 };
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
 function size(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 ** 2) return `${Math.round(bytes / 1024)} KB`;
@@ -26,13 +28,14 @@ const tileColor = (tile: ImportTile) => {
   return start ? raidColor({ started_at: start }) : undefined;
 };
 
-const Tile = memo(function Tile({ tile, order, importing }: { tile: ImportTile; order: number; importing: boolean }) {
+/** `stage` drives the import animation; "imported" pins the end state so the entrance animation never replays. */
+const Tile = memo(function Tile({ tile, order, stage }: { tile: ImportTile; order: number; stage: "importing" | "imported" | null }) {
   const style = {
     "--raid": tileColor(tile),
-    "--delay": `${Math.min(order * 6, 700)}ms`,
+    "--delay": `${Math.min(order * 8, 1000)}ms`,
   } as CSSProperties;
   const title = [tile.name, tile.group, tile.detail].filter(Boolean).join("\n");
-  return <div className={`tile ${tile.kind} ${tile.status} ${importing && tile.status === "used" ? "importing" : ""}`} style={style} title={title}>
+  return <div className={`tile ${tile.kind} ${tile.status} ${stage && tile.status === "used" ? stage : ""}`} style={style} title={title}>
     {tile.kind === "screenshot"
       ? previewSrc(tile.path) && <img src={previewSrc(tile.path)} loading="lazy" decoding="async" alt="" draggable={false} />
       : <><span className="tile-source">{sourceLabel[tile.source ?? ""] ?? "LOG"}</span><span className="tile-size">{size(tile.size)}</span></>}
@@ -40,19 +43,22 @@ const Tile = memo(function Tile({ tile, order, importing }: { tile: ImportTile; 
   </div>;
 });
 
-function Panel({ title, tiles, importing, empty }: { title: string; tiles: ImportTile[]; importing: boolean; empty: string }) {
+function Panel({ title, tiles, stage, empty, found }: {
+  title: string; tiles: ImportTile[]; stage: "importing" | "imported" | null; empty: string; found: string | null;
+}) {
   const done = tiles.filter((tile) => tile.status !== "pending").length;
   const used = tiles.filter((tile) => tile.status === "used");
   let order = 0;
   return <section className="import-panel">
     <header>
       <h2>{title}</h2>
-      <span className="faint">{tiles.length ? `${used.length} used · ${done}/${tiles.length} read` : ""}</span>
+      {found && <span className="panel-found">{found}</span>}
+      <span className="faint">{tiles.length ? `${done < tiles.length ? `${done}/` : ""}${tiles.length} files · ${used.length} used` : ""}</span>
     </header>
     <div className="import-progress"><span style={{ width: tiles.length ? `${done / tiles.length * 100}%` : 0 }} /></div>
     {tiles.length
       ? <div className="tile-grid">{tiles.map((tile) =>
-        <Tile key={tile.id} tile={tile} importing={importing} order={tile.status === "used" ? order++ : 0} />)}</div>
+        <Tile key={tile.id} tile={tile} stage={stage} order={tile.status === "used" ? order++ : 0} />)}</div>
       : <p className="faint import-empty">{empty}</p>}
   </section>;
 }
@@ -64,17 +70,14 @@ export function ImportPage({ scanner, importer, onNavigate }: { scanner: Scanner
   const shots = files.filter((file) => file.kind === "screenshot");
   const logs = files.filter((file) => file.kind === "log");
   const busy = running(phase);
+  const stage = phase === "importing" || phase === "imported" ? phase : null;
   const hasData = !!result && (result.raids.length > 0 || result.positions.length > 0);
 
   return <div className="import-page">
     <header className="import-header">
       <h1>Import</h1>
       <span className={`import-phase ${phase}`}>{phaseLabel[phase]}</span>
-      {result && <span className="import-summary">
-        <strong>{result.raids.length}</strong> raids · <strong>{result.positions.length}</strong> positions
-        {result.unmatched_screenshots > 0 && <span className="faint"> · {result.unmatched_screenshots} outside raids</span>}
-        {result.cancelled && <span className="faint"> · cancelled</span>}
-      </span>}
+      {result?.cancelled && <span className="faint">Cancelled · partial results</span>}
       <div className="import-actions">
         {phase === "imported" && <button type="button" className="link" onClick={() => onNavigate("timeline")}>Open timeline</button>}
         {busy
@@ -90,8 +93,10 @@ export function ImportPage({ scanner, importer, onNavigate }: { scanner: Scanner
     {desktop && !configured && <p className="faint">Set the source folders in <button type="button" className="link" onClick={() => onNavigate("settings")}>Settings</button> first.</p>}
 
     <div className={`import-panels ${phase === "importing" ? "importing" : ""}`}>
-      <Panel title="Screenshots" tiles={shots} importing={phase === "importing"} empty={phase === "idle" ? "Scan to discover screenshots." : "No screenshots found."} />
-      <Panel title="Logs" tiles={logs} importing={phase === "importing"} empty={phase === "idle" ? "Scan to discover log files." : "No log files found."} />
+      <Panel title="Screenshots" tiles={shots} stage={stage}
+        found={result ? `${plural(result.positions.length, "position")}${result.unmatched_screenshots ? ` · ${result.unmatched_screenshots} outside raids` : ""}` : null} empty={phase === "idle" ? "Scan to discover screenshots." : "No screenshots found."} />
+      <Panel title="Logs" tiles={logs} stage={stage}
+        found={result ? plural(result.raids.length, "raid") : null} empty={phase === "idle" ? "Scan to discover log files." : "No log files found."} />
     </div>
   </div>;
 }
