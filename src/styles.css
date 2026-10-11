@@ -279,6 +279,7 @@ input:disabled { opacity: .55; }
 .map-axis.x { left: 0; right: 0; height: 1px; }
 .map-axis.y { top: 0; bottom: 0; width: 1px; }
 .map-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--faint); pointer-events: none; }
+.map-empty.on-map { inset: auto 0 14px; }
 
 .marker { position: absolute; border-radius: 50%; transform: translate(-50%, -50%) rotate(var(--rot)); pointer-events: auto; }
 .marker.pointer { border-radius: 0 50% 50% 50%; }
@@ -292,6 +293,13 @@ input:disabled { opacity: .55; }
 
 .map-chip { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 12px;
   border-radius: 14px; background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); font-size: 12px; font-weight: 500; }
+.map-switch { position: absolute; top: 50px; right: 14px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.map-switch-button { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; color: var(--muted);
+  background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); }
+.map-switch-button:hover { color: var(--text); }
+.map-switch-button.active { color: var(--accent); }
+.map-switch-list { display: flex; flex-direction: column; gap: 2px; padding: 4px; min-width: 150px;
+  border-radius: 9px; background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); }
 /* Left column: layers panel at the top, floor picker and toolbar at the bottom; the panels shrink before overlapping. */
 .map-left { position: absolute; left: 14px; top: 14px; bottom: 14px; z-index: 3; display: flex; flex-direction: column;
   justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; }
