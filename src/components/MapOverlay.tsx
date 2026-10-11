@@ -11,12 +11,12 @@ import { markerIcon, type Filters, type MapMarker } from "../lib/mapLayers";
  */
 export const MapOverlay = memo(function MapOverlay({ markers, filters, projection, floors, floor, labelled }: {
   markers: MapMarker[]; filters: Filters; projection: MapProjection;
-  /** Floor name per marker id (null = base floor) and the floor being viewed. */
-  floors: Map<string, string | null>; floor: string | null;
+  /** Floor name per marker id (null = base floor), and the floor shown: a name, null for the base, undefined for all. */
+  floors: Map<string, string | null>; floor: string | null | undefined;
   labelled: boolean;
 }) {
   const at = (point: { x: number; z: number }) => projection.toPlane(point);
-  const otherFloor = (marker: MapMarker) => (floors.get(marker.id) ?? null) !== floor;
+  const otherFloor = (marker: MapMarker) => floor !== undefined && (floors.get(marker.id) ?? null) !== floor;
   const zones = markers.filter((marker) => marker.outline?.length);
 
   return <>
