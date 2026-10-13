@@ -11,6 +11,7 @@ export { baseFloor, floorAt, floorById, floorsOf, GROUND, UNDERGROUND_OPACITY, t
 export { tileBounds, tileCount, tilePathAt, tileRange, tileSets, tileZoom, tilesIn, type Tile } from "./tiles.ts";
 export { iconUrl, MapAssetsContext, useMapAssets, webAssets, type MapAssets } from "./assets.ts";
 export { containerIcon, mapIcons } from "./icons.ts";
+export { documentLocations, documentPhoto, documentSource, type DocumentLocation } from "./documents.ts";
 export { tarkovPreset, type CategoryDef, type DocumentType, type DynamicLayer, type GroupDef, type LayerDef, type MarkerPreset } from "./markerPreset.ts";
 export {
   buildMarkers, countMarkers, defaultFilters, groupOn, isVisible, layerState, layersFor, markerIcon, markerTint, roleOf, sameFilters,

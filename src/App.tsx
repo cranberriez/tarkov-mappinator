@@ -62,7 +62,7 @@ export function App() {
       <main className="content">
         {page === "overview" && <OverviewPage scanner={scanner} onNavigate={navigate} />}
         {page === "map" && <MapPage key={viewing?.id ?? "live"} scanner={scanner} viewing={viewing} onCloseViewing={() => setViewingId(null)} mode={gameMode.mode} valuableLoot={valuableLoot.on}
-          members={group.members} focus={memberFocus} />}
+          members={group.members} focus={memberFocus} documentLinker={dev.flags.documentLinker} />}
         {page === "group" && <GroupPage group={group} onShowMember={(id) => { setViewingId(null); setMemberFocus({ id, nonce: Date.now() }); setPage("map"); }} />}
         {page === "timeline" && <TimelinePage scanner={scanner} onOpenRaid={(id) => { setViewingId(id); setPage("map"); }} />}
         {page === "activity" && <ActivityPage scanner={scanner} />}

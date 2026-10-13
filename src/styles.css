@@ -512,10 +512,11 @@ input:disabled { opacity: .55; }
 .overlay-marker.spawns img { width: 14px; height: 14px; }
 .overlay-marker.containers, .overlay-marker.access, .overlay-marker.other { transform: translate(-8px, -50%); }
 .overlay-marker.containers img, .overlay-marker.access img, .overlay-marker.other img { width: 16px; height: 16px; }
-/* Item icons that need to stand out sit on a round gradient of their colour. */
+/* Item icons that need to stand out sit on an opaque dark disc ringed in their colour. */
 img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fit: contain;
-  background: radial-gradient(circle, color-mix(in srgb, var(--tint) 95%, transparent), color-mix(in srgb, var(--tint) 60%, transparent) 80%); }
-.overlay-marker.documents { transform: translate(-10px, -50%); }
+  background: #131416; box-shadow: 0 0 0 1.5px var(--tint); }
+/* Markers sharing a spot (two document types) sit side by side around it. */
+.overlay-marker.documents { transform: translate(calc(-10px + var(--slot, 0) * 22px), -50%); }
 .overlay-marker.documents img { width: 20px; height: 20px; }
 .overlay-marker.loose { transform: translate(-5px, -50%); }
 .overlay-marker.loose img { width: 10px; height: 10px; filter: drop-shadow(0 0 1px #000) drop-shadow(0 1px 3px rgb(0 0 0 / 90%)); }
@@ -648,6 +649,10 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .marker-card { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 10px;
   background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); font-size: 12px; }
 .marker-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* A document's reference photo widens the card so the spot reads at a glance. */
+.marker-cards:has(.marker-card-photo) { width: 340px; }
+.marker-card-document { display: flex; flex-direction: column; gap: 2px; }
+.marker-card-photo { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; border-radius: 6px; margin-bottom: 4px; background: #131416; }
 .marker-card-head > img { width: 24px; height: 24px; flex-shrink: 0; }
 .marker-card-head .icon-button { width: 24px; height: 24px; margin: -4px -6px -4px 0; flex-shrink: 0; }
 .marker-card-title { display: flex; flex-direction: column; min-width: 0; flex: 1; font-weight: 500; }
@@ -685,3 +690,23 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 button.group-member:not(:disabled):hover { background: var(--surface-hover); }
 .group-member .group-name { font-weight: 500; margin-right: auto; }
 .group-alone { padding: 8px 6px; }
+
+/* Dev-only document photo linker: one photo at a time at the right; the marker card moves aside for it. */
+.doc-link-actions { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.doc-picker { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); z-index: 4; width: min(480px, 45%); max-height: calc(100% - 28px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 10px; background: rgb(15 16 17 / 88%); backdrop-filter: blur(8px); font-size: 12px; }
+.doc-picker-head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 500; }
+.doc-picker-photo { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 9; border-radius: 6px; background: #131416; overflow: hidden; }
+.doc-picker-photo img { width: 100%; height: 100%; object-fit: contain; }
+.doc-picker-photo .icon-button { position: absolute; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; background: rgb(15 16 17 / 70%); }
+.doc-picker-photo .icon-button:hover { background: rgb(15 16 17 / 90%); }
+.doc-picker-photo .prev { left: 6px; }
+.doc-picker-photo .next { right: 6px; }
+.doc-picker-info { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.map-page:has(.doc-picker) .marker-cards { right: calc(min(480px, 45%) + 28px); }
+.doc-picker-modes { display: flex; gap: 2px; }
+.doc-picker-modes button { padding: 3px 8px; border-radius: 6px; color: var(--muted); }
+.doc-picker-modes button.active { background: var(--surface-hover); color: var(--text); }
+.doc-picker-actions { display: flex; gap: 6px; }
+.doc-picker-actions .secondary { flex: 1; }
+.doc-picker-why { color: var(--warn); }

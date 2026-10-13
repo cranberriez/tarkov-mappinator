@@ -261,3 +261,25 @@ test("loose loot: one group per item category under its top level, uncategorised
   assert.deepEqual(plain[0].groups, ["loose"]);
   assert.equal(layersFor(plain).find((l) => l.key === "loose").categories, undefined);
 });
+
+test("document locations attach to the spawn under them; hand-placed ones elsewhere get their own marker", () => {
+  const project = "6a3181f178450ec91c0ea1aa";
+  const location = (id, x, z, match = "auto") => ({ id, maps: ["customs"], type: "project", title: id, position: { x, z }, match });
+  const markers = buildMarkers(map({ lootLoose: [{ position: at(10, 20), items: [project] }, { position: at(-40, 5), items: [project] }] }), {}, undefined, [
+    location("stale", 10.2, 20.1), location("linked", 10, 20, "manual"), location("placed", 100, 100, "manual"), { id: "loose", maps: ["customs"], type: "project", title: "loose" },
+  ]);
+  const documents = markers.filter((marker) => marker.layer === "documents");
+  assert.deepEqual(documents.map((marker) => [marker.id, marker.document?.id]),
+    [["document:0", "linked"], ["document:1", undefined], ["document:placed", "placed"]]);
+});
+
+test("a spawn that can hold two document types gets a marker per type, each with its own location", () => {
+  const [financial, project] = ["6a31807f17005505b70d5827", "6a3181f178450ec91c0ea1aa"];
+  const location = (id, type) => ({ id, maps: ["customs"], type, title: id, position: { x: 1, z: 2 }, match: "manual" });
+  const markers = buildMarkers(map({ lootLoose: [{ position: at(1, 2), items: [financial, project] }] }), {}, undefined,
+    [location("shelf", "financial"), location("desk", "project")]).filter((marker) => marker.layer === "documents");
+  assert.deepEqual(markers.map((marker) => [marker.id, marker.groups, marker.document?.id, marker.slot]), [
+    ["document:0:financial", ["financial"], "shelf", { index: 0, of: 2 }],
+    ["document:0:project", ["project"], "desk", { index: 1, of: 2 }],
+  ]);
+});

@@ -78,7 +78,8 @@ export const MapOverlay = memo(function MapOverlay({ markers, filters, preset = 
       const named = labelled && marker.layer === "extracts" && !!marker.label;
       const lootItem = lootIcons?.get(marker.id);
       return <div key={marker.id} className={`overlay-marker ${marker.layer} ${lootItem ? "valuable" : ""} ${otherFloor(marker) ? "other-floor" : ""} ${marker.id === selected ? "selected" : ""}`}
-        data-marker={marker.id} style={{ left: `calc(${x}px * var(--s))`, top: `calc(${y}px * var(--s))` }}>
+        data-marker={marker.id} style={{ left: `calc(${x}px * var(--s))`, top: `calc(${y}px * var(--s))`,
+          ...marker.slot ? { "--slot": marker.slot.index - (marker.slot.of - 1) / 2 } : {} } as CSSProperties}>
         <img src={icon(lootItem ? `item:${lootItem}` : markerIcon(marker, filters, preset)) ?? mapIcons.container_crate} alt="" draggable={false}
           className={tint ? "tinted" : undefined} style={tint ? { "--tint": tint } as CSSProperties : undefined} />
         {named && <span className="overlay-label">{marker.label}</span>}

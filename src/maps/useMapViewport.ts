@@ -27,11 +27,11 @@ export function initialView(projection: MapProjection, art: PlaneRect | null, fo
 
 /**
  * Pan and zoom over a map frame: drag to pan (applied once a frame), wheel and double click to zoom, eased `panTo`.
- * `onPan` runs as a drag starts moving the view; `onTap` gets the element under a press that barely moved.
+ * `onPan` runs as a drag starts moving the view; `onTap` gets the element under a press that barely moved, and its plane point.
  * With `zoomAroundCentre` the wheel zooms around the frame centre instead of the cursor.
  */
 export function useMapViewport({ unitsPerMetre, zoomAroundCentre = false, onPan, onTap }: {
-  unitsPerMetre: number; zoomAroundCentre?: boolean; onPan?: () => void; onTap?: (target: Element) => void;
+  unitsPerMetre: number; zoomAroundCentre?: boolean; onPan?: () => void; onTap?: (target: Element, at: PlanePoint) => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<Size>({ width: 0, height: 0 });
@@ -106,7 +106,10 @@ export function useMapViewport({ unitsPerMetre, zoomAroundCentre = false, onPan,
     },
     onPointerUp: (event: PointerEvent) => {
       const start = press.current;
-      if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) < TAP_PX) onTap?.(start.target);
+      if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) < TAP_PX) {
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+        onTap?.(start.target, { x: view.cx + (start.x - rect.left - size.width / 2) / view.scale, y: view.cy + (start.y - rect.top - size.height / 2) / view.scale });
+      }
       endDrag();
     },
     onPointerCancel: endDrag,

@@ -5,14 +5,15 @@ import { inCaptureOrder, positionsForRaid, toPlayerPosition } from "../lib/posit
 import type { RaidRecord } from "../lib/raids";
 import type { PositionObservation } from "../bindings/PositionObservation";
 import {
-  artStyleOf, baseFloor, buildMarkers, countMarkers, defaultFilters, floorAt, floorById, floorsOf, games, httpMapSource, isVisible, layersFor,
-  MapAssetsContext, mapName, maps as calibrations, resolveGame, resolveMap, roleOf, TarkovMap, useLookups, useMapData, withDefaults,
-  type ArtStyle, type Filters, type FloorSelection, type PlayerPosition, type PlayerTrack, type Role, type TarkovMapHandle,
+  artStyleOf, baseFloor, buildMarkers, countMarkers, defaultFilters, documentLocations, floorAt, floorById, floorsOf, games, httpMapSource, isVisible, layersFor,
+  MapAssetsContext, mapName, maps as calibrations, resolveGame, resolveMap, roleOf, TarkovMap, tarkovPreset, useLookups, useMapData, withDefaults,
+  type ArtStyle, type DocumentLocation, type Filters, type FloorSelection, type PlayerPosition, type PlayerTrack, type Role, type TarkovMapHandle,
 } from "../maps";
 import { type DataMode, useDesktopMapSource } from "../tarkov-data";
 import { bestLooseItems, useItemData } from "../lib/itemData";
 import { MapLayersPanel } from "../components/MapLayersPanel";
 import { MapMarkerCard } from "../components/MapMarkerCard";
+import { DocumentLinkActions, DocumentPicker, saveDocumentLink } from "../components/DocumentLinker";
 import { appAssets } from "../lib/tiles";
 import { keys, usePersisted } from "../lib/persist";
 import { age } from "../lib/format";
@@ -38,11 +39,13 @@ const webSource = isTauri() ? null : httpMapSource();
  * The live raid's map, or with `viewing` a past raid's: its positions up to the one picked on the
  * scrubber, which then stands in for the newest position (followed, floor picked from it).
  */
-export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, members = [], focus = null }: {
+export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, members = [], focus = null, documentLinker = false }: {
   scanner: Scanner; viewing: RaidRecord | null; onCloseViewing: () => void; mode: DataMode; valuableLoot: boolean;
   /** Other group members; those with a position on the shown map are drawn there. */
   members?: GroupMember[];
   focus?: MemberFocus | null;
+  /** Dev builds: the document photo linker (see DocumentLinker). */
+  documentLinker?: boolean;
 }) {
   const { snapshot, positions, connected, desktop } = scanner;
   const live = snapshot?.raid;
@@ -85,7 +88,10 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
   const source = webSource ?? desktopSource;
   const mapData = useMapData(source, shownKey, mode);
   const lookups = useLookups(source, mode);
-  const overlay = useMemo(() => mapData ? buildMarkers(mapData, lookups) : [], [mapData, lookups]);
+  const documents = useMemo(() => mapData ? documentLocations(mapData.normalizedName) : [], [mapData]);
+  const overlay = useMemo(() => mapData ? buildMarkers(mapData, lookups, tarkovPreset, documents) : [], [mapData, lookups, documents]);
+  const [placing, setPlacing] = useState<string | null>(null);
+  useEffect(() => setPlacing(null), [mapData]);
   const itemData = useItemData(mode);
   const getItem = itemData.ok ? itemData.get : undefined;
   const lootIcons = useMemo(() => valuableLoot && getItem ? bestLooseItems(overlay, getItem) : undefined, [valuableLoot, getItem, overlay]);
@@ -154,6 +160,14 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
     setChosenFloor(null);
     setCentre(member.position ? { key: `${member.id}|${nonce}`, map: key, point: member.position } : null);
   };
+  /** Document linker review: centres on the marker a location is matched to and pins it. */
+  const showDocument = (location: DocumentLocation) => {
+    const marker = overlay.find((other) => other.document?.id === location.id);
+    if (!marker || !shownKey) return;
+    leaveFollow();
+    setCentre({ key: `document|${location.id}|${Date.now()}`, map: shownKey, point: { key: location.id, ...marker.position } });
+    setPinned(marker.id);
+  };
   useEffect(() => { if (focus) showMember(members.find((other) => other.id === focus.id), focus.nonce); }, [focus?.nonce]);
   const mapOptions = useMemo(() => games.filter((game) => game.art && calibrations[game.art])
     .map((game) => ({ key: game.key, label: game.name })), []);
@@ -169,7 +183,8 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
     <TarkovMap ref={map} map={calibration} art={preferred} floor={floor} split={split} players={players} follow={follow ? SELF : null}
       centre={centre && centre.map === shownKey ? centre : null}
       onUserPan={onUserPan} markers={shownOverlay} filters={filters} lootIcons={lootIcons} selected={pinned}
-      onMarkerHover={setHovered} onMarkerTap={(id) => setPinned((current) => current === id ? null : id)}>
+      onMarkerHover={setHovered} onMarkerTap={(id) => setPinned((current) => current === id ? null : id)}
+      onMapTap={documentLinker && placing ? (point) => { void saveDocumentLink(placing, point); setPlacing(null); } : undefined}>
       {!newest && (onRaidMap || !calibration) && <p className={`map-empty ${calibration ? "on-map" : ""}`}>Take a screenshot in raid to place a position</p>}
     </TarkovMap>
 
@@ -206,7 +221,11 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
     </div>
 
     {cardMarker && <MapMarkerCard marker={cardMarker} filters={filters} get={getItem} pinned={!!pinned} onClose={() => setPinned(null)}
-      floorName={calibration && floors.length ? floorAt(calibration, cardMarker.position).name : undefined} />}
+      floorName={calibration && floors.length ? floorAt(calibration, cardMarker.position).name : undefined}>
+      {documentLinker && pinned && cardMarker.layer === "documents" && <DocumentLinkActions marker={cardMarker} />}
+    </MapMarkerCard>}
+    {documentLinker && documents.length > 0 && <DocumentPicker locations={documents} labels={calibration?.labels ?? []} placing={placing} onPlacing={setPlacing}
+      marker={pinned && overlayById.get(pinned)?.layer === "documents" ? overlayById.get(pinned)! : null} onShow={showDocument} />}
 
     <MapSwitcher maps={mapOptions} current={shownKey} label={mapName(shownMap) ?? (status === "online" ? "No map" : status === "offline" ? "Disconnected" : "Preview")}
       floor={shownFloor && !shownFloor.base ? shownFloor.name : undefined} state={mapState} liveName={mapName(live?.map)} onSelect={chooseMap}

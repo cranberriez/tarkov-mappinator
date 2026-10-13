@@ -26,6 +26,16 @@ test("projection matches tarkov.dev's CRS for every calibrated map", () => {
   }
 });
 
+test("toWorld undoes toPlane for every calibrated map and the metric plane", () => {
+  for (const projection of [...Object.values(maps).map((map) => projectionFor(map)), metricProjection]) {
+    for (const [x, z] of [[0, 0], [123.4, -56.7], [-300, 250]]) {
+      const back = projection.toWorld(projection.toPlane({ x, z }));
+      close(back.x, x, 1e-6);
+      close(back.z, z, 1e-6);
+    }
+  }
+});
+
 test("art rectangle spans both projected corners of the SVG bounds", () => {
   const customs = maps.customs;
   const projection = projectionFor(customs);

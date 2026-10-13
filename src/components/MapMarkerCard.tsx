@@ -1,4 +1,5 @@
-import { groupOn, markerIcon, tarkovPreset, useMapAssets, type Detail, type Filters, type MapMarker, type MarkerPreset } from "../maps";
+import type { ReactNode } from "react";
+import { documentPhoto, groupOn, markerIcon, tarkovPreset, useMapAssets, type Detail, type Filters, type MapMarker, type MarkerPreset } from "../maps";
 import { formatRoubles, itemValue, type ItemGet } from "../lib/itemData";
 import { CloseIcon } from "./Icons";
 
@@ -11,8 +12,9 @@ const percent = (chance: number) => `${Math.round(chance * 100)}%`;
  * Hovering previews it; a pinned card stays until closed. A boss spawn point stacks one panel per
  * shown boss type, then one with the place itself.
  */
-export function MapMarkerCard({ marker, filters, preset = tarkovPreset, floorName, pinned, onClose, get }: {
+export function MapMarkerCard({ marker, filters, preset = tarkovPreset, floorName, pinned, onClose, get, children }: {
   marker: MapMarker; filters: Filters; preset?: MarkerPreset; floorName?: string; /** Item lookup, when enrichment is ready: names, prices and value order. */ get?: ItemGet; pinned: boolean; onClose: () => void;
+  /** Extra content at the bottom of the card (not for bosses). */ children?: ReactNode;
 }) {
   const { icon: iconSrc, link: assetUrl } = useMapAssets();
   const [title, ...rest] = [marker.label, ...marker.tags].filter(Boolean) as string[];
@@ -46,13 +48,21 @@ export function MapMarkerCard({ marker, filters, preset = tarkovPreset, floorNam
       </div>
     </div>;
   }
+  const document = marker.document;
+  const photo = document && documentPhoto(document);
   return <div className="marker-cards"><div className="marker-card">
     <div className="marker-card-head">
       <img src={iconSrc(markerIcon(marker, filters, preset))} alt="" draggable={false} />
       <div className="marker-card-title"><span>{title}</span>{rest.length > 0 && <span className="marker-card-sub">{rest.join(" · ")}</span>}</div>
       {close}
     </div>
-    <Rows get={get} rows={[...marker.details ?? [], ...place]} />
+    {document && <div className="marker-card-document">
+      {photo && <img className="marker-card-photo" src={photo} alt={document.title} draggable={false} />}
+      <span>{document.title}</span>
+      {document.description && <span className="marker-card-sub">{document.description}</span>}
+    </div>}
+    <Rows get={get} rows={[...document?.key ? [{ label: "Key", value: document.key }] : [], ...marker.details ?? [], ...place]} />
+    {children}
   </div></div>;
 }
 

@@ -4,6 +4,7 @@
 // groups, and shows when any of its groups is on. Layers, groups and game tables come from a `MarkerPreset`
 // (`tarkovPreset` unless one is passed); markers of your own (quests, say) need only a layer in the preset.
 import type { Extract, GameMapData, LooseCategory, Mob } from "./data.ts";
+import type { DocumentLocation } from "./documents.ts";
 import { containerGroup, tarkovPreset, type CategoryDef, type GroupDef, type LayerDef, type MarkerPreset } from "./markerPreset.ts";
 import type { Vec3 } from "./types.ts";
 
@@ -39,6 +40,10 @@ export type MapMarker = {
   details?: Detail[];
   /** Boss spawn points: one entry per boss type, shown as stacked cards instead of `details`. */
   bosses?: BossInfo[];
+  /** Battle Pass document spots: the known location here, with its reference photo. */
+  document?: DocumentLocation;
+  /** Its place among markers sharing one spot, drawn side by side. */
+  slot?: { index: number; of: number };
 };
 
 export type LayerFilter = { groups: Record<string, boolean> };
@@ -101,6 +106,8 @@ export const isVisible = (marker: MapMarker, filters: Filters, preset: MarkerPre
 
 const ROUBLES = "5449016a4bdc2d6f028b456f";
 const distance = (a: Vec3, b: Vec3) => Math.hypot(a.x - b.x, a.z - b.z);
+/** A document location within this of a spawn is that spawn. */
+const SAME_SPOT_M = 1;
 const posKey = ({ x, y, z }: Vec3) => `${x.toFixed(1)}|${y.toFixed(1)}|${z.toFixed(1)}`;
 const percent = (chance: number) => `${Math.round(chance * 100)}%`;
 const metres = (value: number) => `${+value.toFixed(1)}`;
@@ -121,11 +128,14 @@ type Named = { name: string; normalizedName: string };
 /** Name tables the map documents point into: `common.json` containers and guns, `mobs.json` mobs. */
 export type Lookups = { containers?: Record<string, Named>; weapons?: Record<string, Named>; mobs?: Record<string, Named & Partial<Mob>>; /** Map id → name. */ maps?: Record<string, string> };
 
-/** All overlay markers for a map, unfiltered. */
-export function buildMarkers(data: GameMapData, lookups: Lookups = {}, preset: MarkerPreset = tarkovPreset): MapMarker[] {
+/**
+ * All overlay markers for a map, unfiltered. `documents` are known document locations on this map (`documentLocations`):
+ * one at a document spawn is attached to its marker; one placed where tarkov.dev has no spawn gets a marker of its own.
+ */
+export function buildMarkers(data: GameMapData, lookups: Lookups = {}, preset: MarkerPreset = tarkovPreset, documents: DocumentLocation[] = []): MapMarker[] {
   return [
     ...extractMarkers(data, lookups), ...spawnMarkers(data), ...bossMarkers(data, lookups, preset),
-    ...zoneMarkers(data), ...pointMarkers(data, lookups, preset),
+    ...zoneMarkers(data), ...pointMarkers(data, lookups, preset, documents),
   ];
 }
 
@@ -268,7 +278,7 @@ function zoneMarkers(data: GameMapData): MapMarker[] {
   return [...hazards, ...artillery];
 }
 
-function pointMarkers(data: GameMapData, lookups: Lookups, preset: MarkerPreset): MapMarker[] {
+function pointMarkers(data: GameMapData, lookups: Lookups, preset: MarkerPreset, locations: DocumentLocation[]): MapMarker[] {
   const markers: MapMarker[] = [];
   const documentGroup = new Map(preset.documents.map(({ key, item }) => [item, key]));
   const seen = new Set<string>();
@@ -309,14 +319,27 @@ function pointMarkers(data: GameMapData, lookups: Lookups, preset: MarkerPreset)
     id: `btr:${index}`, layer: "other", groups: ["btr"], position: { x: stop.x, y: stop.y, z: stop.z },
     icon: "btr_stop", label: stop.name, tags: ["BTR stop"],
   }));
+  // Hand-made links first, so one wins a spawn over a stale automatic match there.
+  const placed = locations.filter((location) => location.position).sort((a, b) => +(b.match === "manual") - +(a.match === "manual"));
+  const claimed = new Set<DocumentLocation>();
+  const spawnSpots: Vec3[] = [];
   (data.lootLoose ?? []).forEach((loot, index) => {
     // A spawn point that can hold a Battle Pass document is a document marker, not loose loot.
     const documents = [...new Set(loot.items.flatMap((item) => documentGroup.get(item) ?? []))];
     if (documents.length) {
+      spawnSpots.push(loot.position);
+      // A spawn that can hold more than one type gets a marker per type, side by side, each with its own location.
       const labels = documents.map((key) => preset.documents.find((type) => type.key === key)!.label);
-      markers.push({ id: `document:${index}`, layer: "documents", groups: documents, position: loot.position,
-        tags: [`${labels.join(" / ")} document`], details: [
-          { label: "Document types", value: labels.join(", ") }, { label: "Possible items", items: loot.items.map((id) => ({ id })) }] });
+      documents.forEach((type, slot) => {
+        const document = placed.find((location) => !claimed.has(location) && location.type === type
+          && distance(location.position as Vec3, loot.position) < SAME_SPOT_M);
+        if (document) claimed.add(document);
+        const shared = documents.length > 1;
+        markers.push({ id: shared ? `document:${index}:${type}` : `document:${index}`, layer: "documents", groups: [type], position: loot.position,
+          document, ...shared ? { slot: { index: slot, of: documents.length } } : {},
+          tags: [`${labels[slot]} document`, ...shared ? [`Shares its spot with ${labels.filter((_, other) => other !== slot).join(", ")}`] : []],
+          details: [{ label: "Document types", value: labels.join(", ") }, { label: "Possible items", items: loot.items.map((id) => ({ id })) }] });
+      });
       return;
     }
     // Spawns whose items have no category (or without item enrichment) stay in the plain group.
@@ -327,6 +350,13 @@ function pointMarkers(data: GameMapData, lookups: Lookups, preset: MarkerPreset)
       details: [...labels ? [{ label: "Categories", value: labels.join(", ") }] : [],
         { label: "Possible items", items: loot.items.map((id) => ({ id })) }] });
   });
+  // Placed by hand where tarkov.dev has no document spawn (Icebreaker, say).
+  for (const location of placed) {
+    if (claimed.has(location) || spawnSpots.some((spot) => distance(spot, location.position as Vec3) < SAME_SPOT_M)) continue;
+    const label = preset.documents.find((type) => type.key === location.type)?.label ?? location.type;
+    markers.push({ id: `document:${location.id}`, layer: "documents", groups: [location.type], document: location,
+      position: { y: 0, ...location.position! }, tags: [`${label} document`] });
+  }
   return markers;
 }
 

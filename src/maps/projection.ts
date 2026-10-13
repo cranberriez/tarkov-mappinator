@@ -6,6 +6,8 @@ import type { MapCalibration, PlanePoint, PlaneRect, WorldBounds, WorldPoint } f
  */
 export type MapProjection = {
   toPlane(point: WorldPoint): PlanePoint;
+  /** Map plane → world x/z (no height). */
+  toWorld(point: PlanePoint): WorldPoint;
   /** Heading in degrees clockwise from world +Z → degrees clockwise from plane "up". */
   heading(degrees: number): number;
   /** Plane units per world metre. */
@@ -17,6 +19,7 @@ const radians = (degrees: number) => (degrees * Math.PI) / 180;
 /** Plain metric plane with world +Z up; for maps without calibration. */
 export const metricProjection: MapProjection = {
   toPlane: ({ x, z }) => ({ x, y: -z }),
+  toWorld: ({ x, y }) => ({ x, z: -y }),
   heading: (degrees) => degrees,
   unitsPerMetre: 1,
 };
@@ -30,6 +33,10 @@ export function projectionFor(map: Pick<MapCalibration, "transform" | "coordinat
     toPlane: ({ x, z }) => {
       const point = linear(x, z);
       return { x: point.x + offsetX, y: point.y + offsetY };
+    },
+    toWorld: ({ x, y }) => {
+      const u = (x - offsetX) / scaleX, v = -(y - offsetY) / scaleY;
+      return { x: u * cos + v * sin, z: v * cos - u * sin };
     },
     heading: (degrees) => {
       const forward = linear(Math.sin(radians(degrees)), Math.cos(radians(degrees)));

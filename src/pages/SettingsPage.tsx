@@ -285,6 +285,8 @@ function DeveloperSection({ dev }: { dev: DevFlagsState }) {
     <h2>Developer</h2>
     <Switch label="Fake players" detail="Five simulated members join any group you're in." on={dev.flags.fakePlayers}
       onChange={(fakePlayers) => dev.set({ fakePlayers })} />
+    <Switch label="Document linker" detail="Link Battle Pass document photos to map spawns, or place them on the map." on={dev.flags.documentLinker}
+      onChange={(documentLinker) => dev.set({ documentLinker })} />
   </section>;
 }
 

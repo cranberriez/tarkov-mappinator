@@ -9,9 +9,11 @@ export const DEV = import.meta.env.DEV;
 export type DevFlags = {
   /** Five simulated members join whatever group you're in, wandering maps and dropping in and out of raids. */
   fakePlayers: boolean;
+  /** On the map, ties document reference photos to spawns (writes src/maps/documents/links.json through the dev server). */
+  documentLinker: boolean;
 };
 
-const off: DevFlags = { fakePlayers: false };
+const off: DevFlags = { fakePlayers: false, documentLinker: false };
 
 export function useDevFlags() {
   const [stored, setFlags] = usePersisted<DevFlags>(keys.devFlags, off);

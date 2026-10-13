@@ -25,6 +25,8 @@ export const WindowMinimize = () => <svg width="10" height="10" viewBox="0 0 10 
 export const WindowMaximize = () => <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x=".5" y=".5" width="9" height="9" fill="none" stroke="currentColor" /></svg>;
 export const WindowClose = () => <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0l10 10M10 0 0 10" stroke="currentColor" /></svg>;
 export const PinIcon = () => <Icon size={16}><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></Icon>;
+export const ChevronLeftIcon = () => <Icon size={18}><path d="m15 5-7 7 7 7" /></Icon>;
+export const ChevronRightIcon = () => <Icon size={18}><path d="m9 5 7 7-7 7" /></Icon>;
 export const CaretIcon = () => <Icon size={12}><path d="m6 9 6 6 6-6" /></Icon>;
 export const SwitchIcon = () => <Icon size={12}><path d="M4 8h15l-4-4M20 16H5l4 4" /></Icon>;
 export const ResetIcon = () => <Icon size={15}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></Icon>;

@@ -8,7 +8,7 @@ import type { Filters, MapMarker } from "./markers.ts";
 import { freshness, type PlayerPosition, type PlayerTrack } from "./players.ts";
 import { artRect, metricProjection, projectionFor } from "./projection.ts";
 import { tileBounds } from "./tiles.ts";
-import type { MapCalibration, PlaneRect } from "./types.ts";
+import type { MapCalibration, PlaneRect, WorldPoint } from "./types.ts";
 import { initialView, useMapViewport } from "./useMapViewport.ts";
 import { useSplitLayout, type ArtStyle } from "./useSplitLayout.ts";
 
@@ -68,6 +68,8 @@ export type TarkovMapProps = {
   selected?: string | null;
   onMarkerHover?: (id: string | null) => void;
   onMarkerTap?: (id: string) => void;
+  /** A tap off the markers, at its world x/z. Floors split apart are not accounted for. */
+  onMapTap?: (point: WorldPoint) => void;
   className?: string;
   /** Drawn over the map, inside its frame. */
   children?: ReactNode;
@@ -82,7 +84,7 @@ const noFilters: Filters = {};
  * Positions are world coordinates in the map's own space, so only pass players who are on this map.
  */
 export function TarkovMap({ map, art: preferred = "svg", floor, split = false, players = [], follow = null, centre = null, onUserPan,
-  markers = noMarkers, filters = noFilters, preset, lootIcons, selected, onMarkerHover, onMarkerTap, className, children, ref }: TarkovMapProps) {
+  markers = noMarkers, filters = noFilters, preset, lootIcons, selected, onMarkerHover, onMarkerTap, onMapTap, className, children, ref }: TarkovMapProps) {
   const projection = useMemo(() => map ? projectionFor(map) : metricProjection, [map]);
   const style = artStyleOf(map, preferred);
   const art = useMemo((): PlaneRect | null => style === "svg" ? artRect(map!, projection) : style === "tiles" ? tileBounds(map!) : null, [map, style, projection]);
@@ -99,7 +101,7 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, p
   const markerAt = (target: Element) => target.closest<HTMLElement>("[data-marker]")?.dataset.marker ?? null;
   const viewport = useMapViewport({
     unitsPerMetre: projection.unitsPerMetre, zoomAroundCentre: !!follow, onPan: onUserPan,
-    onTap: (target) => { const id = markerAt(target); if (id) onMarkerTap?.(id); },
+    onTap: (target, at) => { const id = markerAt(target); if (id) onMarkerTap?.(id); else onMapTap?.(projection.toWorld(at)); },
   });
   const { view, size, toScreen, panTo, zoomAt } = viewport;
 
