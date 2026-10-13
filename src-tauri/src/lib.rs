@@ -1,6 +1,7 @@
 mod scanner;
 mod tarkov_data;
 mod tile_cache;
+mod window_anim;
 
 use scanner::{import, FolderConfig, ScannerService, ScannerSnapshot};
 use serde_json::value::RawValue;
@@ -229,7 +230,10 @@ pub fn run() {
             tile_prefetch_status,
             tile_prefetch,
             tile_prefetch_cancel,
-            tile_cache_clear
+            tile_cache_clear,
+            window_anim::animate_window,
+            window_anim::unmaximize_in_place,
+            window_anim::maximize_with_restore
         ])
         .run(tauri::generate_context!())
         .expect("Unable to launch Tarkov Mappinator");

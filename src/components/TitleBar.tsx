@@ -1,18 +1,27 @@
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Scanner } from "../lib/useScanner";
+import type { MiniMode } from "../lib/useMiniMode";
 import { lifecycleLabel } from "../lib/format";
 import { mapName } from "../maps";
-import { PlayIcon, StopIcon, WindowClose, WindowMaximize, WindowMinimize } from "./Icons";
+import { CaretIcon, ExpandIcon, PlayIcon, StopIcon, WindowClose, WindowMaximize, WindowMinimize } from "./Icons";
 
 const appWindow = () => getCurrentWindow();
 
-export function TitleBar({ scanner }: { scanner: Scanner }) {
-  const { snapshot, running, busy, connected, desktop, perform } = scanner;
-  const raid = snapshot?.raid;
-  const live = running && raid?.lifecycle === "active";
-  const raidText = raid && raid.lifecycle !== "unknown"
-    ? [mapName(raid.map), lifecycleLabel[raid.lifecycle] ?? raid.lifecycle].filter(Boolean).join(" · ")
-    : null;
+function raidSummary(scanner: Scanner) {
+  const raid = scanner.snapshot?.raid;
+  return {
+    live: scanner.running && raid?.lifecycle === "active",
+    text: raid && raid.lifecycle !== "unknown"
+      ? [mapName(raid.map), lifecycleLabel[raid.lifecycle] ?? raid.lifecycle].filter(Boolean).join(" · ")
+      : null,
+  };
+}
+
+export function TitleBar({ scanner, mini }: { scanner: Scanner; mini: MiniMode }) {
+  const { running, busy, connected, desktop, perform } = scanner;
+  const { live, text: raidText } = raidSummary(scanner);
+  const [menu, setMenu] = useState(false);
 
   return <div className="titlebar" data-tauri-drag-region>
     <div className="titlebar-brand" data-tauri-drag-region>
@@ -24,17 +33,70 @@ export function TitleBar({ scanner }: { scanner: Scanner }) {
         <span className="dot" />{raidText}</span>}
     </div>
     <div className="titlebar-actions">
-      <button type="button" className={`scan-toggle ${running ? "on" : ""}`} disabled={!connected || !!busy}
-        onClick={() => void perform(running ? "stop" : "start")}
-        title={running ? "Stop monitoring" : "Start monitoring"}>
-        {running ? <StopIcon /> : <PlayIcon />}
-        {busy === "start" ? "Starting" : busy === "stop" ? "Stopping" : running ? "Monitoring" : "Start"}
-      </button>
+      <div className={`scan-split ${running ? "on" : ""}`}>
+        <button type="button" className={`scan-toggle ${running ? "on" : ""}`} disabled={!connected || !!busy}
+          onClick={() => void perform(running ? "stop" : "start")}
+          title={running ? "Stop monitoring" : "Start monitoring"}>
+          {running ? <StopIcon /> : <PlayIcon />}
+          {busy === "start" ? "Starting" : busy === "stop" ? "Stopping" : running ? "Monitoring" : "Start"}
+        </button>
+        {desktop && <button type="button" className="scan-more" aria-label="More start options" aria-haspopup="menu"
+          aria-expanded={menu} onClick={() => setMenu((open) => !open)}><CaretIcon /></button>}
+        {menu && <StartMenu onClose={() => setMenu(false)}>
+          {running
+            ? <button type="button" role="menuitem" onClick={() => { setMenu(false); void mini.setMini(true); }}>Switch to mini mode</button>
+            : <button type="button" role="menuitem" disabled={!connected || !!busy}
+              onClick={() => {
+                // Start after the animation: starting blocks the window thread while it reads recent logs.
+                setMenu(false); void mini.setMini(true).then(() => perform("start"));
+              }}>Start in mini mode</button>}
+        </StartMenu>}
+      </div>
       {desktop && <div className="window-controls">
         <button type="button" aria-label="Minimize" onClick={() => void appWindow().minimize()}><WindowMinimize /></button>
         <button type="button" aria-label="Maximize" onClick={() => void appWindow().toggleMaximize()}><WindowMaximize /></button>
-        <button type="button" aria-label="Close" className="close" onClick={() => void appWindow().close()}><WindowClose /></button>
+        <button type="button" aria-label="Close" className="close" onClick={mini.close}><WindowClose /></button>
       </div>}
     </div>
+  </div>;
+}
+
+function StartMenu({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const away = (event: PointerEvent) => {
+      // The caret toggles the menu itself.
+      if (!ref.current?.parentElement?.contains(event.target as Node)) onClose();
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("pointerdown", away);
+    window.addEventListener("blur", onClose);
+    window.addEventListener("keydown", escape);
+    return () => {
+      window.removeEventListener("pointerdown", away);
+      window.removeEventListener("blur", onClose);
+      window.removeEventListener("keydown", escape);
+    };
+  }, [onClose]);
+  return <div ref={ref} className="context-menu start-menu" role="menu">{children}</div>;
+}
+
+/** The whole window in mini mode: drag anywhere that isn't a button. */
+export function MiniBar({ scanner, mini }: { scanner: Scanner; mini: MiniMode }) {
+  const { running, busy, connected, error, perform } = scanner;
+  const { live, text } = raidSummary(scanner);
+  const status = error ? "Error" : busy === "start" ? "Starting" : busy === "stop" ? "Stopping"
+    : text ?? (running ? "Monitoring" : "Stopped");
+
+  return <div className="mini" data-tauri-drag-region>
+    <span className="brand-mark" aria-hidden="true" data-tauri-drag-region />
+    <span className={`mini-status ${live ? "live" : running ? "running" : ""} ${error ? "bad" : ""}`}
+      title={error ?? undefined} data-tauri-drag-region><span className="dot" data-tauri-drag-region />{status}</span>
+    <button type="button" className={`mini-button ${running ? "on" : "start"}`} disabled={!connected || !!busy}
+      aria-label={running ? "Stop monitoring" : "Start monitoring"} title={running ? "Stop monitoring" : "Start monitoring"}
+      onClick={() => void perform(running ? "stop" : "start")}>{running ? <StopIcon /> : <PlayIcon />}</button>
+    <button type="button" className="mini-button" aria-label="Exit mini mode" title="Exit mini mode"
+      onClick={() => void mini.setMini(false)}><ExpandIcon /></button>
+    <button type="button" className="mini-button close" aria-label="Close" title="Close" onClick={mini.close}><WindowClose /></button>
   </div>;
 }

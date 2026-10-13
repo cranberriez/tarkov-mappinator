@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Scanner } from "../lib/useScanner";
+import type { MiniMode } from "../lib/useMiniMode";
 import type { FolderConfig } from "../bindings/FolderConfig";
 import type { SourceHealth } from "../bindings/SourceHealth";
 import { LogCoveragePanel } from "../components/LogCoveragePanel";
@@ -33,7 +34,17 @@ function FolderField({ id, label, value, health, disabled, placeholder, onChange
   </div>;
 }
 
-export function SettingsPage({ scanner }: { scanner: Scanner }) {
+function Switch({ label, detail, on, disabled, onChange }: {
+  label: string; detail: string; on: boolean; disabled?: boolean; onChange: (on: boolean) => void;
+}) {
+  return <button type="button" role="switch" aria-checked={on} className="switch-row" disabled={disabled}
+    onClick={() => onChange(!on)}>
+    <span><strong>{label}</strong><span className="faint">{detail}</span></span>
+    <span className={`switch ${on ? "on" : ""}`} aria-hidden="true" />
+  </button>;
+}
+
+export function SettingsPage({ scanner, mini }: { scanner: Scanner; mini: MiniMode }) {
   const { snapshot, running, connected, busy, error, perform, retry } = scanner;
   const [folders, setFolders] = useState<FolderConfig>({ screenshots: "", logs: "" });
   const edited = useRef(false);
@@ -45,6 +56,14 @@ export function SettingsPage({ scanner }: { scanner: Scanner }) {
     <header className="page-header"><h1>Settings</h1></header>
     {error && <div className="error" role="alert">{error}
       {!connected && <button type="button" className="link" onClick={retry}>Retry</button>}</div>}
+
+    <section className="settings-section">
+      <h2>Mini mode</h2>
+      <Switch label="Mini mode" detail="Shrink to a small strip with start, stop and close." on={mini.mini}
+        disabled={!mini.desktop} onChange={mini.setMini} />
+      <Switch label="Start in mini mode" detail="Open the app as the strip next time." on={mini.startMini}
+        disabled={!mini.desktop} onChange={mini.setStartMini} />
+    </section>
 
     <section className="settings-section">
       <h2>Sources</h2>
