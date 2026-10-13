@@ -15,10 +15,11 @@ export type OverlayArea = { x: number; y: number; width: number; height: number;
  * Data markers placed in plane units, relative to the plane origin. The caller translates this layer
  * for panning and sets `--s` (pixels per plane unit) on it for zooming, so neither re-renders the markers;
  * only filtering, a floor change or crossing the label zoom does.
+ * With a floor shown, markers and zones on other floors are hidden, except extracts, which dim.
  * Zones draw their outline underneath their icon. Extract names show when `labelled`; hovering any marker
  * shows its name and what it is.
  * With `area`, only markers inside it are drawn, and a dense marker is left out where something drawn before it
- * already holds its cell: others first, then those on the shown floor, then containers before loose loot.
+ * already holds its cell: others first, then containers before loose loot.
  * Cells are fixed to the plane, so panning never changes which marker wins one.
  */
 export const MapOverlay = memo(function MapOverlay({ markers, filters, projection, floors, floor, shift, labelled, area, selected }: {
@@ -37,13 +38,14 @@ export const MapOverlay = memo(function MapOverlay({ markers, filters, projectio
   };
   const at = (point: { x: number; z: number }, dx = 0) => { const plane = projection.toPlane(point); return { x: plane.x + dx, y: plane.y }; };
   const otherFloor = (marker: MapMarker) => floor !== undefined && (floors.get(marker.id) ?? null) !== floor;
-  const zones = markers.filter((marker) => marker.outline?.length);
+  const hidden = (marker: MapMarker) => otherFloor(marker) && marker.layer !== "extracts";
+  const zones = markers.filter((marker) => marker.outline?.length && !hidden(marker));
   const placed = useMemo(() => {
-    const all = markers.map((marker) => ({ marker, ...at(marker.position, shiftOf(marker)) }));
+    const all = markers.filter((marker) => !hidden(marker)).map((marker) => ({ marker, ...at(marker.position, shiftOf(marker)) }));
     if (!area) return all;
     const inside = all.filter(({ x, y }) => x >= area.x && x <= area.x + area.width && y >= area.y && y <= area.y + area.height);
     const cell = CELL_PX / area.scale;
-    const rank = ({ marker }: typeof inside[number]) => !DENSE.has(marker.layer) ? 0 : (otherFloor(marker) ? 2 : 0) + (marker.layer === "loose" ? 2 : 1);
+    const rank = ({ marker }: typeof inside[number]) => !DENSE.has(marker.layer) ? 0 : (marker.layer === "loose" ? 2 : 1);
     const taken = new Set<string>(), kept = new Set<typeof inside[number]>();
     for (const entry of [...inside].sort((a, b) => rank(a) - rank(b))) {
       const key = `${Math.floor(entry.x / cell)}|${Math.floor(entry.y / cell)}`;
