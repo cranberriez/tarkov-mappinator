@@ -1,4 +1,4 @@
-import type { MapCalibration, MapFloor, PlanePoint, PlaneRect, WorldBounds, WorldPoint } from "./types.ts";
+import type { MapCalibration, PlanePoint, PlaneRect, WorldBounds, WorldPoint } from "./types.ts";
 
 /**
  * World → map plane. The plane is screen-oriented (x right, y down) in the map's own units,
@@ -52,31 +52,3 @@ export function planeRect(projection: MapProjection, bounds: WorldBounds): Plane
 /** Plane rectangle the SVG artwork is stretched over. */
 export const artRect = (map: MapCalibration, projection = projectionFor(map)) =>
   planeRect(projection, map.svgBounds ?? map.bounds);
-
-const within = (bounds: WorldBounds, { x, z }: WorldPoint) => {
-  const [[x1, z1], [x2, z2]] = bounds;
-  return x >= Math.min(x1, x2) && x <= Math.max(x1, x2) && z >= Math.min(z1, z2) && z <= Math.max(z1, z2);
-};
-
-/** A floor below the ground: tarkov.dev gives these an open-ended lower height bound. */
-export const isUnderground = (floor: MapFloor) => !!floor.extents?.some((extent) => extent.height[0] <= -1000);
-
-/** Opacity of underground floors drawn over the ground when every floor is shown. */
-export const UNDERGROUND_OPACITY = 0.3;
-
-/**
- * The floor a world position is on, or null for the base floor.
- * Later floors win when several match, as tarkov.dev lists them bottom to top.
- */
-export function floorAt(map: MapCalibration, point: WorldPoint): MapFloor | null {
-  if (point.y === undefined) return null;
-  const height = point.y;
-  let match: MapFloor | null = null;
-  for (const floor of map.layers) {
-    const hit = floor.extents?.some((extent) =>
-      height >= extent.height[0] && height < extent.height[1]
-      && (!extent.bounds || extent.bounds.some((bounds) => within(bounds, point))));
-    if (hit) match = floor;
-  }
-  return match;
-}

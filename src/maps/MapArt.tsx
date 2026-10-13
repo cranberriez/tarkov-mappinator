@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { isUnderground, UNDERGROUND_OPACITY } from "./projection.ts";
+import { floorById, floorsOf, UNDERGROUND_OPACITY, type FloorSelection } from "./floors.ts";
 import { splitFloors, type Box, type Piece, type Slot } from "./split.ts";
 import type { MapCalibration } from "./types.ts";
 
@@ -26,15 +26,21 @@ const SHADOW_CSS = `
   svg > g.floor-underground { opacity: ${UNDERGROUND_OPACITY}; }
 `;
 
-/** One floor of one building when floors are split apart: its original place and how far it moves sideways, as fractions of the art's width and height. */
-export type FloorSlot = { layer: string; x: number; y: number; width: number; height: number; dx: number };
+/**
+ * One floor of one building when floors are split apart: the floor's id, its original place and how far it moves
+ * sideways, as fractions of the art's width and height.
+ */
+export type FloorSlot = { floor: string; x: number; y: number; width: number; height: number; dx: number };
 
 /** Gap between columns and the distance within which pieces count as one building, as fractions of the art's width. */
 const GAP = 0.006, JOIN = 0.003;
 const LEAVES = "path,rect,polygon,polyline,circle,ellipse,line,use,image";
 
-/** Moves every building's floors out beside the ground (see `splitFloors`); returns where they went. */
-function splitArt(svg: SVGSVGElement, groups: SVGGElement[], base: string | undefined, floorIds: Set<string>, listed: string[], underground: Set<string | undefined>): FloorSlot[] {
+/**
+ * Moves every building's floors out beside the ground (see `splitFloors`); returns where they went.
+ * `floorOf` maps the SVG group id of each floor except the base to its floor id.
+ */
+function splitArt(svg: SVGSVGElement, groups: SVGGElement[], base: string | undefined, floorOf: Map<string, string>, listed: string[], underground: Set<string | undefined>): FloorSlot[] {
   const root = svg.getScreenCTM();
   const view = svg.viewBox.baseVal;
   if (!root || !base) return [];
@@ -43,7 +49,7 @@ function splitArt(svg: SVGSVGElement, groups: SVGGElement[], base: string | unde
   let ground: Box | null = null;
   for (const group of groups) {
     const owner = group.dataset.keepWithGroup ?? group.id;
-    if (owner !== base && !floorIds.has(owner)) continue;
+    if (owner !== base && !floorOf.has(owner)) continue;
     for (const element of group.querySelectorAll<SVGGraphicsElement>(LEAVES)) {
       if (element.closest("defs,clipPath,mask,pattern,symbol,marker")) continue;
       const matrix = element.getScreenCTM();
@@ -78,23 +84,23 @@ function splitArt(svg: SVGSVGElement, groups: SVGGElement[], base: string | unde
     element.dataset.baseTransform ??= element.getAttribute("transform") ?? "";
     element.setAttribute("transform", `translate(${x} ${y}) ${element.dataset.baseTransform}`.trim());
   }
-  return slots.map((slot) => ({ layer: slot.layer, x: (slot.x1 - view.x) / view.width, y: (slot.y1 - view.y) / view.height,
+  return slots.map((slot) => ({ floor: floorOf.get(slot.layer)!, x: (slot.x1 - view.x) / view.width, y: (slot.y1 - view.y) / view.height,
     width: (slot.x2 - slot.x1) / view.width, height: (slot.y2 - slot.y1) / view.height, dx: slot.dx / view.width }));
 }
 
 /**
  * Vector artwork for a map that has an `svg`, filling its box (place it over `artRect`).
- * `floor` is an SVG layer id; null or the base layer shows the base floor alone,
- * any other floor is drawn over a dimmed base floor. With `all`, the base floor is drawn first, then the
- * underground floors faintly over it, then the upper floors in order on top.
- * With `split` (implies `all`), every floor is drawn at full strength and moved sideways clear of the ground:
+ * `floor` is a floor id: the base floor shows alone, any other floor with vector art is drawn over a dimmed base floor.
+ * With every floor (`floor` null), the base floor is drawn first, then the underground floors faintly over it,
+ * then the upper floors in order on top.
+ * With `split` (implies every floor), every floor is drawn at full strength and moved sideways clear of the ground:
  * upper floors to its right, underground floors to its left, each in a column of its own; `onSplit` gets the slots.
  */
-export function MapArt({ map, floor = null, all = false, split = false, onSplit, className, style }: {
-  map: MapCalibration & { svg: string }; floor?: string | null; all?: boolean; split?: boolean;
+export function MapArt({ map, floor, split = false, onSplit, className, style }: {
+  map: MapCalibration & { svg: string }; floor: FloorSelection; split?: boolean;
   onSplit?: (slots: FloorSlot[] | null) => void; className?: string; style?: CSSProperties;
 }) {
-  all = all || split;
+  const all = floor === null || split;
   const host = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<SVGSVGElement | null>(null);
 
@@ -119,15 +125,18 @@ export function MapArt({ map, floor = null, all = false, split = false, onSplit,
 
   useLayoutEffect(() => {
     if (!svg) return;
-    const active = !all && floor && floor !== map.svgLayer ? floor : null;
-    const floors = map.layers.filter((layer) => layer.svgLayer);
-    const underground = new Set(floors.filter(isUnderground).map((layer) => layer.svgLayer));
+    const chosen = floorById(map, floor);
+    const active = !all && chosen && !chosen.base ? chosen.svgLayer ?? null : null;
+    // Floors drawn by a group of their own, in tarkov.dev's order.
+    const floors = floorsOf(map).filter((other) => !other.base && other.svgLayer && other.svgLayer !== map.svgLayer);
+    const floorOf = new Map(floors.map((other) => [other.svgLayer!, other.id]));
+    const underground = new Set(floors.filter((other) => other.underground).map((other) => other.svgLayer));
     // Stacking: base, underground, then upper floors bottom to top (the order tarkov.dev lists them).
-    const rank = (owner: string) => owner === map.svgLayer ? 0 : underground.has(owner) ? 1 : 2 + floors.findIndex((layer) => layer.svgLayer === owner);
+    const rank = (owner: string) => owner === map.svgLayer ? 0 : underground.has(owner) ? 1 : 2 + floors.findIndex((other) => other.svgLayer === owner);
     const groups = [...svg.children].filter((group): group is SVGGElement => group instanceof SVGGElement && !!group.id);
     for (const group of groups) {
       const owner = group.dataset.keepWithGroup ?? group.id;
-      const shown = owner === map.svgLayer || (all ? floors.some((layer) => layer.svgLayer === owner) : owner === active);
+      const shown = owner === map.svgLayer || (all ? floorOf.has(owner) : owner === active);
       group.classList.toggle("floor-hidden", !shown);
       group.classList.toggle("floor-dimmed", !all && owner === map.svgLayer && active !== null);
       group.classList.toggle("floor-underground", all && !split && underground.has(owner));
@@ -138,11 +147,11 @@ export function MapArt({ map, floor = null, all = false, split = false, onSplit,
       if (base) piece.setAttribute("transform", base); else piece.removeAttribute("transform");
     }
     if (!split) onSplit?.(null);
-    else onSplit?.(splitArt(svg, groups, map.svgLayer, new Set(floors.map((layer) => layer.svgLayer!)), floors.map((layer) => layer.svgLayer!), underground));
+    else onSplit?.(splitArt(svg, groups, map.svgLayer, floorOf, floors.map((other) => other.svgLayer!), underground));
     // Array.sort is stable, so groups keep their file order within a floor.
     const ordered = groups.map((group) => ({ group, rank: rank(group.dataset.keepWithGroup ?? group.id) }));
     if (all) for (const { group } of ordered.sort((a, b) => a.rank - b.rank)) svg.append(group);
-  }, [svg, floor, all, split, map.svgLayer, map.layers]);
+  }, [svg, floor, all, split, map, onSplit]);
 
   return <div ref={host} className={className} style={style} />;
 }

@@ -53,6 +53,9 @@ export type GameMap = {
   art: string | null;
 };
 
+/** A point in world coordinates (metres): x and z across the ground, y up; y may be unknown. */
 export type WorldPoint = { x: number; y?: number; z: number };
+/** A world point with its height, as tarkov.dev's documents carry them. */
+export type Vec3 = Required<WorldPoint>;
 export type PlanePoint = { x: number; y: number };
 export type PlaneRect = { x: number; y: number; width: number; height: number };

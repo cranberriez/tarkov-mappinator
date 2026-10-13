@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildMarkers, countMarkers, defaultFilters, groupOn, isVisible, layersFor, markerIcon, roleOf, withDefaults } from "./mapLayers.ts";
+import { buildMarkers, countMarkers, defaultFilters, groupOn, isVisible, layersFor, markerIcon, roleOf, withDefaults } from "./markers.ts";
 
 const at = (x, z, y = 0) => ({ x, y, z });
 const map = (fields) => ({ extracts: [], transits: [], spawns: [], ...fields });
@@ -51,7 +51,7 @@ test("visibility needs any of the marker's groups on", () => {
 });
 
 test("the header turns all present groups off when any is on, otherwise all on", async () => {
-  const { layerState, toggleLayer } = await import("./mapLayers.ts");
+  const { layerState, toggleLayer } = await import("./markers.ts");
   const present = ["pmc", "scav"];
   const mixed = { groups: { pmc: true, scav: false, transit: true } };
   assert.equal(layerState(mixed, present, "extracts"), "mixed");
@@ -83,7 +83,7 @@ test("counts per layer and group", () => {
 });
 
 test("filter equality ignores key order and unknown keys", async () => {
-  const { sameFilters } = await import("./mapLayers.ts");
+  const { sameFilters } = await import("./markers.ts");
   const a = defaultFilters("unknown");
   const b = { ...structuredClone(a), spawns: { groups: { scav: true, pmc: true } }, stale: {} };
   assert.equal(sameFilters(a, b), true);
@@ -178,7 +178,7 @@ test("boss types: one group each, same-type entries merged, defaults for unknown
 });
 
 test("filter equality treats missing boss types as defaults and ignores old boss keys", async () => {
-  const { sameFilters } = await import("./mapLayers.ts");
+  const { sameFilters } = await import("./markers.ts");
   const a = defaultFilters("unknown");
   const b = structuredClone(a);
   b.bosses.groups = { killa: true, raiders: false, bosses: false };
@@ -189,7 +189,7 @@ test("filter equality treats missing boss types as defaults and ignores old boss
 });
 
 test("container types: one group each under a category, categories off by default decide the type's default", async () => {
-  const { sameFilters, layerState, toggleLayer } = await import("./mapLayers.ts");
+  const { sameFilters, layerState, toggleLayer } = await import("./markers.ts");
   const markers = buildMarkers(map({ lootContainers: [
     { lootContainer: "c1", position: at(1, 1) }, { lootContainer: "c2", position: at(2, 2) }, { lootContainer: "c3", position: at(3, 3) },
     { lootContainer: "c4", position: at(4, 4) }, { lootContainer: "unknown-id", position: at(5, 5) },
@@ -222,7 +222,7 @@ test("container types: one group each under a category, categories off by defaul
 });
 
 test("old container category keys are dropped and ignored by filter equality", async () => {
-  const { sameFilters } = await import("./mapLayers.ts");
+  const { sameFilters } = await import("./markers.ts");
   assert.deepEqual(withDefaults({ containers: { groups: { valuables: false, general: true, safe: false } } }, "unknown").containers.groups, { safe: false });
   const a = defaultFilters("unknown");
   const b = structuredClone(a);

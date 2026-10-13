@@ -1,4 +1,4 @@
-import { isUnderground } from "./projection.ts";
+import { floorsOf, GROUND, type Floor } from "./floors.ts";
 import type { MapCalibration } from "./types.ts";
 
 export type Box = { x1: number; y1: number; x2: number; y2: number };
@@ -69,32 +69,31 @@ export function splitFloors(ground: Box, pieces: Piece[], order: string[], { gap
   return slots;
 }
 
-const lowest = (floor: MapCalibration["layers"][number]) => Math.min(...(floor.extents?.map((extent) => extent.height[0]) ?? [0]));
+const lowest = (floor: Floor) => Math.min(...(floor.extents?.map((extent) => extent.height[0]) ?? [0]));
 
 /**
- * Sideways shift of each tiled floor (by name) that puts every floor in a column of its own, `gap` apart,
+ * Sideways shift of each tiled floor (by id) that puts every floor in a column of its own, `gap` apart,
  * each as wide as `widthOf` says (columns are centred on the floor's own art),
- * low to high from left to right. A floor sharing the map's base tiles stays put, and the rest line up around it;
- * otherwise the ground stays put with underground floors to its left and upper floors to its right.
+ * low to high from left to right. A listed floor drawn by the map's base tiles stays put, and the rest line up
+ * around it; otherwise the ground (`GROUND`) stays put with underground floors to its left and upper floors to its right.
  */
-export function columnShifts(map: MapCalibration, widthOf: (floor: string) => number, gap: number): Map<string, number> {
-  const floors = map.layers.filter((floor) => floor.tilePath).sort((a, b) => lowest(a) - lowest(b));
-  const base = floors.findIndex((floor) => floor.tilePath === map.tilePath);
+export function columnShifts(map: MapCalibration, widthOf: (floor: Floor) => number, gap: number): Map<string, number> {
+  const [base, ...rest] = floorsOf(map);
   const shifts = new Map<string, number>();
   // Columns left to right as centres, counted from the first column's left edge.
   const centres = new Map<string, number>();
   let edge = 0;
-  const lay = (row: typeof floors) => { for (const floor of row) { const width = widthOf(floor.name); centres.set(floor.name, edge + width / 2); edge += width + gap; } };
-  if (base >= 0) { lay(floors); const origin = centres.get(floors[base].name)!; for (const [name, centre] of centres) shifts.set(name, centre - origin); }
-  else {
+  const lay = (row: Floor[]) => { for (const floor of row) { const width = widthOf(floor); centres.set(floor.id, edge + width / 2); edge += width + gap; } };
+  if (base.id !== GROUND) {
+    lay([base, ...rest].filter((floor) => floor.tilePath).sort((a, b) => lowest(a) - lowest(b)));
+  } else {
     // The ground is a column too: its width is a full map, so the others sit past its edges.
-    const below = floors.filter(isUnderground), above = floors.filter((floor) => !isUnderground(floor));
-    const ground = widthOf("");
-    lay(below);
-    const origin = edge + ground / 2;
-    edge += ground + gap;
-    lay(above);
-    for (const [name, centre] of centres) shifts.set(name, centre - origin);
+    const tiled = rest.filter((floor) => floor.tilePath).sort((a, b) => lowest(a) - lowest(b));
+    lay(tiled.filter((floor) => floor.underground));
+    lay([base]);
+    lay(tiled.filter((floor) => !floor.underground));
   }
+  const origin = centres.get(base.id) ?? 0;
+  for (const [id, centre] of centres) shifts.set(id, centre - origin);
   return shifts;
 }

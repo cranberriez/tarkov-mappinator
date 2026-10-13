@@ -1,5 +1,6 @@
-/** tarkov.dev data set. PvE is stored whole; the others as differences from it, merged on read. */
-export type DataMode = "pve" | "regular" | "pvp-season";
+import type { DataMode } from "../maps/data.ts";
+
+export type { DataMode };
 
 const modes: Record<string, DataMode> = { pve: "pve", regular: "regular", pvpseason: "pvp-season" };
 

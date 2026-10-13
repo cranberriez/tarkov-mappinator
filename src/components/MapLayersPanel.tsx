@@ -1,32 +1,29 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { assetUrl, iconSrc } from "../lib/tiles";
-import { groupOn, layerState, sameFilters, toggleLayer, type Filters, type LayerDef } from "../lib/mapLayers";
-import { keys, load, save } from "../lib/persist";
+import { groupOn, layerState, sameFilters, tarkovPreset, toggleLayer, useMapAssets, type Filters, type LayerDef, type MarkerPreset } from "../maps";
 import { CaretIcon, PinIcon, ResetIcon } from "./Icons";
 
-const PRESET_SLOTS = 3;
+export const PRESET_SLOTS = 3;
 
 /**
  * Tiered marker filter: each layer row switches the whole layer, the rows under it switch its groups.
  * Groups the current map has no markers for are left out. Layers fold behind a caret; three preset
  * slots save and restore the switches (right click a saved slot to overwrite or clear it).
+ * Folding (by layer key, and `layer.category` key) and the preset slots are the caller's to keep.
  */
-export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen, onChange }: {
+export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen, onChange, collapsed, onCollapse, presets: stored, onPresets, preset: markerPreset = tarkovPreset }: {
   layers: LayerDef[]; filters: Filters; defaults: Filters; counts: Record<string, number>; open: boolean;
   onOpen: (open: boolean) => void; onChange: (filters: Filters) => void;
+  collapsed: Record<string, boolean>; onCollapse: (collapsed: Record<string, boolean>) => void;
+  presets: (Filters | null)[]; onPresets: (presets: (Filters | null)[]) => void; preset?: MarkerPreset;
 }) {
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => load(keys.mapLayersCollapsed, {}));
-  useEffect(() => save(keys.mapLayersCollapsed, collapsed), [collapsed]);
-  const [presets, setPresets] = useState<(Filters | null)[]>(() => {
-    const stored = load<(Filters | null)[]>(keys.mapPresets, []);
-    return Array.from({ length: PRESET_SLOTS }, (_, index) => stored[index] ?? null);
-  });
-  useEffect(() => save(keys.mapPresets, presets), [presets]);
+  const { icon: iconSrc, link: assetUrl } = useMapAssets();
   const [menu, setMenu] = useState<{ slot: number; x: number; y: number } | null>(null);
+  const presets = Array.from({ length: PRESET_SLOTS }, (_, index) => stored[index] ?? null);
+  const setCollapsed = (update: (current: Record<string, boolean>) => Record<string, boolean>) => onCollapse(update(collapsed));
 
   const setPreset = (slot: number, value: Filters | null) =>
-    setPresets((current) => current.map((preset, index) => index === slot ? value : preset));
+    onPresets(presets.map((preset, index) => index === slot ? value : preset));
 
   const shown = layers.filter((layer) => counts[layer.key]);
   const setGroup = (key: string, group: string, on: boolean) => onChange({
@@ -34,7 +31,7 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
   });
 
   const groupRow = (layerKey: string, state: Filters[string], group: LayerDef["groups"][number], sub: boolean) => {
-    const on = groupOn(state, group.key, layerKey);
+    const on = groupOn(state, group.key, layerKey, markerPreset);
     return <button key={group.key} type="button" className={`layer-row group ${sub ? "sub" : ""} ${on ? "" : "off"}`} aria-pressed={on}
       title={group.label} onClick={() => setGroup(layerKey, group.key, !on)}>
       {group.image ? <img src={assetUrl(group.image)} alt="" className="portrait" draggable={false}
@@ -53,7 +50,7 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
       {open && <>
         <div className="presets">
           {presets.map((preset, slot) => {
-            const active = !!preset && sameFilters(preset, filters);
+            const active = !!preset && sameFilters(preset, filters, markerPreset);
             return <button key={slot} type="button" className={`preset ${preset ? "saved" : ""} ${active ? "active" : ""}`}
               title={preset ? `Preset ${slot + 1} · right click for options` : `Save as preset ${slot + 1}`}
               onClick={() => preset ? onChange(structuredClone(preset)) : setPreset(slot, structuredClone(filters))}
@@ -63,7 +60,7 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
               }}>{slot + 1}</button>;
           })}
         </div>
-        <button type="button" className="icon-button" title="Reset to defaults" disabled={sameFilters(filters, defaults)}
+        <button type="button" className="icon-button" title="Reset to defaults" disabled={sameFilters(filters, defaults, markerPreset)}
           onClick={() => onChange(structuredClone(defaults))}><ResetIcon /></button>
       </>}
     </div>
@@ -72,7 +69,7 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
       const folded = collapsed[layer.key] ?? !!layer.folded;
       // The header speaks for the groups this map has.
       const present = layer.groups.filter((group) => counts[`${layer.key}.${group.key}`]);
-      const status = layerState(state, present.map((group) => group.key), layer.key);
+      const status = layerState(state, present.map((group) => group.key), layer.key, markerPreset);
       return <div key={layer.key} className={`layer ${status}`}>
         <div className="layer-head">
           <button type="button" className={`caret ${folded ? "folded" : ""}`} aria-expanded={!folded}
@@ -80,7 +77,7 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
             onClick={() => setCollapsed((current) => ({ ...current, [layer.key]: !folded }))}><CaretIcon /></button>
           <button type="button" className="layer-row" aria-pressed={status === "mixed" ? "mixed" : status === "on"} aria-label={layer.label}
             title={status === "off" ? `Show all ${layer.label.toLowerCase()}` : `Hide all ${layer.label.toLowerCase()}`}
-            onClick={() => onChange({ ...filters, [layer.key]: toggleLayer(state, present.map((group) => group.key), layer.key) })}>
+            onClick={() => onChange({ ...filters, [layer.key]: toggleLayer(state, present.map((group) => group.key), layer.key, markerPreset) })}>
             <span className="layer-name">{layer.label}</span>
             <span className="faint">{counts[layer.key]}</span>
           </button>
@@ -93,7 +90,7 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
             const id = `${layer.key}.${category.key}`;
             const unfolded = collapsed[id] === false;
             const keys = types.map((group) => group.key);
-            const catState = layerState(state, keys, layer.key);
+            const catState = layerState(state, keys, layer.key, markerPreset);
             return <div key={category.key} className="layer-cat">
               <div className={`layer-head cat ${catState}`}>
                 <button type="button" className={`caret ${unfolded ? "" : "folded"}`} aria-expanded={unfolded}
@@ -101,7 +98,7 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
                   onClick={() => setCollapsed((current) => ({ ...current, [id]: unfolded }))}><CaretIcon /></button>
                 <button type="button" className="layer-row group" aria-pressed={catState === "mixed" ? "mixed" : catState === "on"} aria-label={category.label}
                   title={catState === "off" ? `Show all ${category.label.toLowerCase()}` : `Hide all ${category.label.toLowerCase()}`}
-                  onClick={() => onChange({ ...filters, [layer.key]: toggleLayer(state, keys, layer.key) })}>
+                  onClick={() => onChange({ ...filters, [layer.key]: toggleLayer(state, keys, layer.key, markerPreset) })}>
                   <img src={iconSrc(category.icon)} alt="" />
                   <span className="group-name">{category.label}</span>
                   <span className="faint">{types.reduce((sum, group) => sum + (counts[`${layer.key}.${group.key}`] ?? 0), 0)}</span>

@@ -1,31 +1,34 @@
 import type { CSSProperties } from "react";
-import { TILE_HOST, tileZoom, tilesIn } from "./tiles.ts";
-import { isUnderground, UNDERGROUND_OPACITY } from "./projection.ts";
-import type { MapCalibration, MapFloor } from "./types.ts";
+import { floorById, floorsOf, UNDERGROUND_OPACITY, type FloorSelection } from "./floors.ts";
+import { useMapAssets } from "./assets.ts";
+import { tileZoom, tilesIn } from "./tiles.ts";
+import type { MapCalibration } from "./types.ts";
 
 export type TileView = { cx: number; cy: number; scale: number; width: number; height: number };
-
-const defaultUrl = (path: string) => TILE_HOST + path;
 
 /**
  * Leaflet-style raster tiles for a map with a `tilePath`, drawn for the visible part of `view`
  * (plane centre, pixels per plane unit, frame size). A coarser zoom sits underneath to cover
- * tiles still loading. A floor with its own tiles is drawn over a dimmed base. With `all`, every floor with
- * its own tiles is drawn over the base: underground faintly first, then the upper floors in order.
- * With `shifts` (plane x per floor name) the floors are split apart instead: each with tiles is drawn at full
- * strength, moved sideways by its shift.
+ * tiles still loading. A floor with its own tiles is drawn over a dimmed base. With every floor (`floor` null),
+ * each floor with its own tiles is drawn over the base: underground faintly first, then the upper floors in order.
+ * With `shifts` (plane x per floor id) the floors are split apart instead: each with tiles is drawn at full
+ * strength, moved sideways by its shift. Tile URLs come from `MapAssetsContext`.
  */
-export function MapTiles({ map, floor = null, all = false, shifts, view, tileUrl = defaultUrl, className }: {
-  map: MapCalibration & { tilePath: string }; floor?: MapFloor | null; all?: boolean; shifts?: Map<string, number>; view: TileView;
-  tileUrl?: (path: string) => string; className?: string;
+export function MapTiles({ map, floor, shifts, view, className }: {
+  map: MapCalibration & { tilePath: string }; floor: FloorSelection; shifts?: Map<string, number>; view: TileView; className?: string;
 }) {
+  const { tile: tileUrl } = useMapAssets();
   const visible = {
     x: view.cx - view.width / 2 / view.scale, y: view.cy - view.height / 2 / view.scale,
     width: view.width / view.scale, height: view.height / view.scale,
   };
   const z = tileZoom(map, view.scale);
-  const overlay = floor?.tilePath && floor.tilePath !== map.tilePath ? floor.tilePath : null;
-  const floors = all ? map.layers.filter((other) => other.tilePath && other.tilePath !== map.tilePath) : [];
+  const [base, ...rest] = floorsOf(map);
+  // Floors with tiles of their own, drawn over the base tiles.
+  const own = rest.filter((other) => other.tilePath && other.tilePath !== map.tilePath);
+  const all = floor === null;
+  const chosen = floorById(map, floor);
+  const overlay = chosen && own.includes(chosen) ? chosen.tilePath! : null;
   const layer = (template: string, zoom: number, style?: CSSProperties, dx = 0) =>
     tilesIn(map, template, zoom, { ...visible, x: visible.x - dx }).map((tile) => {
       const left = Math.floor((tile.rect.x + dx - visible.x) * view.scale);
@@ -39,23 +42,22 @@ export function MapTiles({ map, floor = null, all = false, shifts, view, tileUrl
     });
 
   if (shifts) {
-    const baseShift = shifts.get(map.layers.find((other) => other.tilePath === map.tilePath)?.name ?? "") ?? 0;
-    const split = map.layers.filter((other) => other.tilePath && other.tilePath !== map.tilePath);
+    const baseShift = shifts.get(base.id) ?? 0;
     return <div className={className} style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
       <div>{z > 2 && layer(map.tilePath, z - 2, undefined, baseShift)}
         {layer(map.tilePath, z, undefined, baseShift)}</div>
-      {split.map((other) => <div key={other.name}>{layer(other.tilePath!, z, undefined, shifts.get(other.name) ?? 0)}</div>)}
+      {own.map((other) => <div key={other.id}>{layer(other.tilePath!, z, undefined, shifts.get(other.id) ?? 0)}</div>)}
     </div>;
   }
 
   return <div className={className} style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-    <div style={{ opacity: overlay && !all ? 0.2 : 1 }}>
+    <div style={{ opacity: overlay ? 0.2 : 1 }}>
       {z > 2 && layer(map.tilePath, z - 2)}
       {layer(map.tilePath, z)}
     </div>
     {all
-      ? [...floors.filter(isUnderground), ...floors.filter((other) => !isUnderground(other))].map((other) =>
-        <div key={other.name} style={isUnderground(other) ? { opacity: UNDERGROUND_OPACITY } : undefined}>{layer(other.tilePath!, z)}</div>)
+      ? [...own.filter((other) => other.underground), ...own.filter((other) => !other.underground)].map((other) =>
+        <div key={other.id} style={other.underground ? { opacity: UNDERGROUND_OPACITY } : undefined}>{layer(other.tilePath!, z)}</div>)
       : overlay && layer(overlay, z)}
   </div>;
 }

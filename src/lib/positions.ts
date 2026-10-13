@@ -1,21 +1,24 @@
 import type { PositionObservation } from "../bindings/PositionObservation";
+import { metricProjection } from "../maps/projection.ts";
+import type { PlayerPosition } from "../maps/players.ts";
+
+export { freshness } from "../maps/players.ts";
 
 export type PositionHistory = PositionObservation[];
+
+/** A scanner capture as a map player position. */
+export const toPlayerPosition = (position: PositionObservation): PlayerPosition => ({
+  x: position.xyz[0], y: position.xyz[1], z: position.xyz[2], heading: position.heading_degrees,
+  at: position.observed_at, key: `${position.filename}|${position.observed_at}`,
+});
 
 /** Positions for the current raid; unassociated captures when no raid is known. */
 export function positionsForRaid(history: PositionHistory, raidId: string | null | undefined): PositionHistory {
   return history.filter((position) => (position.raid_id ?? null) === (raidId ?? null));
 }
 
-/** 1 when just received, easing to 0 over `window` milliseconds. */
-export function freshness(observedAt: string, now: number, window = 120_000): number {
-  const time = Date.parse(observedAt);
-  if (Number.isNaN(time)) return 0;
-  return Math.min(1, Math.max(0, 1 - (now - time) / window));
-}
-
-/** Map plane: world X → right, world Z → up (screen Y is inverted). */
-export const toPlane = (position: PositionObservation) => ({ x: position.xyz[0], y: -position.xyz[2] });
+/** Uncalibrated map plane: world X → right, world Z → up (screen Y is inverted). */
+export const toPlane = (position: PositionObservation) => metricProjection.toPlane(toPlayerPosition(position));
 
 /** Capture order: filename capture minute, then receipt time. */
 export function inCaptureOrder(positions: PositionHistory): PositionHistory {

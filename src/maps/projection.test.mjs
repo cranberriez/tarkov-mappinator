@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { artRect, floorAt, metricProjection, projectionFor } from "./projection.ts";
+import { artRect, metricProjection, projectionFor } from "./projection.ts";
+import { floorAt, floorsOf, GROUND } from "./floors.ts";
 import { games, mapName, maps, resolveGame, resolveMap } from "./catalog.ts";
 import { tileCount, tileRange, tilesIn, tileZoom } from "./tiles.ts";
 
@@ -55,10 +56,27 @@ test("heading follows the projected forward direction, for any rotation", () => 
 test("floors match by height and optional area", () => {
   const customs = maps.customs;
   const dorms = { x: 200, z: 150 };
-  assert.equal(floorAt(customs, { ...dorms, y: 1 }), null);
-  assert.equal(floorAt(customs, { ...dorms, y: 4 })?.svgLayer, "Second_Floor");
-  assert.equal(floorAt(customs, { x: -340, z: 200, y: 4 }), null, "outside every 2nd-floor area");
-  assert.equal(floorAt(customs, dorms), null, "no height, base floor");
+  assert.equal(floorAt(customs, { ...dorms, y: 1 }).id, GROUND);
+  assert.equal(floorAt(customs, { ...dorms, y: 4 }).svgLayer, "Second_Floor");
+  assert.equal(floorAt(customs, { x: -340, z: 200, y: 4 }).id, GROUND, "outside every 2nd-floor area");
+  assert.equal(floorAt(customs, dorms).id, GROUND, "no height, base floor");
+});
+
+test("every map has one base floor, listed first, and floor ids are unique", () => {
+  for (const [key, map] of Object.entries(maps)) {
+    const floors = floorsOf(map);
+    assert.equal(floors.filter((floor) => floor.base).length, 1, key);
+    assert.ok(floors[0].base, key);
+    assert.equal(new Set(floors.map((floor) => floor.id)).size, floors.length, key);
+    assert.ok(!map.layers.some((layer) => layer.name === GROUND), `${key} lists a floor named "${GROUND}"`);
+  }
+});
+
+test("a listed floor drawn by the base art is the base floor, with no separate ground", () => {
+  const floors = floorsOf(maps.icebreaker);
+  assert.equal(floors[0].id, "Infirmary");
+  assert.equal(floors.length, maps.icebreaker.layers.length);
+  assert.deepEqual([floorsOf(maps.customs)[0].id, floorsOf(maps.customs)[0].name], [GROUND, "Ground Level"]);
 });
 
 // Identifiers observed in real game logs: `Location:` ids and scene bundles.

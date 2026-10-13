@@ -1,5 +1,4 @@
-import { assetUrl, iconSrc } from "../lib/tiles";
-import { groupOn, markerIcon, type Detail, type Filters, type MapMarker } from "../lib/mapLayers";
+import { groupOn, markerIcon, tarkovPreset, useMapAssets, type Detail, type Filters, type MapMarker, type MarkerPreset } from "../maps";
 import { formatRoubles, itemValue, type ItemGet } from "../lib/itemData";
 import { CloseIcon } from "./Icons";
 
@@ -12,9 +11,10 @@ const percent = (chance: number) => `${Math.round(chance * 100)}%`;
  * Hovering previews it; a pinned card stays until closed. A boss spawn point stacks one panel per
  * shown boss type, then one with the place itself.
  */
-export function MapMarkerCard({ marker, filters, floorName, pinned, onClose, get }: {
-  marker: MapMarker; filters: Filters; floorName?: string; /** Item lookup, when enrichment is ready: names, prices and value order. */ get?: ItemGet; pinned: boolean; onClose: () => void;
+export function MapMarkerCard({ marker, filters, preset = tarkovPreset, floorName, pinned, onClose, get }: {
+  marker: MapMarker; filters: Filters; preset?: MarkerPreset; floorName?: string; /** Item lookup, when enrichment is ready: names, prices and value order. */ get?: ItemGet; pinned: boolean; onClose: () => void;
 }) {
+  const { icon: iconSrc, link: assetUrl } = useMapAssets();
   const [title, ...rest] = [marker.label, ...marker.tags].filter(Boolean) as string[];
   const { x, y, z } = marker.position;
   const place: Detail[] = [
@@ -23,7 +23,7 @@ export function MapMarkerCard({ marker, filters, floorName, pinned, onClose, get
   ];
   const close = pinned && <button type="button" className="icon-button" title="Close" onClick={onClose}><CloseIcon /></button>;
   if (marker.bosses) {
-    const bosses = marker.bosses.filter((boss) => groupOn(filters[marker.layer], boss.group, marker.layer));
+    const bosses = marker.bosses.filter((boss) => groupOn(filters[marker.layer], boss.group, marker.layer, preset));
     const places = [...new Set(marker.bosses.flatMap((boss) => boss.location.split(", ")))].join(" · ");
     return <div className="marker-cards">
       {bosses.map((boss, index) => <div key={boss.group} className="marker-card">
@@ -48,7 +48,7 @@ export function MapMarkerCard({ marker, filters, floorName, pinned, onClose, get
   }
   return <div className="marker-cards"><div className="marker-card">
     <div className="marker-card-head">
-      <img src={iconSrc(markerIcon(marker, filters))} alt="" draggable={false} />
+      <img src={iconSrc(markerIcon(marker, filters, preset))} alt="" draggable={false} />
       <div className="marker-card-title"><span>{title}</span>{rest.length > 0 && <span className="marker-card-sub">{rest.join(" · ")}</span>}</div>
       {close}
     </div>
@@ -62,6 +62,7 @@ const titleOf = (id: string, get?: ItemGet) => {
 };
 
 function Rows({ rows, get }: { rows: Detail[]; get?: ItemGet }) {
+  const { icon: iconSrc } = useMapAssets();
   return rows.length > 0 ? <div className="marker-card-rows">
     {rows.map((row, index) => <div key={index} className="marker-card-row">
       <span className="marker-card-label">{row.label}</span>

@@ -2,13 +2,16 @@
 // Reads are per map so the full response is never loaded at once.
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DataStatus } from "../bindings/DataStatus";
 import type { MapEntry } from "../bindings/MapEntry";
-import type { CommonData, GameMapData, Mob } from "./types";
+import type { CommonData, GameMapData, Mob } from "../maps/data";
+import type { Lookups } from "../maps/markers";
+import { namesOf, type MapDataSource } from "../maps/source";
+import { useItemStatus } from "../lib/itemData";
 import type { DataMode } from "./mode";
 
-export type * from "./types";
+export type * from "../maps/data";
 export type { DataStatus, MapEntry };
 export { dataMode, type DataMode } from "./mode";
 
@@ -23,14 +26,6 @@ export const getMobs = (mode: DataMode = "pve") => invoke<Record<string, unknown
 export const onDataStatus = (receive: (status: DataStatus) => void) =>
   listen<DataStatus>("tarkov-data:updated", (event) => receive(event.payload));
 
-/** Index entry for any name the game or tarkov.dev uses: normalized name, game id, scene, or English name. */
-export function findMapEntry(status: DataStatus | null, name: string | null | undefined): MapEntry | null {
-  if (!status?.manifest || !name) return null;
-  const key = name.trim().toLowerCase().replace(/^maps\//, "").replace(/\.bundle$/, "");
-  return status.manifest.maps.find((map) =>
-    [map.normalized_name, map.name_id, map.scene, map.name].some((alias) => alias.toLowerCase() === key)) ?? null;
-}
-
 /** Live sync status; null outside the desktop app or before the first reply. */
 export function useDataStatus(): DataStatus | null {
   const [status, setStatus] = useState<DataStatus | null>(null);
@@ -44,54 +39,34 @@ export function useDataStatus(): DataStatus | null {
   return status;
 }
 
-type Named = { name: string; normalizedName: string };
-/** Name tables the map documents point into, by id or mob key. */
-export type NameLookups = { containers: Record<string, Named>; weapons: Record<string, Named>; mobs: Record<string, Mob> };
-
-// Mobs are several MB; load them once per mode and sync, and keep only names for containers and guns.
-const lookupCache = new Map<string, Promise<NameLookups>>();
-const names = (table: Record<string, unknown>): Record<string, Named> => Object.fromEntries(
-  Object.entries(table).map(([key, value]) => {
-    const { name, normalizedName } = value as Named;
-    return [key, { name, normalizedName }];
-  }));
-
-/** Container, stationary weapon and mob names for a mode, reloaded when the local mirror is refreshed. */
-export function useNameLookups(status: DataStatus | null, mode: DataMode = "pve"): NameLookups | null {
-  const [lookups, setLookups] = useState<NameLookups | null>(null);
-  const fetchedAt = status?.manifest?.fetched_at;
-  useEffect(() => {
-    setLookups(null);
-    if (!fetchedAt) return;
-    const key = `${mode}|${fetchedAt}`;
-    let pending = lookupCache.get(key);
-    if (!pending) {
-      pending = Promise.all([getCommonData(mode), getMobs(mode)]).then(([common, mobs]) => ({
-        containers: names(common.lootContainers), weapons: names(common.stationaryWeapons), mobs: mobs as Record<string, Mob>,
-      }));
-      pending.catch(() => lookupCache.delete(key));
-      lookupCache.set(key, pending);
-    }
-    let live = true;
-    pending.then((next) => { if (live) setLookups(next); }, () => {});
-    return () => { live = false; };
-  }, [fetchedAt, mode]);
-  return lookups;
-}
-
 /**
- * One map's data for a mode, reloaded when the local mirror is refreshed, or when `items` changes: a key for the
- * item data, which the backend adds loose loot categories from.
+ * The local mirror as a map data source, or null outside the desktop app or before the mirror has data.
+ * A new source arrives when the mirror is refreshed, or when item data changes: the backend adds loose loot
+ * categories from it to each map document it reads.
  */
-export function useMapData(normalizedName: string | null | undefined, status: DataStatus | null, mode: DataMode = "pve", items?: string): GameMapData | null {
-  const [data, setData] = useState<GameMapData | null>(null);
-  const fetchedAt = status?.manifest?.fetched_at;
-  useEffect(() => {
-    setData(null);
-    if (!normalizedName || !fetchedAt) return;
-    let live = true;
-    getMapData(normalizedName, mode).then((next) => { if (live) setData(next); }, () => {});
-    return () => { live = false; };
-  }, [normalizedName, fetchedAt, mode, items]);
-  return data;
+export function useDesktopMapSource(): MapDataSource | null {
+  const status = useDataStatus();
+  const items = useItemStatus();
+  const manifest = status?.manifest;
+  const itemsVersion = `${items?.config.enabled}|${items?.config.pieces.extra}|${items?.fetched_at}`;
+  return useMemo(() => {
+    if (!manifest) return null;
+    const maps = Object.fromEntries(manifest.maps.map((entry) => [entry.id, entry.name]));
+    const lookups = new Map<DataMode, Promise<Lookups>>();
+    return {
+      map: getMapData,
+      lookups: (mode) => {
+        let pending = lookups.get(mode);
+        if (!pending) {
+          // Mobs are several MB; keep only names for containers and guns.
+          pending = Promise.all([getCommonData(mode), getMobs(mode)]).then(([common, mobs]) => ({
+            containers: namesOf(common.lootContainers), weapons: namesOf(common.stationaryWeapons), mobs: mobs as Record<string, Mob>, maps,
+          }));
+          pending.catch(() => lookups.delete(mode));
+          lookups.set(mode, pending);
+        }
+        return pending;
+      },
+    };
+  }, [manifest?.fetched_at, itemsVersion]);
 }

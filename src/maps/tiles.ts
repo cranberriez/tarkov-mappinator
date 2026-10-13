@@ -1,9 +1,6 @@
 import { planeRect, projectionFor } from "./projection.ts";
 import type { MapCalibration, MapFloor, PlaneRect } from "./types.ts";
 
-/** tarkov.dev's tile host; tile paths in the calibration are relative to it. */
-export const TILE_HOST = "https://assets.tarkov.dev/maps/";
-
 export type Tile = { z: number; x: number; y: number; path: string; rect: PlaneRect };
 
 export const tilePathAt = (template: string, z: number, x: number, y: number) =>

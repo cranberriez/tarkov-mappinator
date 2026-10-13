@@ -16,9 +16,9 @@ use std::{
 };
 use ts_rs::TS;
 
-pub const TILE_HOST: &str = "https://assets.tarkov.dev/maps/";
+pub const TILE_HOST: &str = env!("TARKOV_TILE_HOST");
 /// Item icons share the cache under `items/<id>-512.webp`; the host serves them from its root.
-const ASSET_HOST: &str = "https://assets.tarkov.dev/";
+const ASSET_HOST: &str = env!("TARKOV_ASSET_HOST");
 const TILE_LIMIT: u64 = 8 * 1024 * 1024;
 const PREFETCH_WORKERS: usize = 6;
 

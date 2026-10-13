@@ -28,7 +28,7 @@ use std::{
 };
 use ts_rs::TS;
 
-pub const SOURCE: &str = "https://json.tarkov.dev";
+pub const SOURCE: &str = env!("TARKOV_DATA_HOST");
 /// The full data set; other modes are stored as differences from it.
 pub const BASELINE: &str = "pve";
 /// tarkov.dev data sets besides the baseline. PvP is `regular`; `/pvp/` does not exist.

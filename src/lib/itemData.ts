@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import type { ItemConfig } from "../bindings/ItemConfig";
 import type { ItemStatus } from "../bindings/ItemStatus";
 import type { DataMode } from "../tarkov-data/mode";
-import type { MapMarker } from "./mapLayers";
+import type { MapMarker } from "../maps";
 
 export type { ItemConfig, ItemStatus };
 

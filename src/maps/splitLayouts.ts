@@ -1,3 +1,5 @@
+import { GROUND, type Floor } from "./floors.ts";
+
 /**
  * Hand-tuned split-floor layouts, by calibration key. Anything not listed uses the defaults.
  * Tile maps split into columns: `columnWidth` is how wide the art really is, `floorWidths` overrides that per
@@ -5,7 +7,7 @@
  * (tiles are drawn square, mostly empty around the art).
  */
 export type SplitLayout = {
-  columnWidth: number; columnGap: number; floorWidths: Record<string, number>;
+  columnWidth: number; columnGap: number; /** By floor id. */ floorWidths: Record<string, number>;
   /** Plane point the floor names hang from (art centre x, art top y), when the art is not centred in the map bounds. */
   label?: { x: number; y: number };
 };
@@ -28,5 +30,6 @@ export const splitLayouts: Record<string, Partial<SplitLayout>> = {
 
 export const splitLayoutFor = (key: string): SplitLayout => ({ ...DEFAULT_SPLIT_LAYOUT, ...splitLayouts[key] });
 
-/** Plane width of a floor's column ("" is the ground) in a map whose art is `art` wide. */
-export const columnWidthOf = (layout: SplitLayout, art: number) => (floor: string) => art * (layout.floorWidths[floor] ?? (floor ? layout.columnWidth : 1));
+/** Plane width of a floor's column in a map whose art is `art` wide; the ground is a full map wide. */
+export const columnWidthOf = (layout: SplitLayout, art: number) => (floor: Floor) =>
+  art * (layout.floorWidths[floor.id] ?? (floor.id === GROUND ? 1 : layout.columnWidth));
