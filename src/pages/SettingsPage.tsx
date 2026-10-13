@@ -21,6 +21,8 @@ import type { AutoShot } from "../lib/useAutoShot";
 import type { ShotCleanup } from "../lib/useShotCleanup";
 import { toastModes, type ToastModeState } from "../lib/useToastMode";
 import type { ValuableLootState } from "../lib/useValuableLoot";
+import { DEFAULT_GROUP_SITE, type Group } from "../lib/useGroup";
+import { normalizeSite } from "../lib/group";
 import type { AutoShotState } from "../bindings/AutoShotState";
 import {
   clearAllData, getCleanupPlan, getHistoryStats, onHistoryReset, onHistoryUpdated, resetPreferences, runCleanup,
@@ -58,8 +60,9 @@ function Switch({ label, detail, on, disabled, onChange }: {
   </button>;
 }
 
-export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup, toastMode, valuableLoot }: {
+export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup, toastMode, valuableLoot, group }: {
   scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot; shotCleanup: ShotCleanup; toastMode: ToastModeState; valuableLoot: ValuableLootState;
+  group: Group;
 }) {
   const { snapshot, running, connected, busy, error, perform, retry } = scanner;
   const [folders, setFolders] = useState<FolderConfig>({ screenshots: "", logs: "" });
@@ -100,6 +103,7 @@ export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup,
     </section>
 
     <ConnectionSection connection={connection} />
+    <GroupServerSection group={group} />
     <AutoShotSection autoShot={autoShot} />
 
     <section className="settings-section">
@@ -213,6 +217,30 @@ function StoredDataSection({ shotCleanup }: { shotCleanup: ShotCleanup }) {
     </>}
     {note && <p className="faint section-note">{note}</p>}
     {error && <p className="diagnostics">{error}</p>}
+  </section>;
+}
+
+/** Which site signs group channels: the default, or a local/dev site while testing. */
+function GroupServerSection({ group }: { group: Group }) {
+  const [typed, setTyped] = useState(group.siteOverride);
+  useEffect(() => setTyped(group.siteOverride), [group.siteOverride]);
+  const site = normalizeSite(typed);
+  const invalid = !!typed.trim() && !site;
+  const changed = (site ?? "") !== (normalizeSite(group.siteOverride) ?? "");
+  return <section className="settings-section">
+    <h2>Group</h2>
+    <form onSubmit={(event) => { event.preventDefault(); if (!invalid) group.setSiteOverride(site ?? ""); }}>
+      <div className="field">
+        <div className="field-label"><label htmlFor="group-site">Server</label><span className="faint">In use: {group.site}</span></div>
+        <input id="group-site" value={typed} placeholder={DEFAULT_GROUP_SITE} spellCheck={false} autoComplete="off"
+          onChange={(event) => setTyped(event.target.value)} />
+        <p className="faint">{invalid ? "Not a web address." : "Site that signs groups, e.g. http://localhost:3000. Empty uses the default."}</p>
+      </div>
+      <div className="form-actions">
+        <button type="submit" className="secondary" disabled={invalid || !changed}>Save</button>
+        {group.siteOverride && <button type="button" className="link" onClick={() => group.setSiteOverride("")}>Use default</button>}
+      </div>
+    </form>
   </section>;
 }
 

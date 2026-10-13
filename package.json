@@ -8,9 +8,11 @@
     "build": "tsc --noEmit && vite build",
     "test": "node --test src/lib/*.test.mjs src/maps/*.test.mjs src/tarkov-data/*.test.mjs",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:instance": "node scripts/dev-instance.mjs"
   },
   "dependencies": {
+    "@apinator/client": "^2.0.0",
     "@tauri-apps/api": "^2.12.3",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ActivityIcon, ImportIcon, LinkIcon, MapIcon, OverviewIcon, SettingsIcon, SidebarIcon, TimelineIcon } from "./Icons";
+import { ActivityIcon, GroupIcon, ImportIcon, LinkIcon, MapIcon, OverviewIcon, SettingsIcon, SidebarIcon, TimelineIcon } from "./Icons";
 import type { CompanionConnection } from "../lib/useCompanion";
 import { connectionLabel, connectionTone } from "../lib/companion";
 import { ConnectionPanel } from "./ConnectionPanel";
 
-export type Page = "overview" | "map" | "timeline" | "activity" | "import" | "settings";
+export type Page = "overview" | "map" | "timeline" | "activity" | "import" | "group" | "settings";
 
 const items: { page: Page; label: string; icon: ReactNode }[] = [
   { page: "overview", label: "Overview", icon: <OverviewIcon /> },
@@ -14,8 +14,10 @@ const items: { page: Page; label: string; icon: ReactNode }[] = [
   { page: "import", label: "Import", icon: <ImportIcon /> },
 ];
 
-export function Sidebar({ page, onNavigate, collapsed, onToggle, connection }: {
+export function Sidebar({ page, onNavigate, collapsed, onToggle, connection, group }: {
   page: Page; onNavigate: (page: Page) => void; collapsed: boolean; onToggle: () => void; connection: CompanionConnection;
+  /** The Group item's dot while in a group (or trying to be); null otherwise. */
+  group: { tone: "ok" | "warn" | "bad"; label: string } | null;
 }) {
   const [panel, setPanel] = useState(false);
   const kind = connection.connection;
@@ -31,6 +33,10 @@ export function Sidebar({ page, onNavigate, collapsed, onToggle, connection }: {
 
   return <nav className={`sidebar ${collapsed ? "collapsed" : ""}`} aria-label="Main">
     {items.map(link)}
+    <button type="button" className={`nav-item ${page === "group" ? "active" : ""}`} aria-current={page === "group" ? "page" : undefined}
+      title={collapsed ? `Group${group ? `: ${group.label}` : ""}` : undefined} onClick={() => onNavigate("group")}>
+      <span className="nav-icon"><GroupIcon />{group && <span className={`dot ${group.tone}`} />}</span><span>Group</span>
+    </button>
     <div className="sidebar-spacer" />
     {connection.enabled && <>
       <ConnectionPanel connection={connection} open={panel && !collapsed} />

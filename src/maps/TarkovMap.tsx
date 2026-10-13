@@ -55,6 +55,8 @@ export type TarkovMapProps = {
   players?: PlayerTrack[];
   /** Id of a track to keep centred on its newest position; dragging calls `onUserPan`, which should turn it off. */
   follow?: string | null;
+  /** A point to centre on once, again whenever `key` changes; for jumping to something without following it. */
+  centre?: { key: string; point: PlayerPosition } | null;
   onUserPan?: () => void;
   /** Overlay markers already filtered for display, with the filters they were filtered by (they pick icons). */
   markers?: MapMarker[];
@@ -79,7 +81,7 @@ const noFilters: Filters = {};
  * A pannable, zoomable Tarkov map: vector art or tiles by floor, data markers, and player positions.
  * Positions are world coordinates in the map's own space, so only pass players who are on this map.
  */
-export function TarkovMap({ map, art: preferred = "svg", floor, split = false, players = [], follow = null, onUserPan,
+export function TarkovMap({ map, art: preferred = "svg", floor, split = false, players = [], follow = null, centre = null, onUserPan,
   markers = noMarkers, filters = noFilters, preset, lootIcons, selected, onMarkerHover, onMarkerTap, className, children, ref }: TarkovMapProps) {
   const projection = useMemo(() => map ? projectionFor(map) : metricProjection, [map]);
   const style = artStyleOf(map, preferred);
@@ -119,6 +121,13 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, p
     const { x, y } = toPlane(newest);
     panTo(x, y);
   }, [newest?.key, follow, panTo, projection, shift]);
+
+  // After the reset above when the map changes, so a jump to another map lands on the point.
+  useEffect(() => {
+    if (!centre || !size.width) return;
+    const { x, y } = toPlane(centre.point);
+    panTo(x, y);
+  }, [centre?.key, mapKey, size.width > 0]);
 
   useImperativeHandle(ref, () => ({
     panTo: (x, y) => panTo(x, y),
@@ -193,7 +202,7 @@ function PlayerMarkers({ players, at, heading }: {
     const newest = track.positions.at(-1);
     const older = track.positions.slice(0, -1);
     const colour = track.color ? { "--player": track.color } : {};
-    return <div key={track.id} className="player-track" style={colour as CSSProperties}>
+    return <div key={track.id} className={`player-track ${track.className ?? ""}`} style={colour as CSSProperties}>
       {older.map((position, index) => <Marker key={position.key} at={at(position)} heading={rotation(position)}
         className="marker old" style={{ opacity: 0.18 + (index + 1) / (older.length + 1) * 0.4 } as CSSProperties} title={title(position)} />)}
       {newest && <Marker at={at(newest)} heading={rotation(newest)} className="marker newest"

@@ -343,6 +343,9 @@ input:disabled { opacity: .55; }
 .marker.newest::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1.5px solid var(--player, var(--accent-strong));
   opacity: 0; animation: ping 2.2s ease-out infinite; animation-play-state: running; }
 @keyframes ping { 0% { transform: scale(.7); opacity: calc(var(--fresh) * .8); } 100% { transform: scale(2.1); opacity: 0; } }
+/* Other group members: their colour always, no glow or ping. */
+.player-track.peer .marker.newest { z-index: 1; width: 16px; height: 16px; background: var(--player); box-shadow: 0 0 0 2px #131416, 0 2px 10px rgb(0 0 0 / 50%); }
+.player-track.peer .marker.newest::after { content: none; }
 
 .map-switch { position: absolute; top: 14px; right: 14px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .map-chip { display: flex; align-items: center; height: 28px; border-radius: 14px; background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px);
@@ -638,3 +641,26 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .marker-card-item img { width: 28px; height: 28px; object-fit: contain; }
 .marker-card-item .count { position: absolute; right: -2px; bottom: -2px; padding: 0 3px; border-radius: 6px; background: rgb(15 16 17 / 90%); font-size: 10px; line-height: 13px; }
 .overlay-marker.selected img { border-radius: 50%; outline: 1.5px solid var(--accent); outline-offset: 1px; }
+
+/* Group */
+.group-page { max-width: 640px; }
+.group-toggle { margin-bottom: 8px; }
+.group-status.online { color: var(--ok); }
+.group-status.error { color: var(--bad); }
+.group-error { color: var(--bad); font-size: 12px; margin-bottom: 8px; }
+.group-name-field { max-width: 260px; margin-top: 16px; }
+.group-actions { display: flex; align-items: center; gap: 10px; max-width: 420px; }
+.group-actions input { flex: 1; }
+.group-code-input { text-transform: uppercase; letter-spacing: .15em; }
+.group-current { margin-top: 8px; }
+.group-code-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.group-code { display: inline-flex; align-items: baseline; gap: 10px; padding: 2px 6px; border-radius: 6px; }
+.group-code strong { font: 600 18px var(--mono); letter-spacing: .15em; }
+.group-code .faint { font-size: 11px; }
+.group-code:hover { background: var(--surface-hover); }
+.group-leave { margin-left: auto; }
+.group-members { list-style: none; display: flex; flex-direction: column; }
+.group-member { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 6px; text-align: left; }
+button.group-member:not(:disabled):hover { background: var(--surface-hover); }
+.group-member .group-name { font-weight: 500; margin-right: auto; }
+.group-alone { padding: 8px 6px; }

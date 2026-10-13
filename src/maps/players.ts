@@ -19,10 +19,12 @@ export type PlayerTrack = {
   color?: string;
   /** Still being updated: the newest marker glows, fading over two minutes from its `at`. */
   live?: boolean;
+  /** Extra class on the track's element, for styling a kind of player (e.g. other group members). */
+  className?: string;
   positions: PlayerPosition[];
 };
 
-export type TrackInfo = Partial<Pick<PlayerTrack, "label" | "color" | "live">>;
+export type TrackInfo = Partial<Pick<PlayerTrack, "label" | "color" | "live" | "className">>;
 
 /** 1 when just taken, easing to 0 over `window` milliseconds. */
 export function freshness(at: string, now: number, window = 120_000): number {

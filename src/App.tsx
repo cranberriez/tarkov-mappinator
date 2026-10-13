@@ -9,10 +9,12 @@ import { useShotCleanup } from "./lib/useShotCleanup";
 import { useToastMode } from "./lib/useToastMode";
 import { useValuableLoot } from "./lib/useValuableLoot";
 import { useGameMode } from "./lib/useGameMode";
+import { useGroup } from "./lib/useGroup";
 import { Sidebar, type Page } from "./components/Sidebar";
 import { Toasts } from "./components/Toasts";
 import { OverviewPage } from "./pages/OverviewPage";
-import { MapPage } from "./pages/MapPage";
+import { MapPage, type MemberFocus } from "./pages/MapPage";
+import { GroupPage } from "./pages/GroupPage";
 import { ActivityPage } from "./pages/ActivityPage";
 import { TimelinePage } from "./pages/TimelinePage";
 import { ImportPage } from "./pages/ImportPage";
@@ -30,11 +32,18 @@ export function App() {
   const valuableLoot = useValuableLoot();
   // App-level so an import keeps streaming while other pages are open.
   const importer = useImport();
+  // App-level so the group stays joined on every page and in mini mode.
+  const group = useGroup(scanner);
+  const [memberFocus, setMemberFocus] = useState<MemberFocus | null>(null);
   const [page, setPage] = useState<Page>("map");
   // A past raid opened from the timeline; the map shows it instead of the live raid until closed.
   const [viewingId, setViewingId] = useState<string | null>(null);
   const viewing = scanner.raids.find((raid) => raid.id === viewingId) ?? null;
-  const navigate = (next: Page) => { setViewingId(null); setPage(next); };
+  const navigate = (next: Page) => { setViewingId(null); setMemberFocus(null); setPage(next); };
+  const groupDot = !group.enabled ? null
+    : group.connection === "online" && group.membership === "joined" ? { tone: "ok" as const, label: `in group ${group.code}` }
+    : group.connection === "error" || group.membership === "error" ? { tone: "bad" as const, label: "not connected" }
+    : group.code ? { tone: "warn" as const, label: "connecting" } : null;
   // The mode comes from the raid on the map; a mode picked in the title bar lasts until a raid starts or another is opened.
   const live = scanner.snapshot?.raid;
   const gameMode = useGameMode(viewing ? viewing.game_mode : live?.game_mode, `${viewingId}|${live?.id}|${live?.started_at}`);
@@ -47,14 +56,16 @@ export function App() {
   return <div className="shell">
     <TitleBar scanner={scanner} mini={mini} gameMode={gameMode} />
     <div className="body">
-      <Sidebar page={page} onNavigate={navigate} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} connection={connection} />
+      <Sidebar page={page} onNavigate={navigate} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} connection={connection} group={groupDot} />
       <main className="content">
         {page === "overview" && <OverviewPage scanner={scanner} onNavigate={navigate} />}
-        {page === "map" && <MapPage key={viewing?.id ?? "live"} scanner={scanner} viewing={viewing} onCloseViewing={() => setViewingId(null)} mode={gameMode.mode} valuableLoot={valuableLoot.on} />}
+        {page === "map" && <MapPage key={viewing?.id ?? "live"} scanner={scanner} viewing={viewing} onCloseViewing={() => setViewingId(null)} mode={gameMode.mode} valuableLoot={valuableLoot.on}
+          members={group.members} focus={memberFocus} />}
+        {page === "group" && <GroupPage group={group} onShowMember={(id) => { setViewingId(null); setMemberFocus({ id, nonce: Date.now() }); setPage("map"); }} />}
         {page === "timeline" && <TimelinePage scanner={scanner} onOpenRaid={(id) => { setViewingId(id); setPage("map"); }} />}
         {page === "activity" && <ActivityPage scanner={scanner} />}
         {page === "import" && <ImportPage scanner={scanner} importer={importer} onNavigate={navigate} />}
-        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} valuableLoot={valuableLoot} />}
+        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} valuableLoot={valuableLoot} group={group} />}
       </main>
     </div>
     <Toasts events={scanner.snapshot?.activity} mode={toastMode.mode} />

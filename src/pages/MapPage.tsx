@@ -7,7 +7,7 @@ import type { PositionObservation } from "../bindings/PositionObservation";
 import {
   artStyleOf, baseFloor, buildMarkers, countMarkers, defaultFilters, floorAt, floorById, floorsOf, games, httpMapSource, isVisible, layersFor,
   MapAssetsContext, mapName, maps as calibrations, resolveGame, resolveMap, roleOf, TarkovMap, useLookups, useMapData, withDefaults,
-  type ArtStyle, type Filters, type FloorSelection, type PlayerTrack, type Role, type TarkovMapHandle,
+  type ArtStyle, type Filters, type FloorSelection, type PlayerPosition, type PlayerTrack, type Role, type TarkovMapHandle,
 } from "../maps";
 import { type DataMode, useDesktopMapSource } from "../tarkov-data";
 import { bestLooseItems, useItemData } from "../lib/itemData";
@@ -21,6 +21,10 @@ import { CrosshairIcon, LayersIcon, MinusIcon, PlusIcon, SplitIcon, TerrainIcon 
 import { MapSwitcher, type MapState } from "../components/MapSwitcher";
 import { MapFloorPanel } from "../components/MapFloorPanel";
 import { RaidScrubber } from "../components/RaidScrubber";
+import type { GroupMember } from "../lib/group";
+
+/** A request to show a group member: their map, centred on them once. `nonce` makes a repeat click count. */
+export type MemberFocus = { id: string; nonce: number };
 
 /** Track id of this player's own positions. */
 const SELF = "self";
@@ -31,8 +35,11 @@ const webSource = isTauri() ? null : httpMapSource();
  * The live raid's map, or with `viewing` a past raid's: its positions up to the one picked on the
  * scrubber, which then stands in for the newest position (followed, floor picked from it).
  */
-export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot }: {
+export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, members = [], focus = null }: {
   scanner: Scanner; viewing: RaidRecord | null; onCloseViewing: () => void; mode: DataMode; valuableLoot: boolean;
+  /** Other group members; those with a position on the shown map are drawn there. */
+  members?: GroupMember[];
+  focus?: MemberFocus | null;
 }) {
   const { snapshot, positions, connected, desktop } = scanner;
   const live = snapshot?.raid;
@@ -52,8 +59,15 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot }
   // Positions are in the raid map's coordinates, so they only show on that map.
   const markers = onRaidMap ? raidMarkers : [];
   const newest: PositionObservation | undefined = markers[markers.length - 1];
-  const players = useMemo((): PlayerTrack[] => markers.length
-    ? [{ id: SELF, live: !viewing, positions: markers.map(toPlayerPosition) }] : [], [markers, viewing]);
+  // Group members on the shown map: their newest position only, in their colour. Not over a past raid.
+  const peers = useMemo((): PlayerTrack[] => viewing ? [] : members
+    .filter((member) => member.position && member.map && resolveGame(member.map)?.key === shownKey)
+    .map((member) => ({ id: `peer:${member.id}`, label: member.name, color: member.color, className: "peer", positions: [member.position!] })),
+  [members, viewing, shownKey]);
+  // This player first: with nothing followed, the map opens on the first track. Peers' markers sit below (styles).
+  const players = useMemo((): PlayerTrack[] => [
+    ...(markers.length ? [{ id: SELF, live: !viewing, positions: markers.map(toPlayerPosition) }] : []), ...peers,
+  ], [markers, viewing, peers]);
 
   const calibration = resolveMap(shownMap);
   const map = useRef<TarkovMapHandle>(null);
@@ -119,12 +133,24 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot }
     else setChosenFloor(id);
   };
   /** Turning follow off by hand goes back to all floors. */
-  const toggleFollow = () => { if (follow) { setChosenFloor(null); leaveFollow(); } else setFollow(true); };
+  const toggleFollow = () => { if (follow) { setChosenFloor(null); leaveFollow(); } else { setFollow(true); setCentre(null); } };
   /** Stops following, staying on the map being shown. */
   function leaveFollow() { setBrowsed(shownMap ?? null); setFollow(false); }
   /** Panning stops following but keeps the floor it was showing. */
   const onUserPan = () => { if (follow) { setChosenFloor(followedFloor); leaveFollow(); } };
-  const chooseMap = (key: string) => { setBrowsed(key); setFollow(false); };
+  const chooseMap = (key: string) => { setBrowsed(key); setFollow(false); setCentre(null); };
+
+  // Jumping to a member shows their map and centres on them once; following stays with this player.
+  const [centre, setCentre] = useState<{ key: string; map: string; point: PlayerPosition } | null>(null);
+  useEffect(() => {
+    const member = focus && members.find((other) => other.id === focus.id);
+    const key = member?.map ? resolveGame(member.map)?.key : null;
+    if (!focus || !member || !key) return;
+    setBrowsed(key);
+    setFollow(false);
+    setChosenFloor(null);
+    setCentre(member.position ? { key: `${member.id}|${focus.nonce}`, map: key, point: member.position } : null);
+  }, [focus?.nonce]);
   const mapOptions = useMemo(() => games.filter((game) => game.art && calibrations[game.art])
     .map((game) => ({ key: game.key, label: game.name })), []);
 
@@ -134,6 +160,7 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot }
 
   return <MapAssetsContext.Provider value={appAssets}><div className="map-page">
     <TarkovMap ref={map} map={calibration} art={preferred} floor={floor} split={split} players={players} follow={follow ? SELF : null}
+      centre={centre && centre.map === shownKey ? centre : null}
       onUserPan={onUserPan} markers={shownOverlay} filters={filters} lootIcons={lootIcons} selected={pinned}
       onMarkerHover={setHovered} onMarkerTap={(id) => setPinned((current) => current === id ? null : id)}>
       {!newest && (onRaidMap || !calibration) && <p className={`map-empty ${calibration ? "on-map" : ""}`}>Take a screenshot in raid to place a position</p>}
@@ -176,7 +203,7 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot }
 
     <MapSwitcher maps={mapOptions} current={shownKey} label={mapName(shownMap) ?? (status === "online" ? "No map" : status === "offline" ? "Disconnected" : "Preview")}
       floor={shownFloor && !shownFloor.base ? shownFloor.name : undefined} state={mapState} liveName={mapName(live?.map)} onSelect={chooseMap}
-      onSwitch={() => { if (viewing) onCloseViewing(); setFollow(true); }} />
+      onSwitch={() => { if (viewing) onCloseViewing(); setFollow(true); setCentre(null); }} />
   </div></MapAssetsContext.Provider>;
 }
 

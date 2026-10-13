@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost tiles: http://tiles.localhost thumb: http://thumb.localhost; style-src 'self' 'unsafe-inline'",
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost https://www.tarkovhideout.com https://dev.tarkovhideout.com http://localhost:* http://127.0.0.1:* wss://*.apinator.io; img-src 'self' asset: http://asset.localhost tiles: http://tiles.localhost thumb: http://thumb.localhost; style-src 'self' 'unsafe-inline'",
       "assetProtocol": {
         "enable": true,
         "scope": []
