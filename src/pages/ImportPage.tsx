@@ -71,20 +71,22 @@ export function ImportPage({ scanner, importer, onNavigate }: { scanner: Scanner
   const logs = files.filter((file) => file.kind === "log");
   const busy = running(phase);
   const stage = phase === "importing" || phase === "imported" ? phase : null;
-  const hasData = !!result && (result.raids.length > 0 || result.positions.length > 0);
+  const hasData = !!result && (result.raids.length > 0 || result.positions.length > 0 || result.activity.length > 0);
 
   return <div className="import-page">
     <header className="import-header">
       <h1>Import</h1>
       <span className={`import-phase ${phase}`}>{phaseLabel[phase]}</span>
       {result?.cancelled && <span className="faint">Cancelled · partial results</span>}
+      {!!result?.already_imported && <span className="faint">{plural(result.already_imported, "file")} already imported
+        {!busy && phase !== "importing" && <> · <button type="button" className="link" onClick={() => config && void scan(config, true)}>Rescan all</button></>}</span>}
       <div className="import-actions">
         {phase === "imported" && <button type="button" className="link" onClick={() => onNavigate("timeline")}>Open timeline</button>}
         {busy
           ? <button type="button" className="secondary" onClick={cancel}>Cancel</button>
           : <button type="button" className="secondary" disabled={!desktop || !configured || phase === "importing"}
             onClick={() => config && void scan(config)}>{phase === "idle" ? "Scan" : "Rescan"}</button>}
-        {(phase === "ready" || phase === "importing") && <button type="button" className="primary" disabled={!hasData || phase === "importing"} onClick={commit}>
+        {(phase === "ready" || phase === "importing") && <button type="button" className="primary" disabled={!hasData || phase === "importing"} onClick={() => void commit()}>
           {phase === "importing" ? "Importing…" : "Import"}</button>}
       </div>
     </header>
@@ -94,9 +96,10 @@ export function ImportPage({ scanner, importer, onNavigate }: { scanner: Scanner
 
     <div className={`import-panels ${phase === "importing" ? "importing" : ""}`}>
       <Panel title="Screenshots" tiles={shots} stage={stage}
-        found={result ? `${plural(result.positions.length, "position")}${result.unmatched_screenshots ? ` · ${result.unmatched_screenshots} outside raids` : ""}` : null} empty={phase === "idle" ? "Scan to discover screenshots." : "No screenshots found."} />
+        found={result ? `${plural(result.positions.length, "position")}${result.unmatched_screenshots ? ` · ${result.unmatched_screenshots} outside raids` : ""}` : null} empty={phase === "idle" ? "Scan to discover screenshots." : "No new screenshots."} />
       <Panel title="Logs" tiles={logs} stage={stage}
-        found={result ? plural(result.raids.length, "raid") : null} empty={phase === "idle" ? "Scan to discover log files." : "No log files found."} />
+        found={result ? `${plural(result.raids.length, "raid")} · ${plural(result.activity.length, "event")}` : null}
+        empty={phase === "idle" ? "Scan to discover log files." : "No new log files."} />
     </div>
   </div>;
 }

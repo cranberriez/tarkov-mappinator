@@ -349,6 +349,14 @@ impl Companion {
         self.status()
     }
 
+    pub fn revoke_all(&self) -> CompanionStatus {
+        let mut inner = self.lock();
+        inner.clients.clear();
+        self.persist(&mut inner);
+        self.publish(inner);
+        self.status()
+    }
+
     /// Feeds the journal; cheap enough to call on every scanner update.
     pub fn observe(&self, snapshot: &crate::scanner::ScannerSnapshot, resolve: journal::Resolve) {
         let mut inner = self.lock();

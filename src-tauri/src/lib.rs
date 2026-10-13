@@ -1,5 +1,6 @@
 mod autoshot;
 mod companion;
+mod history;
 mod scanner;
 mod tarkov_data;
 mod tile_cache;
@@ -7,7 +8,11 @@ mod window_anim;
 
 use autoshot::{AutoShot, AutoShotConfig, AutoShotStatus};
 use companion::{model::CompanionStatus, Companion};
-use scanner::{import, FolderConfig, ScannerService, ScannerSnapshot};
+use history::{CleanupKind, CleanupPlan, History, HistoryData, HistoryStats, LegacyRaid};
+use scanner::{
+    import::{self, FileStamp, ImportEvent, ImportResult},
+    FolderConfig, HistoryBatch, PositionObservation, ScannerService, ScannerSnapshot,
+};
 use serde_json::value::RawValue;
 use tarkov_data::{DataStatus, TarkovData};
 use tile_cache::{CacheStats, PrefetchStatus, Tile, TileCache, TileJob};
@@ -42,6 +47,24 @@ fn publish_snapshot(app: &tauri::AppHandle, snapshot: &ScannerSnapshot) {
     });
 }
 
+/// Stores what monitoring observed and sends the stored rows to the UI as `history:updated`.
+fn record_history(app: &tauri::AppHandle, batch: HistoryBatch) {
+    if batch.is_empty() {
+        return;
+    }
+    match app.state::<Arc<History>>().record(&batch) {
+        Ok(delta) => {
+            let _ = app.emit("history:updated", delta);
+        }
+        Err(error) => eprintln!("{error}"),
+    }
+}
+
+/// Tells the UI to reload history after a bulk change (import, clear).
+fn history_reset(app: &tauri::AppHandle) {
+    let _ = app.emit("history:reset", ());
+}
+
 #[tauri::command(async)]
 fn check_folders(
     config: FolderConfig,
@@ -57,28 +80,139 @@ fn check_folders(
 struct ImportControl {
     running: Arc<AtomicBool>,
     cancel: Arc<AtomicBool>,
+    /// The last finished scan, stored only once the user commits it.
+    pending: Arc<Mutex<Option<(ImportResult, Vec<FileStamp>)>>>,
 }
 
-/// Starts a one-off, read-only import in the background; progress arrives as `import:event`.
+/// Starts a read-only import scan in the background; progress arrives as `import:event`.
+/// Files an earlier import read and that have not changed are left out unless `all`.
 #[tauri::command]
-fn start_import(config: FolderConfig, app: tauri::AppHandle, control: State<'_, ImportControl>) -> Result<(), String> {
+fn start_import(
+    config: FolderConfig,
+    all: bool,
+    app: tauri::AppHandle,
+    control: State<'_, ImportControl>,
+    history: State<'_, Arc<History>>,
+) -> Result<(), String> {
+    let known = history.known(!all)?;
     if control.running.swap(true, Ordering::SeqCst) {
         return Err("An import is already running.".into());
     }
     control.cancel.store(false, Ordering::SeqCst);
+    if let Ok(mut pending) = control.pending.lock() {
+        *pending = None;
+    }
     // Thumbnails load the screenshots themselves through the asset protocol.
     if !config.screenshots.is_empty() {
         if let Err(error) = app.asset_protocol_scope().allow_directory(&config.screenshots, false) {
             eprintln!("Unable to allow screenshot previews: {error}");
         }
     }
-    let (running, cancel) = (control.running.clone(), control.cancel.clone());
+    let (running, cancel, pending) = (control.running.clone(), control.cancel.clone(), control.pending.clone());
     std::thread::spawn(move || {
-        import::run(&config, &cancel, |event| {
+        let mut result = None;
+        let files = import::run(&config, &known, &cancel, |event| {
+            if let ImportEvent::Finished { result: finished } = &event {
+                result = Some(finished.clone());
+            }
             let _ = app.emit("import:event", event);
         });
+        if let (Some(result), Ok(mut pending)) = (result, pending.lock()) {
+            *pending = Some((result, files));
+        }
         running.store(false, Ordering::SeqCst);
     });
+    Ok(())
+}
+
+/// Stores the last finished scan.
+#[tauri::command(async)]
+fn commit_import(
+    app: tauri::AppHandle,
+    control: State<'_, ImportControl>,
+    history: State<'_, Arc<History>>,
+) -> Result<(), String> {
+    let pending = control.pending.lock().map_err(|_| "Import state unavailable")?.take();
+    let (result, files) = pending.ok_or("Nothing to import; scan again.")?;
+    history.import(&result, &files)?;
+    history_reset(&app);
+    Ok(())
+}
+
+#[tauri::command(async)]
+fn history_load(history: State<'_, Arc<History>>) -> Result<HistoryData, String> {
+    history.load()
+}
+
+#[tauri::command(async)]
+fn history_stats(history: State<'_, Arc<History>>) -> HistoryStats {
+    history.stats()
+}
+
+/// One-time move of the history the UI used to keep in localStorage.
+#[tauri::command(async)]
+fn history_migrate(
+    raids: Vec<LegacyRaid>,
+    positions: Vec<PositionObservation>,
+    history: State<'_, Arc<History>>,
+) -> Result<(), String> {
+    history.migrate_legacy(&raids, &positions)
+}
+
+/// Deletes stored raids, positions, activity and the import ledger.
+#[tauri::command(async)]
+fn history_clear(app: tauri::AppHandle, history: State<'_, Arc<History>>) -> Result<(), String> {
+    history.clear()?;
+    history_reset(&app);
+    Ok(())
+}
+
+fn source_folders(service: &State<'_, Mutex<ScannerService>>) -> Result<FolderConfig, String> {
+    Ok(service.lock().map_err(|_| "Scanner state unavailable")?.snapshot().config)
+}
+
+#[tauri::command(async)]
+fn cleanup_plan(
+    service: State<'_, Mutex<ScannerService>>,
+    history: State<'_, Arc<History>>,
+) -> Result<CleanupPlan, String> {
+    Ok(history.cleanup_plan(&source_folders(&service)?))
+}
+
+/// Moves game files whose data is stored to the Recycle Bin; returns how many were moved.
+#[tauri::command(async)]
+fn cleanup_run(
+    kind: CleanupKind,
+    service: State<'_, Mutex<ScannerService>>,
+    history: State<'_, Arc<History>>,
+) -> Result<u32, String> {
+    history.cleanup(&source_folders(&service)?, kind)
+}
+
+/// Deletes everything the app stored: history, map tiles, map data and paired sites.
+/// Preferences live in the webview and are reset by the UI. Map data downloads again.
+#[tauri::command(async)]
+fn clear_all_data(
+    app: tauri::AppHandle,
+    control: State<'_, ImportControl>,
+    history: State<'_, Arc<History>>,
+    tiles: State<'_, Arc<TileCache>>,
+    data: State<'_, Arc<TarkovData>>,
+    companion: State<'_, Arc<Companion>>,
+) -> Result<(), String> {
+    if control.running.load(Ordering::SeqCst) {
+        return Err("Cancel the running import first.".into());
+    }
+    tiles.clear()?;
+    let status = data.clear()?;
+    let _ = app.emit("tarkov-data:updated", status);
+    companion.revoke_all();
+    if let Ok(mut pending) = control.pending.lock() {
+        *pending = None;
+    }
+    history.clear()?;
+    history_reset(&app);
+    tarkov_data_sync(app.clone(), data);
     Ok(())
 }
 
@@ -213,6 +347,7 @@ pub fn run() {
         .manage(Mutex::new(ScannerService::new()))
         .manage(ImportControl::default())
         .setup(|app| {
+            app.manage(Arc::new(History::open(app.path().app_data_dir()?.join("history.sqlite3"))));
             let store = app.path().app_data_dir()?.join("tarkov-data");
             let data = Arc::new(TarkovData::open(store));
             app.manage(data.clone());
@@ -255,8 +390,14 @@ pub fn run() {
             std::thread::spawn(move || loop {
                 std::thread::sleep(std::time::Duration::from_secs(1));
                 let state = handle.state::<Mutex<ScannerService>>();
-                // Published after the lock is released.
-                let changed = state.lock().ok().and_then(|mut service| service.poll().then(|| service.snapshot()));
+                // Stored and published after the lock is released.
+                let Ok((changed, batch)) = state.lock().map(|mut service| {
+                    let changed = service.poll().then(|| service.snapshot());
+                    (changed, service.take_history())
+                }) else {
+                    continue;
+                };
+                record_history(&handle, batch);
                 if let Some(snapshot) = changed {
                     publish_snapshot(&handle, &snapshot);
                 }
@@ -277,6 +418,14 @@ pub fn run() {
             autoshot_configure,
             start_import,
             cancel_import,
+            commit_import,
+            history_load,
+            history_stats,
+            history_migrate,
+            history_clear,
+            cleanup_plan,
+            cleanup_run,
+            clear_all_data,
             tarkov_data_status,
             tarkov_data_sync,
             tarkov_data_map,
@@ -302,7 +451,11 @@ fn start_scanner(
     app: tauri::AppHandle,
     service: State<'_, Mutex<ScannerService>>,
 ) -> Result<ScannerSnapshot, String> {
-    let snapshot = service.lock().map_err(|_| "Scanner state unavailable")?.start(config);
+    let (snapshot, batch) = {
+        let mut service = service.lock().map_err(|_| "Scanner state unavailable")?;
+        (service.start(config), service.take_history())
+    };
+    record_history(&app, batch);
     publish_snapshot(&app, &snapshot);
     Ok(snapshot)
 }

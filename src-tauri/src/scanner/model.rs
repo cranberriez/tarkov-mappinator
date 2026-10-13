@@ -47,7 +47,7 @@ pub struct RaidState {
     pub raw_game_mode: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, PartialEq, TS)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TS)]
 pub struct PositionObservation {
     pub xyz: [f64; 3],
     pub raw_quaternion: [f64; 4],
@@ -57,6 +57,36 @@ pub struct PositionObservation {
     pub raid_id: Option<String>,
     pub filename: String,
     pub heading_convention: String,
+}
+
+/// A raid as stored in history. Live monitoring and import derive the same ID, so they coincide.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TS)]
+pub struct RaidRecord {
+    /// `local:<session>:<start timestamp>`.
+    pub id: String,
+    /// Log session folder name.
+    pub session: String,
+    /// Raw game map identifier, as for `RaidState::map`.
+    pub map: Option<String>,
+    pub game_mode: Option<String>,
+    pub raw_game_mode: Option<String>,
+    pub started_at: String,
+    /// None while active, or when no end was ever observed.
+    pub ended_at: Option<String>,
+}
+
+/// What monitoring learned since it was last drained, for the history store.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct HistoryBatch {
+    pub raids: Vec<RaidRecord>,
+    pub positions: Vec<PositionObservation>,
+    pub activity: Vec<ActivityEvent>,
+}
+
+impl HistoryBatch {
+    pub fn is_empty(&self) -> bool {
+        self.raids.is_empty() && self.positions.is_empty() && self.activity.is_empty()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, TS)]

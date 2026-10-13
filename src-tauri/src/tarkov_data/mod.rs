@@ -176,6 +176,29 @@ impl TarkovData {
         true
     }
 
+    /// Deletes the stored data; the next sync downloads it again.
+    pub fn clear(&self) -> Result<DataStatus, String> {
+        // Holding the sync flag keeps a sync from writing while the store is removed.
+        if self.syncing.swap(true, Ordering::SeqCst) {
+            return Err("Map data is syncing; try again in a moment.".into());
+        }
+        let removed = match fs::remove_dir_all(&self.root) {
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                Err(format!("Unable to clear {}: {error}", self.root.display()))
+            }
+            _ => Ok(()),
+        };
+        let status = self.update(|status| {
+            if removed.is_ok() {
+                status.manifest = None;
+                status.state = SyncState::Idle;
+                status.error = None;
+            }
+        });
+        self.syncing.store(false, Ordering::SeqCst);
+        removed.map(|_| status)
+    }
+
     fn mode_manifest(&self, mode: Option<&str>) -> Result<Option<ModeManifest>, String> {
         match mode {
             None | Some(BASELINE) => Ok(None),

@@ -32,7 +32,13 @@
     }
   },
   "bundle": {
-    "active": false,
-    "icon": []
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "windows": {
+      "nsis": {
+        "installerHooks": "./windows/hooks.nsh"
+      }
+    }
   }
 }

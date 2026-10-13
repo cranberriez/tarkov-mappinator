@@ -14,7 +14,7 @@ const IMPORT_ANIMATION_MS = 2000;
 
 export const previewSrc = (path: string) => (isTauri() && path ? convertFileSrc(path) : undefined);
 
-export function useImport(onImport: (result: ImportResult) => void) {
+export function useImport() {
   const desktop = isTauri();
   const [phase, setPhase] = useState<ImportPhase>("idle");
   const [files, setFiles] = useState<ImportTile[]>([]);
@@ -55,14 +55,15 @@ export function useImport(onImport: (result: ImportResult) => void) {
     return () => { disposed = true; unlisten?.(); };
   }, [desktop]);
 
-  const scan = useCallback(async (config: FolderConfig) => {
+  /** `all` re-reads files earlier imports already stored. */
+  const scan = useCallback(async (config: FolderConfig, all = false) => {
     index.current.clear();
     setFiles([]);
     setResult(null);
     setError(null);
     setPhase("discovering");
     try {
-      await invoke("start_import", { config });
+      await invoke("start_import", { config, all });
     } catch (cause) {
       setError(String(cause));
       setPhase("idle");
@@ -71,11 +72,19 @@ export function useImport(onImport: (result: ImportResult) => void) {
 
   const cancel = useCallback(() => { void invoke("cancel_import"); }, []);
 
-  const commit = useCallback(() => {
+  const commit = useCallback(async () => {
     if (!result) return;
+    setError(null);
     setPhase("importing");
-    window.setTimeout(() => { onImport(result); setPhase("imported"); }, IMPORT_ANIMATION_MS);
-  }, [result, onImport]);
+    try {
+      // Stored right away; the backend's reset signal reloads history once the animation has played.
+      await Promise.all([invoke("commit_import"), new Promise((done) => window.setTimeout(done, IMPORT_ANIMATION_MS))]);
+      setPhase("imported");
+    } catch (cause) {
+      setError(String(cause));
+      setPhase("ready");
+    }
+  }, [result]);
 
   return { desktop, phase, files, result, error, scan, cancel, commit };
 }

@@ -2,18 +2,6 @@ import type { PositionObservation } from "../bindings/PositionObservation";
 
 export type PositionHistory = PositionObservation[];
 
-const MAX_POSITIONS = 5000;
-const key = (position: PositionObservation) => `${position.filename}|${position.observed_at}`;
-
-/** The backend only exposes the latest position, so history accumulates client-side. */
-export function appendPosition(history: PositionHistory, position: PositionObservation): PositionHistory {
-  const last = history[history.length - 1];
-  if (last && key(last) === key(position)) return history;
-  if (history.some((entry) => key(entry) === key(position))) return history;
-  const next = [...history, position];
-  return next.length > MAX_POSITIONS ? next.slice(next.length - MAX_POSITIONS) : next;
-}
-
 /** Positions for the current raid; unassociated captures when no raid is known. */
 export function positionsForRaid(history: PositionHistory, raidId: string | null | undefined): PositionHistory {
   return history.filter((position) => (position.raid_id ?? null) === (raidId ?? null));
@@ -32,11 +20,9 @@ export const toPlane = (position: PositionObservation) => ({ x: position.xyz[0],
 const captureOrder = (position: PositionObservation) =>
   Date.parse((position.captured_at ?? position.observed_at).replace(" ", "T")) || 0;
 
-/** Adds imported captures not already known (by filename), keeping history in capture order. */
-export function mergePositions(history: PositionHistory, incoming: PositionHistory): PositionHistory {
-  const known = new Set(history.map((position) => position.filename));
-  const fresh = incoming.filter((position) => !known.has(position.filename));
-  if (!fresh.length) return history;
-  const next = [...history, ...fresh].sort((a, b) => captureOrder(a) - captureOrder(b));
-  return next.length > MAX_POSITIONS ? next.slice(next.length - MAX_POSITIONS) : next;
+/** Replaces captures by filename with their stored versions, keeping history in capture order. */
+export function upsertPositions(history: PositionHistory, stored: PositionHistory): PositionHistory {
+  const byName = new Map(history.map((position) => [position.filename, position]));
+  for (const position of stored) byName.set(position.filename, position);
+  return [...byName.values()].sort((a, b) => captureOrder(a) - captureOrder(b));
 }

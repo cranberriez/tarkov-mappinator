@@ -1,4 +1,4 @@
-/** Small localStorage helpers; the scanner keeps no history, so the UI remembers it between launches. */
+/** Small localStorage helpers for UI preferences. Raid history lives in the backend store; `positions` and `raids` are read once to migrate it. */
 export function load<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);

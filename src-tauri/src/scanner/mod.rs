@@ -7,7 +7,8 @@ mod sources;
 use chrono::{Local, NaiveDateTime};
 use model::LogCoverage;
 pub use model::{
-    FolderConfig, MonitoringStatus, PositionObservation, ScannerSnapshot, SourceStatus,
+    ActivityEvent, FolderConfig, HistoryBatch, MonitoringStatus, PositionObservation, RaidRecord, ScannerSnapshot,
+    SourceStatus,
 };
 use parsers::LogEvent;
 use std::{
@@ -38,6 +39,8 @@ pub struct ScannerService {
     activity_order: VecDeque<u64>,
     /// App-sent screenshot key presses not yet matched to a file; see `note_auto_press`.
     auto_presses: Vec<SystemTime>,
+    /// Raids, positions and activity not yet handed to the history store; see `take_history`.
+    history: HistoryBatch,
 }
 
 /// A screenshot file created this soon after an app-sent press is taken to be that press's capture.
@@ -65,7 +68,33 @@ impl ScannerService {
             activity_seen: HashSet::new(),
             activity_order: VecDeque::new(),
             auto_presses: Vec::new(),
+            history: HistoryBatch::default(),
         }
+    }
+    /// Everything observed since the last call, for the history store.
+    pub fn take_history(&mut self) -> HistoryBatch {
+        std::mem::take(&mut self.history)
+    }
+    fn session_name(&self) -> String {
+        self.session
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned()
+    }
+    /// The current raid as a history record, once it has started.
+    fn raid_record(&self) -> Option<RaidRecord> {
+        let raid = &self.snapshot.raid;
+        Some(RaidRecord {
+            id: raid.id.clone()?,
+            session: self.session_name(),
+            map: raid.map.clone(),
+            game_mode: raid.game_mode.clone(),
+            raw_game_mode: raid.raw_game_mode.clone(),
+            started_at: raid.started_at.clone()?,
+            ended_at: None,
+        })
     }
     /// Monitoring is on and the logs show a raid in progress.
     pub fn in_live_raid(&self) -> bool {
@@ -138,6 +167,7 @@ impl ScannerService {
         self.poll_logs(true);
         self.snapshot.recovered_positions = self.recover_raid_positions();
         self.snapshot.latest_position = self.snapshot.recovered_positions.last().cloned();
+        self.history.positions.extend(self.snapshot.recovered_positions.iter().cloned());
         if !self.snapshot.recovered_positions.is_empty() {
             let count = self.snapshot.recovered_positions.len();
             self.diagnostic(format!("Recovered {count} existing screenshot(s) captured since the active raid started."));
@@ -280,7 +310,7 @@ impl ScannerService {
                         self.diagnostic(format!("Ignored older capture {name}."));
                         continue;
                     }
-                    self.snapshot.latest_position = Some(PositionObservation {
+                    let observation = PositionObservation {
                         xyz: position.xyz,
                         raw_quaternion: position.quaternion,
                         heading_degrees: position.heading_degrees,
@@ -289,7 +319,9 @@ impl ScannerService {
                         captured_at: Some(position.captured.to_string()),
                         raid_id,
                         filename: name,
-                    });
+                    };
+                    self.history.positions.push(observation.clone());
+                    self.snapshot.latest_position = Some(observation);
                 }
                 Ok(_) => {
                     self.snapshot.screenshots_rejected += 1;
@@ -460,7 +492,6 @@ impl ScannerService {
         let Some(record) = activity::record(line) else {
             return;
         };
-        use std::hash::{Hash, Hasher};
         let recovered = startup
             || NaiveDateTime::parse_from_str(record.timestamp, "%Y-%m-%d %H:%M:%S%.f")
                 .map(|v| v < self.boundary)
@@ -476,23 +507,9 @@ impl ScannerService {
                     startup || time.with_timezone(&Local).naive_local() < self.boundary;
             }
         }
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        // Semantic fingerprint deliberately ignores filename: a replay/rotation copy
-        // must not duplicate either feed entries or coverage counts.
-        if let Some(event) = event
-            .as_ref()
-            .filter(|e| e.evidence == "quest_notification")
-        {
-            event.kind.hash(&mut hasher);
-            event.action.hash(&mut hasher);
-            event.entity_id.hash(&mut hasher);
-            event.event_at.hash(&mut hasher);
-        } else {
-            self.session.hash(&mut hasher);
-            source.hash(&mut hasher);
-            line.hash(&mut hasher);
-        }
-        let fingerprint = hasher.finish();
+        // Deliberately ignores filename: a replay/rotation copy must not duplicate either
+        // feed entries or coverage counts.
+        let fingerprint = activity::fingerprint(event.as_ref(), &self.session_name(), source, line);
         if !self.activity_seen.insert(fingerprint) {
             return;
         }
@@ -503,7 +520,7 @@ impl ScannerService {
             }
         }
         if let Some(event) = event.as_mut() {
-            event.id = format!("event:{fingerprint:016x}");
+            event.id = activity::event_id(fingerprint);
         }
         let category = activity::safe_category(record.category);
         if let Some(counter) = self
@@ -530,6 +547,9 @@ impl ScannerService {
             });
         }
         if let Some(event) = event {
+            if stored_activity(&event) {
+                self.history.activity.push(event.clone());
+            }
             self.snapshot.activity.push(event);
             self.snapshot.activity.sort_by(|a, b| {
                 activity::sort_time(b)
@@ -540,6 +560,15 @@ impl ScannerService {
                 self.snapshot.activity.pop();
                 self.snapshot.activity_dropped = self.snapshot.activity_dropped.saturating_add(1);
             }
+        }
+    }
+    /// Ends the active raid in history; the store keeps the first end it is given.
+    fn record_end(&mut self, timestamp: &str) {
+        if self.snapshot.raid.lifecycle != "active" {
+            return;
+        }
+        if let Some(raid) = self.raid_record() {
+            self.history.raids.push(RaidRecord { ended_at: Some(timestamp.into()), ..raid });
         }
     }
     fn reduce(&mut self, timestamp: String, event: LogEvent, recovered: bool) {
@@ -611,6 +640,7 @@ impl ScannerService {
                 ));
                 self.snapshot.raid.lifecycle = "active".into();
                 self.snapshot.raid.started_at = Some(timestamp);
+                self.history.raids.extend(self.raid_record());
                 self.snapshot.raid.recovered = recovered;
                 self.snapshot.raid.detail = if recovered {
                     "Recovered current-session start; continued activity is unconfirmed."
@@ -621,6 +651,7 @@ impl ScannerService {
                 self.snapshot.latest_position = None;
             }
             LogEvent::Ended => {
+                self.record_end(&timestamp);
                 self.snapshot.raid.recovered = recovered;
                 self.snapshot.raid.lifecycle = "ended".into();
                 self.snapshot.raid.detail = if recovered {
@@ -632,6 +663,7 @@ impl ScannerService {
                 self.snapshot.latest_position = None;
             }
             LogEvent::LocalEndReported => {
+                self.record_end(&timestamp);
                 self.snapshot.raid.recovered = recovered;
                 self.snapshot.raid.lifecycle = "ended".into();
                 self.snapshot.raid.detail = if recovered {
@@ -644,6 +676,14 @@ impl ScannerService {
             }
         }
     }
+}
+/// True for a game screenshot whose name carries a position.
+pub fn is_position_capture(name: &str) -> bool {
+    parsers::position_filename(name).is_ok()
+}
+/// Inventory moves are too frequent and too uninformative to keep.
+pub(crate) fn stored_activity(event: &ActivityEvent) -> bool {
+    event.kind != "inventory"
 }
 pub(crate) fn files(path: &Path) -> Vec<PathBuf> {
     fs::read_dir(path)
@@ -941,6 +981,19 @@ mod tests {
         );
         assert!(service.snapshot.raid.id.is_none());
         assert_eq!(service.snapshot.raid.lifecycle, "unknown");
+    }
+    #[test]
+    fn monitoring_hands_history_the_same_raids_import_rebuilds() {
+        let fixture = include_str!("../../../fixtures/logs/pve-local-ends.log");
+        let (_dir, mut service) = setup_logs(fixture);
+        let batch = service.take_history();
+        let mut live: Vec<_> = batch.raids.iter().filter(|raid| raid.ended_at.is_some()).cloned().collect();
+        live.sort_by(|a, b| a.started_at.cmp(&b.started_at));
+        let events = fixture.lines().filter_map(parsers::log_record).collect();
+        let imported = import::raids_from_events("log_2026.10.11_8-55-46_1.2.0.0.47965", events);
+        assert_eq!(live, imported);
+        assert!(batch.activity.iter().all(|event| event.kind != "inventory"));
+        assert!(service.take_history().is_empty());
     }
     #[test]
     fn local_end_fixture_recovers_latest_raid_and_live_partial_backend_append_ends_it() {

@@ -5,7 +5,28 @@ use super::{
 };
 use chrono::NaiveDateTime;
 use regex::Regex;
+use sha2::{Digest, Sha256};
 use std::sync::LazyLock;
+
+/// Stable record identity shared by monitoring and import, so stored history deduplicates
+/// across runs and builds. Quest notifications are identified by content (a redelivered or
+/// rotated copy matches); anything else by its exact line within its session and source.
+pub fn fingerprint(event: Option<&ActivityEvent>, session: &str, source: &str, line: &str) -> u64 {
+    let mut hash = Sha256::new();
+    let parts: [&str; 5] = match event.filter(|e| e.evidence == "quest_notification") {
+        Some(e) => ["quest", &e.kind, &e.action, e.entity_id.as_deref().unwrap_or(""), e.event_at.as_deref().unwrap_or("")],
+        None => ["line", session, source, line, ""],
+    };
+    for part in parts {
+        hash.update(part.as_bytes());
+        hash.update([0]);
+    }
+    u64::from_be_bytes(hash.finalize()[..8].try_into().expect("8 bytes"))
+}
+
+pub fn event_id(fingerprint: u64) -> String {
+    format!("event:{fingerprint:016x}")
+}
 
 pub struct Record<'a> {
     pub timestamp: &'a str,

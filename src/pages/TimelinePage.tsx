@@ -35,7 +35,7 @@ export function TimelinePage({ scanner }: { scanner: Scanner }) {
       <h1>Timeline</h1>
       {!!raids.length && <button type="button" className={`secondary ${confirming ? "danger" : ""}`}
         onBlur={() => setConfirming(false)}
-        onClick={() => { if (confirming) { clearHistory(); setConfirming(false); } else setConfirming(true); }}>
+        onClick={() => { if (confirming) { void clearHistory(); setConfirming(false); } else setConfirming(true); }}>
         {confirming ? "Clear raids and positions?" : "Clear history"}</button>}
     </header>
 
@@ -62,7 +62,7 @@ export function TimelinePage({ scanner }: { scanner: Scanner }) {
             <span className="tl-dot start" />
             <strong>{mapName(raid.map) ?? "Unknown map"}</strong>
             <ModeChip mode={raid.game_mode} />
-            <span className="faint">{[raid.player_role, `Started ${when(raid.started_at)}`].filter(Boolean).join(" · ")}</span>
+            <span className="faint">Started {when(raid.started_at)}</span>
           </div>
         </li>;
       })}

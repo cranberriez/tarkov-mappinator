@@ -18,6 +18,10 @@ import { ClientList, connectionDetail, PendingPrompts } from "../components/Conn
 import { useNow } from "../lib/useNow";
 import type { AutoShot } from "../lib/useAutoShot";
 import type { AutoShotState } from "../bindings/AutoShotState";
+import {
+  clearAllData, getCleanupPlan, getHistoryStats, onHistoryReset, onHistoryUpdated, resetPreferences, runCleanup,
+  type CleanupKind, type CleanupPlan, type HistoryStats,
+} from "../lib/history";
 
 const statusLabel: Record<SourceHealth["status"], string> = {
   not_configured: "Not set", available: "Accessible", missing: "Missing", not_directory: "Not a folder", unreadable: "No access",
@@ -102,6 +106,7 @@ export function SettingsPage({ scanner, mini, connection, autoShot }: {
         : <p className="faint">{snapshot ? "No issues reported." : "Backend not connected."}</p>}
     </section>
 
+    <StoredDataSection />
     <MapDataSection />
     <TileSection />
 
@@ -109,7 +114,107 @@ export function SettingsPage({ scanner, mini, connection, autoShot }: {
       <h2>Log coverage</h2>
       <LogCoveragePanel snapshot={snapshot} />
     </section>
+
+    <DangerZone />
   </div>;
+}
+
+const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
+
+/** A two-click button: the first click asks, the second acts; leaving it cancels. */
+function ConfirmButton({ label, confirm, busy, disabled, onConfirm }: {
+  label: string; confirm: string; busy?: string | null; disabled?: boolean; onConfirm: () => void;
+}) {
+  const [asking, setAsking] = useState(false);
+  return <button type="button" className={`secondary ${asking ? "danger" : ""}`} disabled={disabled || !!busy}
+    onBlur={() => setAsking(false)} onClick={() => { if (asking) { setAsking(false); onConfirm(); } else setAsking(true); }}>
+    {busy ?? (asking ? confirm : label)}</button>;
+}
+
+function StoredDataSection() {
+  const desktop = isTauri();
+  const [stats, setStats] = useState<HistoryStats | null>(null);
+  const [plan, setPlan] = useState<CleanupPlan | null>(null);
+  const [busy, setBusy] = useState<CleanupKind | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = () => {
+    getHistoryStats().then(setStats, (cause) => setError(String(cause)));
+    getCleanupPlan().then(setPlan, (cause) => setError(String(cause)));
+  };
+  useEffect(() => {
+    if (!desktop) return;
+    refresh();
+    const updated = onHistoryUpdated(() => getHistoryStats().then(setStats, () => {}));
+    const reset = onHistoryReset(refresh);
+    return () => { void updated.then((stop) => stop()); void reset.then((stop) => stop()); };
+  }, []);
+
+  const clean = (kind: CleanupKind) => {
+    setBusy(kind);
+    setError(null);
+    setNote(null);
+    runCleanup(kind).then((moved) => setNote(`Moved ${plural(moved, kind === "logs" ? "log session" : "screenshot")} to the Recycle Bin.`),
+      (cause) => setError(String(cause))).finally(() => { setBusy(null); refresh(); });
+  };
+  const ago = (value: string | null | undefined) => value ? `${age(value, Date.now())} ago` : "Never";
+
+  return <section className="settings-section">
+    <h2>Stored data</h2>
+    {stats?.error && <p className="diagnostics">{stats.error}</p>}
+    <div className="stats compact">
+      <div className="stat"><span>Raids</span><strong>{stats?.raids.toLocaleString() ?? "—"}</strong></div>
+      <div className="stat"><span>Positions</span><strong>{stats?.positions.toLocaleString() ?? "—"}</strong></div>
+      <div className="stat"><span>Events</span><strong>{stats?.activity.toLocaleString() ?? "—"}</strong></div>
+      <div className="stat"><span>On disk</span><strong>{stats ? megabytes(stats.bytes) : "—"}</strong></div>
+      <div className="stat"><span>Last import</span><strong>{stats ? ago(stats.last_import_at) : "—"}</strong></div>
+    </div>
+    {!desktop && <p className="faint">Desktop app only.</p>}
+    {plan && <>
+      <div className="action-row">
+        <span><strong>Imported screenshots</strong>
+          <span className="faint">{plan.screenshots ? `${plural(plan.screenshots, "file")} · ${megabytes(plan.screenshot_bytes)}, positions already stored` : "None to remove."}</span></span>
+        <ConfirmButton label="Move to Recycle Bin" confirm={`Move ${plural(plan.screenshots, "file")}?`} disabled={!plan.screenshots}
+          busy={busy === "screenshots" ? "Moving…" : null} onConfirm={() => clean("screenshots")} />
+      </div>
+      <div className="action-row">
+        <span><strong>Imported log sessions</strong>
+          <span className="faint">{plan.log_sessions ? `${plural(plan.log_sessions, "session")} · ${megabytes(plan.log_bytes)}, newest always kept` : "None to remove. The newest session is always kept."}</span></span>
+        <ConfirmButton label="Move to Recycle Bin" confirm={`Move ${plural(plan.log_sessions, "session")}?`} disabled={!plan.log_sessions}
+          busy={busy === "logs" ? "Moving…" : null} onConfirm={() => clean("logs")} />
+      </div>
+    </>}
+    {note && <p className="faint section-note">{note}</p>}
+    {error && <p className="diagnostics">{error}</p>}
+  </section>;
+}
+
+function DangerZone() {
+  const desktop = isTauri();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const act = (label: string, action: () => Promise<unknown>) => {
+    setBusy(label);
+    setError(null);
+    action().catch((cause) => setError(String(cause))).finally(() => setBusy(null));
+  };
+  return <section className="settings-section danger-zone">
+    <h2>Danger zone</h2>
+    <div className="action-row">
+      <span><strong>Delete all stored data</strong>
+        <span className="faint">Raids, positions, events, import record, map tiles, map data and paired sites. Game files are not touched.</span></span>
+      <ConfirmButton label="Delete data" confirm="Delete everything?" disabled={!desktop} busy={busy === "data" ? "Deleting…" : null}
+        onConfirm={() => act("data", () => clearAllData().then(() => window.location.reload()))} />
+    </div>
+    <div className="action-row">
+      <span><strong>Reset preferences</strong>
+        <span className="faint">Window, map, mini mode, connection and auto-screenshot settings. Reloads the app.</span></span>
+      <ConfirmButton label="Reset" confirm="Reset preferences?" busy={busy === "prefs" ? "Resetting…" : null}
+        onConfirm={() => act("prefs", resetPreferences)} />
+    </div>
+    {error && <p className="diagnostics">{error}</p>}
+  </section>;
 }
 
 function ConnectionSection({ connection }: { connection: CompanionConnection }) {

@@ -22,7 +22,7 @@ export function App() {
   const connection = useCompanion();
   const autoShot = useAutoShot();
   // App-level so an import keeps streaming while other pages are open.
-  const importer = useImport(scanner.importHistory);
+  const importer = useImport();
   const [page, setPage] = useState<Page>("map");
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === "1");
   useEffect(() => { localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0"); }, [collapsed]);

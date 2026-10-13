@@ -3,18 +3,17 @@ import {
   acceptSnapshot, checkFolders, getSnapshot, isTauri, onSnapshot, startScanner, stopScanner,
   type FolderConfig, type ScannerSnapshot,
 } from "./scanner";
-import { appendPosition, mergePositions, type PositionHistory } from "./positions";
-import { mergeImportedRaids, observeRaids, type RaidRecord } from "./raids";
-import type { ImportResult } from "../bindings/ImportResult";
-import { keys, load, save } from "./persist";
+import { upsertPositions, type PositionHistory } from "./positions";
+import { upsertRaids, type RaidRecord } from "./raids";
+import { clearHistory, loadHistory, migrateLegacyHistory, onHistoryReset, onHistoryUpdated } from "./history";
 
 export type ScannerAction = "check" | "start" | "stop";
 
 export function useScanner() {
   const desktop = isTauri();
   const [snapshot, setSnapshot] = useState<ScannerSnapshot | null>(null);
-  const [positions, setPositions] = useState<PositionHistory>(() => load(keys.positions, []));
-  const [raids, setRaids] = useState<RaidRecord[]>(() => load(keys.raids, []));
+  const [positions, setPositions] = useState<PositionHistory>([]);
+  const [raids, setRaids] = useState<RaidRecord[]>([]);
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState<ScannerAction | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,23 +24,30 @@ export function useScanner() {
     const accepted = acceptSnapshot(current.current, next);
     current.current = accepted;
     setSnapshot(accepted);
-    // Screenshots from the active raid that predate monitoring; merging is idempotent across snapshots.
-    if (accepted.recovered_positions.length) {
-      const recovered = accepted.recovered_positions;
-      setPositions((history) => mergePositions(history, recovered));
-    }
-    if (accepted.latest_position) {
-      const position = accepted.latest_position;
-      setPositions((history) => appendPosition(history, position));
-    }
-    setRaids((records) => {
-      const next = observeRaids(records, accepted.raid, accepted.activity);
-      return JSON.stringify(next) === JSON.stringify(records) ? records : next;
-    });
   }, []);
 
-  useEffect(() => save(keys.positions, positions), [positions]);
-  useEffect(() => save(keys.raids, raids), [raids]);
+  // History is stored by the backend: loaded whole, then kept current from what it stores.
+  useEffect(() => {
+    if (!desktop) return;
+    let disposed = false;
+    const reload = () => loadHistory().then((data) => {
+      if (disposed) return;
+      setRaids(data.raids);
+      setPositions(data.positions);
+    }, (cause) => { if (!disposed) setError(String(cause)); });
+    const updated = onHistoryUpdated((delta) => {
+      if (disposed) return;
+      if (delta.raids.length) setRaids((records) => upsertRaids(records, delta.raids));
+      if (delta.positions.length) setPositions((history) => upsertPositions(history, delta.positions));
+    });
+    const reset = onHistoryReset(() => { if (!disposed) void reload(); });
+    void migrateLegacyHistory().catch((cause) => { if (!disposed) setError(String(cause)); }).finally(reload);
+    return () => {
+      disposed = true;
+      void updated.then((stop) => stop());
+      void reset.then((stop) => stop());
+    };
+  }, [desktop]);
 
   useEffect(() => {
     if (!desktop) return;
@@ -88,11 +94,8 @@ export function useScanner() {
     desktop, snapshot, positions, raids, connected, busy, error, perform,
     running: snapshot?.monitoring === "running",
     retry: () => setAttempt((value) => value + 1),
-    clearHistory: () => { setPositions([]); setRaids([]); },
-    importHistory: (result: ImportResult) => {
-      setRaids((records) => mergeImportedRaids(records, result.raids));
-      setPositions((history) => mergePositions(history, result.positions));
-    },
+    /** Stored raids, positions, activity and the import record; the backend then signals a reload. */
+    clearHistory: () => clearHistory().catch((cause) => setError(String(cause))),
   };
 }
 
