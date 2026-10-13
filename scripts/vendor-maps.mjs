@@ -67,6 +67,11 @@ for (const map of interactive) {
   };
 }
 
+// Corrections to upstream calibration. Icebreaker's upstream transform is not uniform (3.5 vs 2) and its bounds are
+// Factory's; fitted against the map's data instead (146 spawns, loot and locks land on their deck's art, 140 exactly
+// versus 46 with upstream's), which gives a uniform 1.5 plane units per metre with the ship centred in its 256px tiles.
+Object.assign(calibration.icebreaker ?? {}, { transform: [1.5, 127, 1.5, 128], bounds: [[84.7, -85.3], [-86, 85.3]] });
+
 // Every game map, keyed by tarkov.dev normalizedName, with both identifiers seen in game logs.
 const games = gameMaps.map((game) => ({
   key: game.normalizedName,

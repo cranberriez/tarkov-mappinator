@@ -5,6 +5,7 @@ function Icon({ children, size = 18 }: { children: ReactNode; size?: number }) {
     strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>;
 }
 
+export const SplitIcon = () => <Icon><rect x="2.5" y="6" width="5" height="12" rx="1" /><rect x="9.5" y="6" width="5" height="12" rx="1" /><rect x="16.5" y="6" width="5" height="12" rx="1" /></Icon>;
 export const OverviewIcon = () => <Icon><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></Icon>;
 export const MapIcon = () => <Icon><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z" /><path d="M9 4v13.5M15 6.5V20" /></Icon>;
 export const ActivityIcon = () => <Icon><path d="M3 12h4l3-8 4 16 3-8h4" /></Icon>;

@@ -16,4 +16,4 @@ export function save(key: string, value: unknown) {
   }
 }
 
-export const keys = { positions: "history:positions:v1", raids: "history:raids:v1", mapStyle: "map:style:v1", mapLayers: "map:layers:v1", mapLayersOpen: "map:layers-open:v1", mapLayersCollapsed: "map:layers-collapsed:v1", mapPresets: "map:presets:v1", mapFloorsOpen: "map:floors-open:v1" } as const;
+export const keys = { positions: "history:positions:v1", raids: "history:raids:v1", mapStyle: "map:style:v1", mapLayers: "map:layers:v1", mapLayersOpen: "map:layers-open:v1", mapLayersCollapsed: "map:layers-collapsed:v1", mapPresets: "map:presets:v1", mapFloorsOpen: "map:floors-open:v1", mapSplit: "map:split:v1" } as const;

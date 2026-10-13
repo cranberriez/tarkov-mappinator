@@ -412,18 +412,20 @@ input:disabled { opacity: .55; }
 .overlay-marker { position: absolute; display: flex; align-items: center; gap: 5px; transform: translate(-11px, -50%); pointer-events: auto; }
 .overlay-marker img { width: 22px; height: 22px; flex-shrink: 0; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 60%)); }
 .overlay-marker.spawns { transform: translate(-7px, -50%); }
-.overlay-marker.spawns img { width: 14px; height: 14px; opacity: .85; }
+.overlay-marker.spawns img { width: 14px; height: 14px; }
 .overlay-marker.containers, .overlay-marker.access, .overlay-marker.other { transform: translate(-8px, -50%); }
 .overlay-marker.containers img, .overlay-marker.access img, .overlay-marker.other img { width: 16px; height: 16px; }
 /* Item icons that need to stand out sit on a round gradient of their colour. */
 img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fit: contain;
-  background: radial-gradient(circle, color-mix(in srgb, var(--tint) 75%, transparent), color-mix(in srgb, var(--tint) 20%, transparent) 75%); }
+  background: radial-gradient(circle, color-mix(in srgb, var(--tint) 95%, transparent), color-mix(in srgb, var(--tint) 60%, transparent) 80%); }
 .overlay-marker.documents { transform: translate(-10px, -50%); }
 .overlay-marker.documents img { width: 20px; height: 20px; }
 .overlay-marker.loose { transform: translate(-5px, -50%); }
-.overlay-marker.loose img { width: 10px; height: 10px; opacity: .8; }
-.overlay-marker.hazards img { width: 18px; height: 18px; opacity: .9; }
+.overlay-marker.loose img { width: 10px; height: 10px; }
+.overlay-marker.hazards img { width: 18px; height: 18px; }
 .overlay-marker.hazards { transform: translate(-9px, -50%); }
+.split-label { position: absolute; transform: translate(-50%, -100%); padding-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; font-weight: 500; color: var(--muted); text-shadow: 0 0 3px #000, 0 1px 2px #000; pointer-events: none; }
 .overlay-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
 .overlay-zones { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .overlay-zones-scale { transform: scale(var(--s)); }
