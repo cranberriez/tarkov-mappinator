@@ -2,7 +2,7 @@
 // a layer (Extracts, Spawns, …) holds groups (PMC, Scav, …) that switch on and off; the layer itself has no
 // switch of its own, its header sets all its groups at once. A marker belongs to one layer and one or more
 // groups, and shows when any of its groups is on.
-import type { GameMapData, Vec3 } from "../tarkov-data/types.ts";
+import type { Extract, GameMapData, Mob, Vec3 } from "../tarkov-data/types.ts";
 
 /** `icon` is a file stem in `src/maps/assets/icons`, or `item:<tarkov.dev item id>`. */
 type GroupDef = { key: string; label: string; icon: string; /** Colour behind the icon. */ tint?: string; /** Hidden until switched on. */ off?: boolean };
@@ -70,6 +70,11 @@ export const layers: LayerDef[] = [
   ] },
 ];
 
+/** One row of a marker's detail card; `items` are item ids, `mono` marks a raw id with no name yet. */
+export type Detail = { label: string; value?: string; items?: { id: string; count?: number }[]; mono?: boolean;
+  /** A boss row: portrait, chance at this spot (`chance`) and in the raid at all (`raidChance`), both 0–1. */
+  boss?: { name: string; image?: string; chance: number; raidChance: number; location: string } };
+
 export type MapMarker = {
   id: string;
   layer: string;
@@ -83,6 +88,8 @@ export type MapMarker = {
   label?: string;
   /** What it is and extra detail, shown on hover after the label, e.g. "Container", "Flare", "Paid". */
   tags: string[];
+  /** Everything else known about it, shown on the detail card. */
+  details?: Detail[];
 };
 
 export type LayerFilter = { groups: Record<string, boolean> };
@@ -143,6 +150,11 @@ const ROUBLES = "5449016a4bdc2d6f028b456f";
 const distance = (a: Vec3, b: Vec3) => Math.hypot(a.x - b.x, a.z - b.z);
 const posKey = ({ x, y, z }: Vec3) => `${x.toFixed(1)}|${y.toFixed(1)}|${z.toFixed(1)}`;
 const percent = (chance: number) => `${Math.round(chance * 100)}%`;
+const metres = (value: number) => `${+value.toFixed(1)}`;
+/** "bottom–top m" for a height band, when the data has one. */
+const heightDetail = (top: number | undefined, bottom: number | undefined): Detail[] =>
+  typeof top === "number" && typeof bottom === "number" ? [{ label: "Height", value: `${metres(bottom)}–${metres(top)} m` }] : [];
+const compact = (value: unknown) => typeof value === "string" ? value : JSON.stringify(value);
 
 function extractTags(name: string, transferItem: { item: string } | undefined) {
   const tags: string[] = [];
@@ -154,20 +166,21 @@ function extractTags(name: string, transferItem: { item: string } | undefined) {
 
 type Named = { name: string; normalizedName: string };
 /** Name tables the map documents point into: `common.json` containers and guns, `mobs.json` mobs. */
-export type Lookups = { containers?: Record<string, Named>; weapons?: Record<string, Named>; mobs?: Record<string, Named> };
+export type Lookups = { containers?: Record<string, Named>; weapons?: Record<string, Named>; mobs?: Record<string, Named & Partial<Mob>>; /** Map id → name. */ maps?: Record<string, string> };
 
 /** All overlay markers for a map, unfiltered. */
 export function buildMarkers(data: GameMapData, lookups: Lookups = {}): MapMarker[] {
   return [
-    ...extractMarkers(data), ...spawnMarkers(data), ...bossMarkers(data, lookups),
+    ...extractMarkers(data, lookups), ...spawnMarkers(data), ...bossMarkers(data, lookups),
     ...zoneMarkers(data), ...pointMarkers(data, lookups),
   ];
 }
 
-function extractMarkers(data: GameMapData): MapMarker[] {
+function extractMarkers(data: GameMapData, lookups: Lookups): MapMarker[] {
   // Extracts without a faction (Night Factory, Ground Zero 21+) count as shared.
   // A PMC and a Scav extract with the same name at the same spot become one marker for both.
   const extracts: MapMarker[] = [];
+  const sources = new Map<MapMarker, Extract>();
   for (const extract of data.extracts ?? []) {
     const groups = extract.faction === "pmc" ? ["pmc"] : extract.faction === "scav" ? ["scav"] : ["pmc", "scav"];
     const twin = extracts.find((other) => other.label === extract.name && distance(other.position, extract.position) < 10);
@@ -176,14 +189,35 @@ function extractMarkers(data: GameMapData): MapMarker[] {
       continue;
     }
     const transferItem = (extract as { transferItem?: { item: string } }).transferItem;
-    extracts.push({ id: `extract:${extract.id}`, layer: "extracts", groups, position: extract.position,
-      label: extract.name, tags: extractTags(extract.name, transferItem) });
+    const marker: MapMarker = { id: `extract:${extract.id}`, layer: "extracts", groups, position: extract.position,
+      label: extract.name, tags: extractTags(extract.name, transferItem) };
+    sources.set(marker, extract);
+    extracts.push(marker);
   }
+  // Details wait until twins have merged, so the faction reflects every group.
+  const switchNames = new Map((data.switches ?? []).map((toggle) => [toggle.id, toggle.name]));
+  for (const [marker, extract] of sources) marker.details = extractDetails(extract, marker.groups, switchNames);
   for (const transit of data.transits ?? []) {
+    const conditions = (transit as { conditions?: string }).conditions;
+    const destination = lookups.maps?.[transit.map];
     extracts.push({ id: `transit:${transit.id}`, layer: "extracts", groups: ["transit"], position: transit.position,
-      label: transit.description.replace(/^Transit to /i, "→ "), tags: ["Transit"] });
+      label: transit.description.replace(/^Transit to /i, "→ "), tags: ["Transit"], details: [
+        destination ? { label: "Destination", value: destination } : { label: "Destination", value: transit.map, mono: true },
+        ...conditions ? [{ label: "Condition", value: conditions, mono: true }] : []] });
   }
   return extracts;
+}
+
+function extractDetails(extract: Extract, groups: string[], switchNames: Map<string, string>): Detail[] {
+  const transfer = (extract as { transferItem?: { item: string; count: number } }).transferItem;
+  const switches = extract.switches ?? [];
+  const named = switches.every((id) => switchNames.has(id));
+  return [
+    { label: "Faction", value: groups.length > 1 ? "Shared" : groups[0] === "scav" ? "Scav" : "PMC" },
+    ...transfer ? [transfer.item === ROUBLES ? { label: "Requires", value: `${transfer.count.toLocaleString("en-US")} ₽` }
+      : { label: "Requires", items: [{ id: transfer.item, count: transfer.count }] }] : [],
+    ...switches.length ? [{ label: "Switch", value: (named ? switches.map((id) => switchNames.get(id)) : switches).join(", "), mono: !named }] : [],
+  ];
 }
 
 /** Player spawns only; bot-only spawn points are a separate concern. */
@@ -200,16 +234,43 @@ function spawnMarkers(data: GameMapData): MapMarker[] {
     seen.add(key);
     markers.push({ id: `spawn:${key}`, layer: "spawns", groups: sides, position: { x, y, z },
       tags: [`${sides.map((side) => side === "pmc" ? "PMC" : "Scav").join(" & ")} spawn`,
-        ...spawn.categories.includes("sniper") ? ["Sniper"] : []] });
+        ...spawn.categories.includes("sniper") ? ["Sniper"] : []],
+      details: [{ label: "Sides", value: spawn.sides.join(", ") }, { label: "Categories", value: spawn.categories.join(", ") },
+        { label: "Zone", value: spawn.zoneName, mono: true }] });
   }
   return markers;
 }
 
-type Boss = { mob: string; spawnChance: number; spawnLocations?: { name: string; chance: number; positions?: Vec3[] }[] };
+type Boss = {
+  mob: string; spawnChance: number; spawnLocations?: { name: string; chance: number; positions?: Vec3[] }[];
+  escorts?: { mob: string; amount: { chance: number; count: number }[] }[];
+  spawnTime?: number; spawnTimeRandom?: boolean; spawnTrigger?: string | null;
+};
 const PMC_BOTS = new Set(["pmcBEAR", "pmcUSEC"]);
 const bossGroup = (mob: string, normalizedName: string) =>
   PMC_BOTS.has(mob) ? "pmcs"
     : (mob.startsWith("boss") || mob === "sectantPriest") && normalizedName !== "black-div" ? "bosses" : "raiders";
+/** Escort headcount: "2–4", or each count with its chance when there are only two. */
+function escortCount(amount: { chance: number; count: number }[]) {
+  const chances = new Map<number, number>();
+  for (const { chance, count } of amount) chances.set(count, (chances.get(count) ?? 0) + chance);
+  const counts = [...chances.keys()].sort((a, b) => a - b);
+  if (counts.length <= 1) return `${counts[0] ?? 0}`;
+  return counts.length === 2 ? counts.map((count) => `${count} (${percent(chances.get(count)!)})`).join(" / ") : `${counts[0]}–${counts[counts.length - 1]}`;
+}
+const bossTime = (seconds: number) => seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
+
+function bossDetails(boss: Boss, name: string, location: { name: string; chance: number }, lookups: Lookups): Detail[] {
+  const time = boss.spawnTime ?? -1;
+  return [
+    { label: name, value: `${percent(boss.spawnChance * location.chance)} · ${location.name}`,
+      boss: { name, image: lookups.mobs?.[boss.mob]?.imagePortraitLink, chance: boss.spawnChance * location.chance, raidChance: boss.spawnChance, location: location.name } },
+    ...(boss.escorts ?? []).map((escort) => ({ label: "Escorts", value: `${lookups.mobs?.[escort.mob]?.name ?? escort.mob} ${escortCount(escort.amount)}` })),
+    ...time >= 0 ? [{ label: "Spawn time", value: `${bossTime(time)}${boss.spawnTimeRandom ? " · random" : ""}` }] : [],
+    ...boss.spawnTrigger ? [{ label: "Trigger", value: boss.spawnTrigger, mono: true }] : [],
+  ];
+}
+
 const bossIcons: Record<string, string> = {
   "cultist-priest": "spawn_cultist-priest", rogue: "spawn_rogue", raider: "spawn_rogue",
   "black-div": "spawn_black-div", af: "spawn_af", bear: "spawn_pmc", usec: "spawn_pmc",
@@ -229,9 +290,11 @@ function bossMarkers(data: GameMapData, lookups: Lookups): MapMarker[] {
         const existing = byPoint.get(key);
         if (!existing) {
           byPoint.set(key, { id: `boss:${key}`, layer: "bosses", groups: [group], position, names: [name],
-            icon: bossIcons[mob?.normalizedName ?? ""] ?? "spawn_boss", tags: [location.name, entry] });
+            icon: bossIcons[mob?.normalizedName ?? ""] ?? "spawn_boss", tags: [location.name, entry],
+            details: bossDetails(boss, name, location, lookups) });
           continue;
         }
+        existing.details!.push(...bossDetails(boss, name, location, lookups));
         if (!existing.names.includes(name)) existing.names.push(name);
         if (!existing.tags.includes(entry)) existing.tags.push(entry);
         if (!existing.groups.includes(group)) existing.groups.push(group);
@@ -241,7 +304,7 @@ function bossMarkers(data: GameMapData, lookups: Lookups): MapMarker[] {
   return [...byPoint.values()].map(({ names, ...marker }) => ({ ...marker, label: names.join(", ") }));
 }
 
-type ArtilleryZone = { position: Vec3; outline?: Vec3[] };
+type ArtilleryZone = { position: Vec3; outline?: Vec3[]; size?: Vec3; top?: number; botom?: number };
 
 /** Hazards and artillery strike areas: an outline with an icon at its centre. */
 function zoneMarkers(data: GameMapData): MapMarker[] {
@@ -250,11 +313,13 @@ function zoneMarkers(data: GameMapData): MapMarker[] {
     id: `hazard:${index}`, layer: "hazards", position: hazard.position, outline: hazard.outline, icon: "hazard",
     groups: [hazard.hazardType === "minefield" || hazard.hazardType === "sniper" ? hazard.hazardType : "other"],
     tags: [hazard.name],
+    details: [{ label: "Type", value: hazard.hazardType }, ...heightDetail(hazard.top, hazard.bottom)],
   }));
   const zones = (data.artillery as { zones?: ArtilleryZone[] } | undefined)?.zones ?? [];
   const artillery = zones.map((zone, index): MapMarker => ({
     id: `artillery:${index}`, layer: "hazards", groups: ["artillery"], position: zone.position, outline: zone.outline,
     icon: "hazard_mortar", tags: ["Artillery strike zone"],
+    details: [...zone.size ? [{ label: "Size", value: `${metres(zone.size.x)} × ${metres(zone.size.z)} m` }] : [], ...heightDetail(zone.top, zone.botom)],
   }));
   return [...hazards, ...artillery];
 }
@@ -290,20 +355,30 @@ function pointMarkers(data: GameMapData, lookups: Lookups): MapMarker[] {
     const named = lookups.containers?.[container.lootContainer];
     const name = named?.normalizedName ?? "";
     markers.push({ id, layer: "containers", groups: [containerGroup(name)], position: container.position,
-      icon: `container_${containerIconAlias[name] ?? (name || "crate")}`, tags: [named?.name ?? "Container"] });
+      icon: `container_${containerIconAlias[name] ?? (name || "crate")}`, tags: [named?.name ?? "Container"],
+      details: [{ label: "Container", value: container.lootContainer, mono: true }] });
   }
   for (const lock of data.locks ?? []) {
     const group = lock.lockType === "trunk" ? "trunk" : "door";
     markers.push({ id: `lock:${lock.id}`, layer: "access", groups: [group], position: lock.position, icon: "lock",
-      tags: [group === "trunk" ? "Locked trunk" : "Locked door"] });
+      tags: [group === "trunk" ? "Locked trunk" : "Locked door"], details: [
+        { label: "Type", value: group === "trunk" ? "Trunk" : "Door" }, { label: "Key", items: [{ id: lock.key }] },
+        { label: "Needs power", value: lock.needsPower ? "Yes" : "No" }] });
   }
+  const opens = new Map<string, Set<string>>();
+  for (const extract of data.extracts ?? []) for (const id of extract.switches ?? []) opens.set(id, (opens.get(id) ?? new Set()).add(extract.name));
   for (const toggle of data.switches ?? []) {
     markers.push({ id: `switch:${toggle.id}`, layer: "access", groups: ["switch"], position: toggle.position,
-      icon: "switch", label: toggle.name, tags: ["Switch"] });
+      icon: "switch", label: toggle.name, tags: ["Switch"], details: [
+        { label: "Type", value: toggle.switchType },
+        ...opens.has(toggle.id) ? [{ label: "Opens", value: [...opens.get(toggle.id)!].join(", ") }] : [],
+        ...toggle.activatedBy ? [{ label: "Activated by", value: compact(toggle.activatedBy), mono: true }] : [],
+        ...toggle.activates?.length ? [{ label: "Activates", value: toggle.activates.map(compact).join(", "), mono: true }] : []] });
   }
   ((data.stationaryWeapons ?? []) as StationaryWeapon[]).forEach((gun, index) => markers.push({
     id: `gun:${index}`, layer: "other", groups: ["stationary"], position: gun.position, icon: "stationarygun",
     tags: [lookups.weapons?.[gun.stationaryWeapon]?.name ?? "Stationary gun"],
+    details: [{ label: "Weapon", value: gun.stationaryWeapon, mono: true }],
   }));
   // BTR stops carry x/y/z flat rather than under `position`.
   ((data.btrStops ?? []) as BtrStop[]).forEach((stop, index) => markers.push({
@@ -316,11 +391,13 @@ function pointMarkers(data: GameMapData, lookups: Lookups): MapMarker[] {
     if (documents.length) {
       const labels = documents.map((key) => documentTypes.find((type) => type.key === key)!.label);
       markers.push({ id: `document:${index}`, layer: "documents", groups: documents, position: loot.position,
-        tags: [`${labels.join(" / ")} document`] });
+        tags: [`${labels.join(" / ")} document`], details: [
+          { label: "Document types", value: labels.join(", ") }, { label: "Possible items", items: loot.items.map((id) => ({ id })) }] });
       return;
     }
     markers.push({ id: `loose:${index}`, layer: "loose", groups: ["loose"], position: loot.position, icon: "loose_loot",
-      tags: ["Loose loot", `${loot.items.length} possible item${loot.items.length === 1 ? "" : "s"}`] });
+      tags: ["Loose loot", `${loot.items.length} possible item${loot.items.length === 1 ? "" : "s"}`],
+      details: [{ label: "Possible items", items: loot.items.map((id) => ({ id })) }] });
   });
   return markers;
 }

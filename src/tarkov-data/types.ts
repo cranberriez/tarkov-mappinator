@@ -60,3 +60,12 @@ export type CommonData = {
   stationaryWeapons: Record<string, StationaryWeapon>;
   goonReports: { map: string; timestamp: string }[];
 };
+
+/** One `mobs.json` entry (boss, follower, PMC bot), keyed by mob id such as "bossBully". */
+export type Mob = {
+  id: string; name: string; normalizedName: string; imagePortraitLink?: string; imagePosterLink?: string;
+  health?: { bodyPart: string; id: string; max: number }[];
+  /** Loadout tree of `{ attributes, contains?, count, item }`, item ids. */
+  equipment?: unknown[];
+  items?: { id: string; attributes?: { difficulty?: string; prevalence?: number } }[];
+};

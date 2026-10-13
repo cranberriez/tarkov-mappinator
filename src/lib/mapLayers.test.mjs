@@ -105,13 +105,15 @@ test("other layers: containers grouped by name and deduplicated, bosses merged p
     btrStops: [{ name: "Stop", x: 1, y: 2, z: 3 }],
   }), {
     containers: { c1: { name: "Safe", normalizedName: "safe" }, c2: { name: "PMC body", normalizedName: "pmc-body" } },
-    mobs: { bossKnight: { name: "Knight", normalizedName: "knight" }, sectantPriest: { name: "Cultist Priest", normalizedName: "cultist-priest" } },
+    mobs: { bossKnight: { name: "Knight", normalizedName: "knight", imagePortraitLink: "https://assets.tarkov.dev/knight-portrait.webp" }, sectantPriest: { name: "Cultist Priest", normalizedName: "cultist-priest" } },
   });
   const by = (layer) => markers.filter((m) => m.layer === layer);
   assert.deepEqual(by("containers").map((m) => [m.groups[0], m.icon]), [["valuables", "container_safe"], ["bodies", "container_dead-scav"]]);
   const [shared, pmc] = by("bosses");
   assert.equal(shared.label, "Knight, Cultist Priest");
   assert.deepEqual(shared.tags, ["Bunker", "Knight 50%", "Cultist Priest 15%"]);
+  assert.deepEqual(shared.details[0].boss, { name: "Knight", image: "https://assets.tarkov.dev/knight-portrait.webp", chance: 0.5, raidChance: 0.5, location: "Bunker" });
+  assert.deepEqual(shared.details.find((d) => d.label === "Cultist Priest").boss, { name: "Cultist Priest", image: undefined, chance: 0.15, raidChance: 0.3, location: "Bunker" });
   assert.deepEqual(pmc.groups, ["pmcs"]);
   assert.deepEqual(by("hazards").map((m) => [m.groups[0], m.outline.length]), [["minefield", 3], ["artillery", 1]]);
   assert.deepEqual(by("other")[0].position, { x: 1, y: 2, z: 3 });
@@ -123,4 +125,21 @@ test("noisy layers and groups start hidden", () => {
   assert.equal(filters.containers.groups.general, false);
   assert.equal(filters.bosses.groups.pmcs, false);
   assert.equal(defaultFilters("scav").containers.groups.valuables, true);
+});
+
+test("lock and extract details: key, power, faction, roubles, switch names", () => {
+  const markers = buildMarkers(map({
+    locks: [{ id: "l", lockType: "trunk", key: "k1", needsPower: true, position: at(0, 0) }],
+    switches: [{ id: "s1", name: "Power Switch", switchType: "Open", activatedBy: false, activates: [], position: at(5, 5) }],
+    extracts: [
+      { id: "a", name: "Gate", faction: "pmc", position: at(10, 0), switches: ["s1"], transferItem: { item: "5449016a4bdc2d6f028b456f", count: 5000 } },
+      { id: "b", name: "Gate", faction: "scav", position: at(11, 0) },
+      { id: "c", name: "Boat", faction: "pmc", position: at(90, 0), transferItem: { item: "x", count: 2 } },
+    ],
+  }), { maps: {} });
+  const by = (prefix) => markers.find((m) => m.id.startsWith(prefix));
+  assert.deepEqual(by("lock:").details, [{ label: "Type", value: "Trunk" }, { label: "Key", items: [{ id: "k1" }] }, { label: "Needs power", value: "Yes" }]);
+  assert.deepEqual(by("extract:a").details, [{ label: "Faction", value: "Shared" }, { label: "Requires", value: "5,000 ₽" }, { label: "Switch", value: "Power Switch", mono: false }]);
+  assert.deepEqual(by("extract:c").details[1], { label: "Requires", items: [{ id: "x", count: 2 }] });
+  assert.deepEqual(by("switch:").details, [{ label: "Type", value: "Open" }, { label: "Opens", value: "Gate" }]);
 });

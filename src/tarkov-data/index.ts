@@ -5,7 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import type { DataStatus } from "../bindings/DataStatus";
 import type { MapEntry } from "../bindings/MapEntry";
-import type { CommonData, GameMapData } from "./types";
+import type { CommonData, GameMapData, Mob } from "./types";
 import type { DataMode } from "./mode";
 
 export type * from "./types";
@@ -46,9 +46,9 @@ export function useDataStatus(): DataStatus | null {
 
 type Named = { name: string; normalizedName: string };
 /** Name tables the map documents point into, by id or mob key. */
-export type NameLookups = { containers: Record<string, Named>; weapons: Record<string, Named>; mobs: Record<string, Named> };
+export type NameLookups = { containers: Record<string, Named>; weapons: Record<string, Named>; mobs: Record<string, Mob> };
 
-// Mobs are several MB; keep only the names, once per mode and sync.
+// Mobs are several MB; load them once per mode and sync, and keep only names for containers and guns.
 const lookupCache = new Map<string, Promise<NameLookups>>();
 const names = (table: Record<string, unknown>): Record<string, Named> => Object.fromEntries(
   Object.entries(table).map(([key, value]) => {
@@ -67,7 +67,7 @@ export function useNameLookups(status: DataStatus | null, mode: DataMode = "pve"
     let pending = lookupCache.get(key);
     if (!pending) {
       pending = Promise.all([getCommonData(mode), getMobs(mode)]).then(([common, mobs]) => ({
-        containers: names(common.lootContainers), weapons: names(common.stationaryWeapons), mobs: names(mobs),
+        containers: names(common.lootContainers), weapons: names(common.stationaryWeapons), mobs: mobs as Record<string, Mob>,
       }));
       pending.catch(() => lookupCache.delete(key));
       lookupCache.set(key, pending);

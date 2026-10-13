@@ -594,3 +594,23 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .experimental { margin-left: 8px; font-size: 11px; font-weight: 500; color: var(--warn); }
 .warn-text { color: var(--warn); }
 .secondary.danger { color: var(--bad); }
+/* Detail card for the hovered or pinned overlay marker; sits above the scrubber row when one is shown. */
+.marker-card { position: absolute; right: 14px; bottom: 14px; z-index: 3; width: 260px; max-height: calc(100% - 28px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 10px; background: rgb(15 16 17 / 82%);
+  backdrop-filter: blur(8px); font-size: 12px; pointer-events: auto; }
+.map-page:has(.map-scrubber) .marker-card { bottom: 58px; max-height: calc(100% - 72px); }
+.marker-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.marker-card-head > img { width: 24px; height: 24px; flex-shrink: 0; }
+.marker-card-head .icon-button { width: 24px; height: 24px; margin: -4px -6px -4px 0; flex-shrink: 0; }
+.marker-card-title { display: flex; flex-direction: column; min-width: 0; flex: 1; font-weight: 500; }
+.marker-card-sub, .marker-card-label { color: var(--muted); font-weight: 400; }
+.marker-card-rows { display: flex; flex-direction: column; gap: 4px; }
+.marker-card-row { display: grid; grid-template-columns: 84px 1fr; gap: 8px; align-items: start; overflow-wrap: anywhere; }
+.marker-card-boss { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.marker-card-boss > img { width: 44px; height: 44px; flex-shrink: 0; border-radius: 6px; object-fit: cover; }
+.marker-card-id { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--muted); }
+.marker-card-items { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.marker-card-item { position: relative; display: block; width: 28px; height: 28px; }
+.marker-card-item img { width: 28px; height: 28px; object-fit: contain; }
+.marker-card-item .count { position: absolute; right: -2px; bottom: -2px; padding: 0 3px; border-radius: 6px; background: rgb(15 16 17 / 90%); font-size: 10px; line-height: 13px; }
+.overlay-marker.selected img { border-radius: 50%; outline: 1.5px solid var(--accent); outline-offset: 1px; }

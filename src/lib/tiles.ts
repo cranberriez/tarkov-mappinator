@@ -11,7 +11,10 @@ export type { CacheStats, PrefetchStatus };
 const base = isTauri() ? convertFileSrc("", "tiles") : TILE_HOST;
 export const tileUrl = (path: string) => base + path;
 /** Item icon (cached like tiles); the host serves `<id>-512.webp` from its root, the cache keys it under `items/`. */
+const ASSETS_HOST = "https://assets.tarkov.dev/";
 const itemIconUrl = (id: string) => isTauri() ? `${base}items/${id}-512.webp` : `https://assets.tarkov.dev/${id}-512.webp`;
+/** An assets.tarkov.dev image link (boss portraits), cached like item icons in the desktop app; other links pass through. */
+export const assetUrl = (link: string) => isTauri() && link.startsWith(ASSETS_HOST) ? `${base}items/${link.slice(ASSETS_HOST.length)}` : link;
 /** Image URL for a layer icon key: a bundled file stem, or `item:<id>`. */
 export const iconSrc = (icon: string): string | undefined => icon.startsWith("item:") ? itemIconUrl(icon.slice(5)) : mapIcons[icon];
 
