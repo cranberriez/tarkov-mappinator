@@ -28,7 +28,7 @@ A `PlayerPosition` is `{ key, x, y?, z, heading?, at? }` in game world coordinat
 
 ## Where data comes from
 
-- Calibration, floors, SVG art and icons are vendored here (`calibration.json`, `assets/`). Refresh with `node scripts/vendor-maps.mjs`.
+- Calibration, floors, SVG art and icons are vendored here (`calibration.json`, `assets/`). Refresh with `node scripts/vendor-maps.mjs`. Floor height fixes for misread floors go in `FLOOR_HEIGHTS` in that script.
 - Map documents come through a `MapDataSource`. `httpMapSource()` reads `https://json.tarkov.dev/<mode>/maps` directly (CORS-open, about 600 KB gzipped per mode). The desktop app uses its local mirror instead (`useDesktopMapSource` in `src/tarkov-data`), which adds loose loot item categories.
 - Images come through `MapAssetsContext`: `webAssets` loads from `assets.tarkov.dev`; provide your own to cache or proxy.
 - tarkov.dev hosts live in `hosts.json`, which the desktop backend also reads at build time.

@@ -72,6 +72,29 @@ for (const map of interactive) {
 // versus 46 with upstream's), which gives a uniform 1.5 plane units per metre with the ship centred in its 256px tiles.
 Object.assign(calibration.icebreaker ?? {}, { transform: [1.5, 127, 1.5, 128], bounds: [[84.7, -85.3], [-86, 85.3]] });
 
+// Floor height corrections: map key → floor name → bounds label → the height range that box should use instead.
+// Upstream shares one range across many boxes, so a corrected box moves into an extent of its own. Add entries as
+// screenshots show a floor misread; each notes the heights seen in game.
+const FLOOR_HEIGHTS = {
+  customs: {
+    // Crackhouse: ground floor reads 2.7-3.3, the 2nd floor 5.3-6.1; upstream starts the 2nd floor at 2.7.
+    "2nd Floor": { mechanic: [4.3, 6.5] },
+  },
+};
+for (const [mapKey, floors] of Object.entries(FLOOR_HEIGHTS)) {
+  for (const [floorName, boxes] of Object.entries(floors)) {
+    const layer = calibration[mapKey]?.layers.find((layer) => layer.name === floorName);
+    for (const [label, height] of Object.entries(boxes)) {
+      const extent = layer?.extents?.find((extent) => extent.bounds?.some((bounds) => bounds[2] === label));
+      if (!extent) throw new Error(`Floor override target missing: ${mapKey} / ${floorName} / ${label}`);
+      const box = extent.bounds.find((bounds) => bounds[2] === label);
+      extent.bounds = extent.bounds.filter((bounds) => bounds !== box);
+      layer.extents.push({ height, bounds: [box] });
+    }
+    if (layer) layer.extents = layer.extents.filter((extent) => !extent.bounds || extent.bounds.length);
+  }
+}
+
 // Every game map, keyed by tarkov.dev normalizedName, with both identifiers seen in game logs.
 const games = gameMaps.map((game) => ({
   key: game.normalizedName,
