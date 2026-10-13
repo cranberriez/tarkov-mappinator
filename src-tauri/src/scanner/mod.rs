@@ -14,7 +14,7 @@ use parsers::LogEvent;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     fs,
-    io::{Read, Seek, SeekFrom},
+    io::{BufRead, BufReader, Read, Seek, SeekFrom},
     path::{Path, PathBuf},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -34,6 +34,8 @@ pub struct ScannerService {
     boundary: NaiveDateTime,
     session: Option<PathBuf>,
     last_event: String,
+    /// `(timestamp, mode)` from `Session mode` records of the current session, sorted and deduplicated.
+    mode_timeline: Vec<(String, String)>,
     pending_screenshots: HashMap<PathBuf, (u64, SystemTime)>,
     activity_seen: HashSet<u64>,
     activity_order: VecDeque<u64>,
@@ -64,6 +66,7 @@ impl ScannerService {
             boundary: Local::now().naive_local(),
             session: None,
             last_event: String::new(),
+            mode_timeline: Vec::new(),
             pending_screenshots: HashMap::new(),
             activity_seen: HashSet::new(),
             activity_order: VecDeque::new(),
@@ -155,6 +158,7 @@ impl ScannerService {
             .into_iter()
             .collect();
         self.tails.clear();
+        self.mode_timeline.clear();
         self.snapshot.activity.clear();
         self.snapshot.log_coverage.clear();
         self.snapshot.activity_dropped = 0;
@@ -349,6 +353,7 @@ impl ScannerService {
                 self.tails.clear();
                 self.session = None;
                 self.last_event.clear();
+                self.mode_timeline.clear();
                 self.diagnostic(
                     "Log source unavailable; previous raid association cleared.".into(),
                 );
@@ -371,10 +376,12 @@ impl ScannerService {
             self.snapshot.raid = ScannerSnapshot::initial(String::new()).raid;
             self.snapshot.latest_position = None;
             self.last_event.clear();
+            self.mode_timeline.clear();
         }
         let mut paths = files(&session);
         paths.sort();
         let mut records = Vec::new();
+        let mut pending_activity = Vec::new();
         // A fixed upper bound on file count and per-file read size bounds each poll.
         for path in paths
             .into_iter()
@@ -402,8 +409,13 @@ impl ScannerService {
             if file.by_ref().take(128).read_to_end(&mut prefix).is_err() {
                 continue;
             }
+            let start = len.saturating_sub(1024 * 1024);
+            // The tail skips the head of a large file, which may hold the session's mode records.
+            if lifecycle_source && start > 0 && !self.tails.contains_key(&path) {
+                self.mode_timeline.extend(scan_modes(&path, start));
+            }
             let tail = self.tails.entry(path.clone()).or_insert_with(|| Tail {
-                offset: len.saturating_sub(1024 * 1024),
+                offset: start,
                 pending: String::new(),
                 created,
                 modified,
@@ -459,9 +471,7 @@ impl ScannerService {
             let complete = tail.pending[..=last].to_owned();
             tail.pending = tail.pending[last + 1..].to_owned();
             let activity_records = activity::assemble(&complete, &mut tail.notification);
-            for record in activity_records {
-                self.observe_activity(&record, source, startup);
-            }
+            pending_activity.push((source, activity_records));
             for line in complete.lines() {
                 if let Some(record) = parsers::log_record(line) {
                     records.push(record);
@@ -476,6 +486,18 @@ impl ScannerService {
                             .into(),
                     );
                 }
+            }
+        }
+        // Modes first: activity in this poll may follow a `Session mode` line from another file.
+        self.mode_timeline.extend(records.iter().filter_map(|(at, event)| match event {
+            LogEvent::Mode(mode) => Some((at.clone(), mode.clone())),
+            _ => None,
+        }));
+        self.mode_timeline.sort();
+        self.mode_timeline.dedup();
+        for (source, activity_records) in pending_activity {
+            for record in activity_records {
+                self.observe_activity(&record, source, startup);
             }
         }
         records.sort_by(|a, b| a.0.cmp(&b.0));
@@ -520,6 +542,7 @@ impl ScannerService {
         }
         if let Some(event) = event.as_mut() {
             event.id = activity::event_id(fingerprint);
+            event.game_mode = activity::mode_at(&self.mode_timeline, &event.logged_at).map(Into::into);
         }
         let category = activity::safe_category(record.category);
         if let Some(counter) = self
@@ -937,6 +960,53 @@ mod tests {
         });
         (dir, service)
     }
+    fn quest_notification(at: &str, id: &str) -> String {
+        format!("{at}|1.2.0.0.47965|Info|push-notifications|Got notification | ChatMessageReceived
+{{\"type\":\"new_message\",\"message\":{{\"type\":10,\"templateId\":\"{id} description\",\"dt\":1791743417}}}}
+")
+    }
+    fn quest_modes(service: &ScannerService) -> Vec<Option<String>> {
+        let mut quests: Vec<_> = service.snapshot.activity.iter().filter(|e| e.kind == "quest").collect();
+        quests.sort_by(|a, b| a.logged_at.cmp(&b.logged_at));
+        quests.into_iter().map(|e| e.game_mode.clone()).collect()
+    }
+    #[test]
+    fn quest_events_carry_the_mode_in_effect_when_logged() {
+        let modes = include_str!("../../../fixtures/logs/pve-customs-started.log");
+        let (dir, mut service) = setup_logs(modes);
+        let path = dir.path().join("log_2026.10.11_8-55-46_1.2.0.0.47965/push-notifications_000.log");
+        fs::write(
+            &path,
+            [
+                quest_notification("2026-10-11 11:00:00.000", "5936d90786f7742b1420ba5b"),
+                quest_notification("2026-10-11 11:03:30.000", "5936d90786f7742b1420ba5c"),
+                quest_notification("2026-10-11 11:10:00.000", "5936d90786f7742b1420ba5d"),
+            ]
+            .concat(),
+        )
+        .unwrap();
+        service.poll();
+        assert_eq!(quest_modes(&service), [None, Some("PvpSeason".into()), Some("Pve".into())]);
+    }
+    #[test]
+    fn mode_records_before_the_startup_tail_window_are_still_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let session = dir.path().join("log_2026.10.11_8-55-46_1.2.0.0.47965");
+        fs::create_dir(&session).unwrap();
+        let filler = "2026-10-11 11:05:00.000|1.2.0.0.47965|Info|application|filler line that is not a record of interest
+".repeat(12_000);
+        let application = format!("2026-10-11 11:03:17.774|1.2.0.0.47965|Info|application|Session mode: Regular
+{filler}");
+        assert!(application.len() > 1024 * 1024);
+        fs::write(session.join("application_000.log"), application).unwrap();
+        fs::write(session.join("push-notifications_000.log"), quest_notification("2026-10-11 11:10:00.000", "5936d90786f7742b1420ba5b")).unwrap();
+        let mut service = ScannerService::new();
+        service.start(FolderConfig {
+            screenshots: dir.path().to_string_lossy().into(),
+            logs: dir.path().to_string_lossy().into(),
+        });
+        assert_eq!(quest_modes(&service), [Some("Regular".into())]);
+    }
     #[test]
     fn current_fixture_recovers_explicit_mode_without_role_and_new_empty_session_wins() {
         let fixture = include_str!("../../../fixtures/logs/pve-customs-started.log");
@@ -1204,6 +1274,23 @@ mod tests {
             .iter()
             .any(|e| e.evidence == "quest_notification" && e.entity_id.is_some()));
     }
+}
+
+/// `Session mode` records in the first `len` bytes of a lifecycle log.
+fn scan_modes(path: &Path, len: u64) -> Vec<(String, String)> {
+    let Ok(file) = fs::File::open(path) else {
+        return Vec::new();
+    };
+    let mut reader = BufReader::new(file.take(len));
+    let (mut line, mut modes) = (Vec::new(), Vec::new());
+    while reader.read_until(b'\n', &mut line).is_ok_and(|read| read > 0) {
+        let text = String::from_utf8_lossy(&line);
+        if let Some((at, LogEvent::Mode(mode))) = parsers::log_record(text.trim_end_matches(['\r', '\n'])) {
+            modes.push((at, mode));
+        }
+        line.clear();
+    }
+    modes
 }
 
 pub(crate) fn session_key(path: &Path) -> (Option<NaiveDateTime>, SystemTime) {

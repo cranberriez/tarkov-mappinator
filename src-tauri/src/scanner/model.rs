@@ -101,6 +101,9 @@ pub struct ActivityEvent {
     pub evidence: String,
     pub recovered: bool,
     pub summary: String,
+    /// Raw session mode in effect when logged (`Pve`, `Regular`, `PvpSeason`); none when no
+    /// `Session mode` record precedes it in its session.
+    pub game_mode: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, TS)]

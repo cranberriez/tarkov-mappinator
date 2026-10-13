@@ -148,12 +148,13 @@ impl Journal {
                 continue;
             };
             let at = rfc3339(event.event_at.as_deref().unwrap_or(&event.logged_at));
+            let quest_mode = data_mode(event.game_mode.as_deref());
             let id = format!("quest:{}", event.id.trim_start_matches("event:"));
             self.push(
                 id,
                 at,
                 event.recovered,
-                mode.clone(),
+                quest_mode,
                 EventBody::Quest { action, quest_id },
             );
         }
@@ -237,6 +238,30 @@ mod tests {
         assert_eq!(data_mode(Some("Regular")).as_deref(), Some("regular"));
         assert_eq!(data_mode(Some("FutureMode")), None);
         assert_eq!(data_mode(None), None);
+    }
+
+    #[test]
+    fn quest_events_carry_the_mode_they_were_logged_in() {
+        let quest = |id: &str, mode: &str| crate::scanner::ActivityEvent {
+            id: format!("event:{id}"),
+            logged_at: "2026-10-11 12:00:00.000".into(),
+            event_at: None,
+            kind: "quest".into(),
+            action: "accepted".into(),
+            entity_id: Some("5936d90786f7742b1420ba5b".into()),
+            source: "push-notifications".into(),
+            evidence: "quest_notification".into(),
+            recovered: false,
+            summary: String::new(),
+            game_mode: Some(mode.into()),
+        };
+        let mut snapshot = ScannerSnapshot::initial(String::new());
+        snapshot.raid.game_mode = Some("PvpSeason".into());
+        snapshot.activity = vec![quest("b", "Pve"), quest("a", "Regular")];
+        let mut journal = Journal::default();
+        journal.observe(&snapshot, &|_| None);
+        let modes: Vec<_> = journal.since(0).unwrap().into_iter().map(|e| e.mode).collect();
+        assert_eq!(modes, [Some("regular".to_string()), Some("pve".to_string())]);
     }
 
     #[test]

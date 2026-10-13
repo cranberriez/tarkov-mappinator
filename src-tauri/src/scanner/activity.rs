@@ -24,6 +24,13 @@ pub fn fingerprint(event: Option<&ActivityEvent>, session: &str, source: &str, l
     u64::from_be_bytes(hash.finalize()[..8].try_into().expect("8 bytes"))
 }
 
+/// Mode in effect at `logged_at`: the latest `(timestamp, mode)` entry at or before it, from a
+/// timeline sorted by timestamp. Never falls back to a later entry.
+pub fn mode_at<'a>(timeline: &'a [(String, String)], logged_at: &str) -> Option<&'a str> {
+    let end = timeline.partition_point(|(at, _)| at.as_str() <= logged_at);
+    end.checked_sub(1).map(|i| timeline[i].1.as_str())
+}
+
 pub fn event_id(fingerprint: u64) -> String {
     format!("event:{fingerprint:016x}")
 }
@@ -131,6 +138,7 @@ pub fn event(line: &str, source: &str, id: String, recovered: bool) -> Option<Ac
             evidence: "quest_notification".into(),
             recovered,
             summary: summary.into(),
+            game_mode: None,
         });
     }
     let (kind, action, evidence, summary) = if let Some((_, event)) = parsers::log_record(line) {
@@ -273,6 +281,7 @@ pub fn event(line: &str, source: &str, id: String, recovered: bool) -> Option<Ac
         evidence: evidence.into(),
         recovered,
         summary: summary.into(),
+        game_mode: None,
     })
 }
 

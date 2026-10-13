@@ -17,7 +17,7 @@ use std::{
 };
 use ts_rs::TS;
 
-const SCHEMA_VERSION: i32 = 1;
+const SCHEMA_VERSION: i32 = 2;
 const SCHEMA: &str = "
 CREATE TABLE raids (
     id TEXT PRIMARY KEY,
@@ -49,7 +49,8 @@ CREATE TABLE activity (
     entity_id TEXT,
     source TEXT NOT NULL,
     evidence TEXT NOT NULL,
-    summary TEXT NOT NULL
+    summary TEXT NOT NULL,
+    game_mode TEXT
 );
 CREATE INDEX activity_logged ON activity (logged_at);
 CREATE TABLE imported_files (
@@ -140,6 +141,13 @@ fn migrate(db: &Connection) -> rusqlite::Result<()> {
     }
     if version < 1 {
         db.execute_batch(SCHEMA)?;
+    } else if version < 2 {
+        // Activity gains the session mode in effect when logged; re-reading logs fills it in.
+        db.execute_batch(
+            "ALTER TABLE activity ADD COLUMN game_mode TEXT; DELETE FROM imported_files WHERE kind = 'log';",
+        )?;
+    }
+    if version < SCHEMA_VERSION {
         db.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     }
     Ok(())
@@ -211,11 +219,12 @@ fn put_position(db: &Connection, position: &PositionObservation) -> rusqlite::Re
 
 fn put_activity(db: &Connection, event: &ActivityEvent) -> rusqlite::Result<()> {
     db.execute(
-        "INSERT OR IGNORE INTO activity (id, logged_at, event_at, kind, action, entity_id, source, evidence, summary)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO activity (id, logged_at, event_at, kind, action, entity_id, source, evidence, summary, game_mode)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+         ON CONFLICT (id) DO UPDATE SET game_mode = COALESCE(activity.game_mode, excluded.game_mode)",
         params![
             event.id, event.logged_at, event.event_at, event.kind, event.action, event.entity_id, event.source,
-            event.evidence, event.summary
+            event.evidence, event.summary, event.game_mode
         ],
     )?;
     Ok(())
@@ -536,6 +545,65 @@ mod tests {
             filename: filename.into(),
             heading_convention: "test".into(),
         }
+    }
+
+    fn activity(id: &str, mode: Option<&str>) -> ActivityEvent {
+        ActivityEvent {
+            id: id.into(),
+            logged_at: "2026-10-11 12:00:00.000".into(),
+            event_at: None,
+            kind: "quest".into(),
+            action: "accepted".into(),
+            entity_id: None,
+            source: "push-notifications".into(),
+            evidence: "quest_notification".into(),
+            recovered: true,
+            summary: String::new(),
+            game_mode: mode.map(Into::into),
+        }
+    }
+
+    fn stored_mode(history: &History, id: &str) -> Option<String> {
+        history.db().query_row("SELECT game_mode FROM activity WHERE id = ?1", [id], |row| row.get(0)).unwrap()
+    }
+
+    #[test]
+    fn version_one_database_gains_the_mode_column_and_rereads_logs() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE activity (id TEXT PRIMARY KEY, logged_at TEXT NOT NULL, event_at TEXT, kind TEXT NOT NULL,
+                action TEXT NOT NULL, entity_id TEXT, source TEXT NOT NULL, evidence TEXT NOT NULL, summary TEXT NOT NULL);
+             CREATE TABLE imported_files (path TEXT PRIMARY KEY, kind TEXT NOT NULL, size INTEGER NOT NULL,
+                modified INTEGER NOT NULL, imported_at TEXT NOT NULL);
+             INSERT INTO imported_files VALUES ('a.log', 'log', 1, 1, 't'), ('b.png', 'screenshot', 1, 1, 't');
+             PRAGMA user_version = 1;",
+        )
+        .unwrap();
+        migrate(&db).unwrap();
+        db.prepare("SELECT game_mode FROM activity").unwrap();
+        let paths: Vec<String> = db
+            .prepare("SELECT path FROM imported_files")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(paths, ["b.png"]);
+        let version: i32 = db.query_row("PRAGMA user_version", [], |row| row.get(0)).unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn reputting_activity_fills_a_missing_mode_but_never_overwrites_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::open(dir.path().join("history.sqlite3"));
+        let record = |event| history.record(&HistoryBatch { raids: vec![], positions: vec![], activity: vec![event] }).unwrap();
+        record(activity("a", None));
+        assert_eq!(stored_mode(&history, "a"), None);
+        record(activity("a", Some("Pve")));
+        assert_eq!(stored_mode(&history, "a").as_deref(), Some("Pve"));
+        record(activity("a", Some("Regular")));
+        assert_eq!(stored_mode(&history, "a").as_deref(), Some("Pve"));
     }
 
     #[test]

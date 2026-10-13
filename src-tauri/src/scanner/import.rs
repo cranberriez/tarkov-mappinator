@@ -343,6 +343,7 @@ pub fn run(config: &FolderConfig, known: &Known, cancel: &AtomicBool, mut emit: 
     let mut batch = Batch { updates: Vec::new(), flushed: Instant::now(), emit: &mut emit };
     'sessions: for (session, files, stamps) in &log_files {
         let mut events = Vec::new();
+        let mut session_activity = Vec::new();
         let mut session_read = Vec::new();
         for (file, stamp) in files.iter().zip(stamps) {
             if cancel.load(Ordering::Relaxed) {
@@ -365,12 +366,24 @@ pub fn run(config: &FolderConfig, known: &Known, cancel: &AtomicBool, mut emit: 
                         batch.push(file.id, ImportFileStatus::Used, None, Some(detail));
                     }
                     events.extend(lifecycle);
-                    activity.extend(found);
+                    session_activity.extend(found);
                     session_read.extend(stamp.clone());
                 }
                 Err(error) => batch.push(file.id, ImportFileStatus::Failed, None, Some(error.to_string())),
             }
         }
+        let mut timeline: Vec<_> = events
+            .iter()
+            .filter_map(|(at, event)| match event {
+                LogEvent::Mode(mode) => Some((at.clone(), mode.clone())),
+                _ => None,
+            })
+            .collect();
+        timeline.sort();
+        for event in &mut session_activity {
+            event.game_mode = activity::mode_at(&timeline, &event.logged_at).map(Into::into);
+        }
+        activity.extend(session_activity);
         raids.extend(raids_from_events(session, events));
         read.extend(session_read);
     }
@@ -538,6 +551,42 @@ mod tests {
         let Some(ImportEvent::Finished { result }) = events.last() else { panic!("no result") };
         assert!(result.activity.iter().any(|event| event.kind == "quest"));
         assert!(result.activity.iter().all(|event| event.id.starts_with("event:")));
+    }
+
+    #[test]
+    fn activity_carries_the_session_mode_in_effect_when_logged() {
+        let line = |at: &str, id: &str| {
+            let payload = format!(
+                r#"{{"type":"new_message","message":{{"type":10,"templateId":"{id} description","dt":1760000000}}}}"#
+            );
+            format!("{at}|1.2.0.0.47965|Info|push-notifications|Got notification | ChatMessageReceived
+{payload}
+")
+        };
+        let mode = |at: &str, mode: &str| format!("{at}|1.2.0.0.47965|Info|application|Session mode: {mode}
+");
+        let logs = tempfile::tempdir().unwrap();
+        let session = logs.path().join("log_2026.10.11_11-00-00_1.2.0");
+        fs::create_dir(&session).unwrap();
+        let push = [
+            line("2026-10-11 11:00:00.000", "5936d90786f7742b1420ba5b"),
+            line("2026-10-11 12:00:00.000", "5936d90786f7742b1420ba5c"),
+            line("2026-10-11 13:00:00.000", "5936d90786f7742b1420ba5d"),
+        ]
+        .concat();
+        let application = [mode("2026-10-11 11:30:00.000", "PvpSeason"), mode("2026-10-11 12:30:00.000", "Pve")].concat();
+        fs::write(session.join("2026.10.11_11-00-00_1.2.0 push-notifications_000.log"), push).unwrap();
+        fs::write(session.join("2026.10.11_11-00-00_1.2.0 application_000.log"), application).unwrap();
+        let config = FolderConfig { logs: logs.path().to_string_lossy().into(), screenshots: String::new() };
+        let mut events = Vec::new();
+        run(&config, &Known::default(), &AtomicBool::new(false), |event| events.push(event));
+        let Some(ImportEvent::Finished { result }) = events.last() else { panic!("no result") };
+        let mut modes: Vec<_> = result.activity.iter().filter(|e| e.kind == "quest").map(|e| (e.logged_at.clone(), e.game_mode.clone())).collect();
+        modes.sort();
+        assert_eq!(
+            modes.into_iter().map(|(_, mode)| mode).collect::<Vec<_>>(),
+            [None, Some("PvpSeason".to_string()), Some("Pve".to_string())]
+        );
     }
 
     #[test]
