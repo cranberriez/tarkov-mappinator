@@ -22,7 +22,7 @@ export type OverlayArea = { x: number; y: number; width: number; height: number;
  * already holds its cell: others first, then containers before loose loot.
  * Cells are fixed to the plane, so panning never changes which marker wins one.
  */
-export const MapOverlay = memo(function MapOverlay({ markers, filters, projection, floors, floor, shift, labelled, area, selected }: {
+export const MapOverlay = memo(function MapOverlay({ markers, filters, projection, floors, floor, shift, labelled, area, selected, lootIcons }: {
   markers: MapMarker[]; filters: Filters; projection: MapProjection;
   /** Floor name per marker id (null = base floor), and the floor shown: a name, null for the base, undefined for all. */
   floors: Map<string, string | null>; floor: string | null | undefined;
@@ -31,6 +31,8 @@ export const MapOverlay = memo(function MapOverlay({ markers, filters, projectio
   labelled: boolean; area: OverlayArea | null;
   /** Id of the pinned marker, ringed. Markers carry `data-marker` so the parent can handle pointer events by delegation. */
   selected?: string | null;
+  /** Item id to show in place of the loose loot dot, by marker id. Keep referentially stable. */
+  lootIcons?: Map<string, string>;
 }) {
   const shiftOf = (marker: MapMarker) => {
     const { x, y } = projection.toPlane(marker.position);
@@ -68,9 +70,10 @@ export const MapOverlay = memo(function MapOverlay({ markers, filters, projectio
       const hover = [marker.label, ...marker.tags].filter(Boolean).join(" · ");
       // Only extracts keep their name on the map; everything else names itself on hover.
       const named = labelled && marker.layer === "extracts" && !!marker.label;
-      return <div key={marker.id} className={`overlay-marker ${marker.layer} ${otherFloor(marker) ? "other-floor" : ""} ${marker.id === selected ? "selected" : ""}`}
+      const lootItem = lootIcons?.get(marker.id);
+      return <div key={marker.id} className={`overlay-marker ${marker.layer} ${lootItem ? "valuable" : ""} ${otherFloor(marker) ? "other-floor" : ""} ${marker.id === selected ? "selected" : ""}`}
         data-marker={marker.id} style={{ left: `calc(${x}px * var(--s))`, top: `calc(${y}px * var(--s))` }}>
-        <img src={iconSrc(markerIcon(marker, filters)) ?? mapIcons.container_crate} alt="" draggable={false}
+        <img src={iconSrc(lootItem ? `item:${lootItem}` : markerIcon(marker, filters)) ?? mapIcons.container_crate} alt="" draggable={false}
           className={tint ? "tinted" : undefined} style={tint ? { "--tint": tint } as CSSProperties : undefined} />
         {named && <span className="overlay-label">{marker.label}</span>}
         {hover && <span className={`overlay-label overlay-hover ${named ? "replaces" : ""}`}>{hover}</span>}

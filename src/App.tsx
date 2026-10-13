@@ -7,6 +7,7 @@ import { useAutoShot } from "./lib/useAutoShot";
 import { useCompanion } from "./lib/useCompanion";
 import { useShotCleanup } from "./lib/useShotCleanup";
 import { useToastMode } from "./lib/useToastMode";
+import { useValuableLoot } from "./lib/useValuableLoot";
 import { Sidebar, type Page } from "./components/Sidebar";
 import { Toasts } from "./components/Toasts";
 import { OverviewPage } from "./pages/OverviewPage";
@@ -25,6 +26,7 @@ export function App() {
   const autoShot = useAutoShot();
   const shotCleanup = useShotCleanup();
   const toastMode = useToastMode();
+  const valuableLoot = useValuableLoot();
   // App-level so an import keeps streaming while other pages are open.
   const importer = useImport();
   const [page, setPage] = useState<Page>("map");
@@ -44,11 +46,11 @@ export function App() {
       <Sidebar page={page} onNavigate={navigate} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} connection={connection} />
       <main className="content">
         {page === "overview" && <OverviewPage scanner={scanner} onNavigate={navigate} />}
-        {page === "map" && <MapPage key={viewing?.id ?? "live"} scanner={scanner} viewing={viewing} onCloseViewing={() => setViewingId(null)} />}
+        {page === "map" && <MapPage key={viewing?.id ?? "live"} scanner={scanner} viewing={viewing} onCloseViewing={() => setViewingId(null)} valuableLoot={valuableLoot.on} />}
         {page === "timeline" && <TimelinePage scanner={scanner} onOpenRaid={(id) => { setViewingId(id); setPage("map"); }} />}
         {page === "activity" && <ActivityPage scanner={scanner} />}
         {page === "import" && <ImportPage scanner={scanner} importer={importer} onNavigate={navigate} />}
-        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} />}
+        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} valuableLoot={valuableLoot} />}
       </main>
     </div>
     <Toasts events={scanner.snapshot?.activity} mode={toastMode.mode} />

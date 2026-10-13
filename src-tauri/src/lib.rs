@@ -3,6 +3,7 @@ mod companion;
 mod history;
 mod scanner;
 mod tarkov_data;
+mod item_data;
 mod thumb;
 mod tile_cache;
 mod window_anim;
@@ -16,6 +17,7 @@ use scanner::{
 };
 use serde_json::value::RawValue;
 use tarkov_data::{DataStatus, TarkovData};
+use item_data::{ItemConfig, ItemData, ItemStatus};
 use thumb::ThumbCache;
 use tile_cache::{CacheStats, PrefetchStatus, Tile, TileCache, TileJob};
 use std::path::PathBuf;
@@ -306,6 +308,52 @@ fn tarkov_data_mobs(mode: Option<String>, data: State<'_, Arc<TarkovData>>) -> R
     raw(data.mobs_json(mode.as_deref())?)
 }
 
+#[tauri::command]
+fn item_data_status(items: State<'_, Arc<ItemData>>) -> ItemStatus {
+    items.status()
+}
+
+/// Saves the item enrichment config; starts a download when one is due.
+#[tauri::command(async)]
+fn item_data_configure(app: tauri::AppHandle, config: ItemConfig, items: State<'_, Arc<ItemData>>) -> Result<ItemStatus, String> {
+    let (status, due) = items.configure(config)?;
+    let _ = app.emit("item-data:updated", &status);
+    if due {
+        item_data_sync(app, items);
+    }
+    Ok(status)
+}
+
+/// Starts a check now when enabled; progress arrives as `item-data:updated`.
+#[tauri::command]
+fn item_data_sync(app: tauri::AppHandle, items: State<'_, Arc<ItemData>>) {
+    let items = items.inner().clone();
+    std::thread::spawn(move || {
+        items.sync(|status| {
+            let _ = app.emit("item-data:updated", status);
+        });
+    });
+}
+
+#[tauri::command(async)]
+fn item_data_clear(app: tauri::AppHandle, items: State<'_, Arc<ItemData>>) -> Result<ItemStatus, String> {
+    let status = items.clear()?;
+    let _ = app.emit("item-data:updated", &status);
+    Ok(status)
+}
+
+/// Shared item table; errors start with `disabled:` or `unavailable:`.
+#[tauri::command(async)]
+fn item_data_shared(items: State<'_, Arc<ItemData>>) -> Result<Box<RawValue>, String> {
+    raw(items.shared_json()?)
+}
+
+/// A mode's differences from the shared item table.
+#[tauri::command(async)]
+fn item_data_mode(mode: Option<String>, items: State<'_, Arc<ItemData>>) -> Result<Box<RawValue>, String> {
+    raw(items.mode_json(mode.as_deref())?)
+}
+
 #[tauri::command(async)]
 fn tile_cache_stats(tiles: State<'_, Arc<TileCache>>) -> CacheStats {
     tiles.stats()
@@ -387,6 +435,18 @@ fn serve_thumb(app: &tauri::AppHandle, thumbs: &ThumbCache, encoded: &str) -> ta
     .expect("static response parts")
 }
 
+/// Checks item data like map data, but only while item enrichment is enabled.
+fn spawn_item_sync(app: tauri::AppHandle, items: Arc<ItemData>) {
+    std::thread::spawn(move || loop {
+        if items.is_stale(chrono::Utc::now()) {
+            items.sync(|status| {
+                let _ = app.emit("item-data:updated", status);
+            });
+        }
+        std::thread::sleep(std::time::Duration::from_secs(15 * 60));
+    });
+}
+
 /// Checks tarkov.dev at startup and whenever the last check is older than `tarkov_data::MAX_AGE`.
 fn spawn_data_sync(app: tauri::AppHandle, data: Arc<TarkovData>) {
     std::thread::spawn(move || loop {
@@ -430,6 +490,11 @@ pub fn run() {
             let data = Arc::new(TarkovData::open(store));
             app.manage(data.clone());
             spawn_data_sync(app.handle().clone(), data);
+            // An earlier build kept items inside the map store.
+            let _ = std::fs::remove_dir_all(app.path().app_data_dir()?.join("tarkov-data").join("items"));
+            let items = Arc::new(ItemData::open(app.path().app_data_dir()?.join("item-data")));
+            app.manage(items.clone());
+            spawn_item_sync(app.handle().clone(), items);
             let tiles = app.path().app_data_dir()?.join("tile-cache");
             app.manage(Arc::new(TileCache::open(tiles)));
             app.manage(ThumbCache::open(app.path().app_data_dir()?.join("thumb-cache")));
@@ -511,6 +576,12 @@ pub fn run() {
             tarkov_data_map,
             tarkov_data_common,
             tarkov_data_mobs,
+            item_data_status,
+            item_data_configure,
+            item_data_sync,
+            item_data_clear,
+            item_data_shared,
+            item_data_mode,
             tile_cache_stats,
             tile_cache_coverage,
             tile_prefetch_status,

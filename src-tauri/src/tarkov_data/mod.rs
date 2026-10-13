@@ -269,7 +269,7 @@ impl TarkovData {
     }
 }
 
-fn parse(text: &str) -> Result<Value, String> {
+pub(crate) fn parse(text: &str) -> Result<Value, String> {
     serde_json::from_str(text).map_err(|error| format!("Invalid stored JSON: {error}"))
 }
 
@@ -280,7 +280,7 @@ fn into_object(value: Value) -> Map<String, Value> {
     }
 }
 
-fn read_text(path: &Path) -> Result<String, String> {
+pub(crate) fn read_text(path: &Path) -> Result<String, String> {
     fs::read_to_string(path).map_err(|error| format!("Unable to read {}: {error}", path.display()))
 }
 
@@ -288,12 +288,12 @@ fn read_manifest(root: &Path) -> Option<DataManifest> {
     serde_json::from_str(&fs::read_to_string(root.join("manifest.json")).ok()?).ok()
 }
 
-enum Fetched {
+pub(crate) enum Fetched {
     Unchanged,
     Changed { body: String, etag: Option<String> },
 }
 
-fn agent() -> ureq::Agent {
+pub(crate) fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(120)))
         .user_agent(concat!("tarkov-mappinator/", env!("CARGO_PKG_VERSION")))
@@ -301,7 +301,7 @@ fn agent() -> ureq::Agent {
         .into()
 }
 
-fn get(agent: &ureq::Agent, url: &str, etag: Option<&str>) -> Result<Fetched, String> {
+pub(crate) fn get(agent: &ureq::Agent, url: &str, etag: Option<&str>) -> Result<Fetched, String> {
     let mut request = agent.get(url);
     if let Some(etag) = etag {
         request = request.header("If-None-Match", etag);
@@ -324,7 +324,7 @@ fn get(agent: &ureq::Agent, url: &str, etag: Option<&str>) -> Result<Fetched, St
     Ok(Fetched::Changed { body, etag })
 }
 
-fn url(set: &str, endpoint: &str) -> String {
+pub(crate) fn url(set: &str, endpoint: &str) -> String {
     format!("{SOURCE}/{set}/{endpoint}")
 }
 
@@ -446,7 +446,7 @@ fn entry(name: &str, map: &Value) -> MapEntry {
     }
 }
 
-fn write_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
+pub(crate) fn write_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
     let text = serde_json::to_string(value).map_err(|error| error.to_string())?;
     fs::write(path, text).map_err(|error| format!("Unable to write {}: {error}", path.display()))
 }

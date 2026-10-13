@@ -474,7 +474,7 @@ input:disabled { opacity: .55; }
 
 /* Map overlay markers and the layer panel */
 .overlay-marker { position: absolute; display: flex; align-items: center; gap: 5px; transform: translate(-11px, -50%); pointer-events: auto; }
-.overlay-marker img { width: 22px; height: 22px; flex-shrink: 0; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 60%)); }
+.overlay-marker img { width: 22px; height: 22px; flex-shrink: 0; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 85%)); }
 .overlay-marker.spawns { transform: translate(-7px, -50%); }
 .overlay-marker.spawns img { width: 14px; height: 14px; }
 .overlay-marker.containers, .overlay-marker.access, .overlay-marker.other { transform: translate(-8px, -50%); }
@@ -485,7 +485,9 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .overlay-marker.documents { transform: translate(-10px, -50%); }
 .overlay-marker.documents img { width: 20px; height: 20px; }
 .overlay-marker.loose { transform: translate(-5px, -50%); }
-.overlay-marker.loose img { width: 10px; height: 10px; }
+.overlay-marker.loose img { width: 10px; height: 10px; filter: drop-shadow(0 0 1px #000) drop-shadow(0 1px 3px rgb(0 0 0 / 90%)); }
+.overlay-marker.loose.valuable { transform: translate(-9px, -50%); }
+.overlay-marker.loose.valuable img { width: 18px; height: 18px; object-fit: contain; }
 .overlay-marker.hazards img { width: 18px; height: 18px; }
 .overlay-marker.hazards { transform: translate(-9px, -50%); }
 .split-label { position: absolute; transform: translate(-50%, -100%); padding-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

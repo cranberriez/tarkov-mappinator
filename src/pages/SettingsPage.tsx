@@ -5,6 +5,7 @@ import type { FolderConfig } from "../bindings/FolderConfig";
 import type { SourceHealth } from "../bindings/SourceHealth";
 import { LogCoveragePanel } from "../components/LogCoveragePanel";
 import { syncData, useDataStatus } from "../tarkov-data";
+import { clearItemData, configureItemData, syncItemData, useItemStatus, type ItemConfig, type ItemStatus } from "../lib/itemData";
 import { age } from "../lib/format";
 import { games, maps, tileCount, type MapCalibration } from "../maps";
 import {
@@ -19,6 +20,7 @@ import { useNow } from "../lib/useNow";
 import type { AutoShot } from "../lib/useAutoShot";
 import type { ShotCleanup } from "../lib/useShotCleanup";
 import { toastModes, type ToastModeState } from "../lib/useToastMode";
+import type { ValuableLootState } from "../lib/useValuableLoot";
 import type { AutoShotState } from "../bindings/AutoShotState";
 import {
   clearAllData, getCleanupPlan, getHistoryStats, onHistoryReset, onHistoryUpdated, resetPreferences, runCleanup,
@@ -56,14 +58,15 @@ function Switch({ label, detail, on, disabled, onChange }: {
   </button>;
 }
 
-export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup, toastMode }: {
-  scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot; shotCleanup: ShotCleanup; toastMode: ToastModeState;
+export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup, toastMode, valuableLoot }: {
+  scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot; shotCleanup: ShotCleanup; toastMode: ToastModeState; valuableLoot: ValuableLootState;
 }) {
   const { snapshot, running, connected, busy, error, perform, retry } = scanner;
   const [folders, setFolders] = useState<FolderConfig>({ screenshots: "", logs: "" });
   const edited = useRef(false);
   useEffect(() => { if (snapshot && !edited.current) setFolders(snapshot.config); }, [snapshot]);
   const locked = !connected || !!busy || running;
+  const itemStatus = useItemStatus();
   const update = (patch: Partial<FolderConfig>) => { edited.current = true; setFolders((current) => ({ ...current, ...patch })); };
 
   return <div className="page">
@@ -88,6 +91,12 @@ export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup,
             aria-pressed={toastMode.mode === option.value} onClick={() => toastMode.setMode(option.value)}>{option.label}</button>)}
         </div>
       </div>
+    </section>
+
+    <section className="settings-section">
+      <h2>Map</h2>
+      <Switch label="Valuable loot icons" detail={itemStatus?.config.enabled ? "Experimental. Loose loot shows its most valuable possible item." : "Needs item enrichment (Item data below)."}
+        on={valuableLoot.on} disabled={!itemStatus?.config.enabled} onChange={valuableLoot.setOn} />
     </section>
 
     <ConnectionSection connection={connection} />
@@ -121,6 +130,7 @@ export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup,
 
     <StoredDataSection shotCleanup={shotCleanup} />
     <MapDataSection />
+    <ItemDataSection status={itemStatus} />
     <TileSection />
 
     <section className="settings-section">
@@ -274,6 +284,44 @@ function MapDataSection() {
         {syncing ? "Syncing…" : "Check now"}</button>
       <span className="faint">From tarkov.dev, checked every 6 hours.</span>
     </div>
+  </section>;
+}
+
+const itemPieces: { key: keyof ItemConfig["pieces"]; label: string }[] = [
+  { key: "flea", label: "Flea prices" }, { key: "traders", label: "Trader prices" },
+  { key: "stats", label: "Stats & properties" }, { key: "extra", label: "Categories, contents & links" },
+];
+
+function ItemDataSection({ status }: { status: ItemStatus | null }) {
+  const [error, setError] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const config = status?.config, enabled = !!config?.enabled, syncing = status?.state === "syncing";
+  const ago = (value: string | null | undefined) => value ? `${age(value, Date.now())} ago` : "—";
+  const configure = (next: ItemConfig) => { setError(null); configureItemData(next).catch((cause) => setError(String(cause))); };
+  return <section className="settings-section">
+    <h2>Item data</h2>
+    <Switch label="Item enrichment" detail="Item names and prices from tarkov.dev, used for item details on the map. Nothing is downloaded while off."
+      on={enabled} disabled={!status} onChange={(on) => config && configure({ ...config, enabled: on })} />
+    {config && enabled && <>
+      {itemPieces.map(({ key, label }) => <Switch key={key} label={label} detail="" on={config.pieces[key]}
+        onChange={(on) => configure({ ...config, pieces: { ...config.pieces, [key]: on } })} />)}
+      <p className="faint section-note">Switching a piece off removes it from disk; switching it on downloads it.</p>
+    </>}
+    {status && (enabled || status.fetched_at) && <div className="stats compact">
+      <div className="stat"><span>Items</span><strong>{status.fetched_at ? status.items.toLocaleString() : "—"}</strong></div>
+      <div className="stat"><span>Downloaded</span><strong>{ago(status.fetched_at)}</strong></div>
+      <div className="stat"><span>Checked</span><strong>{syncing ? "Checking…" : ago(status.checked_at)}</strong></div>
+      <div className="stat"><span>Storage</span><strong>{status.fetched_at ? megabytes(status.bytes) : "—"}</strong></div>
+    </div>}
+    {!enabled && status?.fetched_at && <p className="faint">Kept on disk, not used or updated.</p>}
+    {status?.state === "failed" && <p className="faint">{status.error}</p>}
+    {error && <p className="diagnostics">{error}</p>}
+    {status && (enabled || status.fetched_at) && <div className="form-actions">
+      {enabled && <button type="button" className="secondary" disabled={syncing} onClick={() => void syncItemData()}>
+        {syncing ? "Syncing…" : "Check now"}</button>}
+      <ConfirmButton label="Remove" confirm="Remove item data?" disabled={!status.fetched_at} busy={clearing ? "Removing…" : null}
+        onConfirm={() => { setClearing(true); setError(null); clearItemData().catch((cause) => setError(String(cause))).finally(() => setClearing(false)); }} />
+    </div>}
   </section>;
 }
 
