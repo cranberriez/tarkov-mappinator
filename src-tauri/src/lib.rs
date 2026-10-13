@@ -4,6 +4,7 @@ mod history;
 mod scanner;
 mod tarkov_data;
 mod item_data;
+mod loose_loot;
 mod thumb;
 mod tile_cache;
 mod window_anim;
@@ -289,13 +290,21 @@ fn raw(json: String) -> Result<Box<RawValue>, String> {
 }
 
 /// `mode` is a tarkov.dev data set (`pve`, `regular`, `pvp-season`); omitted means PvE.
+/// With item enrichment on, loose loot spawns carry their item categories (see `loose_loot`).
 #[tauri::command(async)]
 fn tarkov_data_map(
     name: String,
     mode: Option<String>,
     data: State<'_, Arc<TarkovData>>,
+    items: State<'_, Arc<ItemData>>,
 ) -> Result<Box<RawValue>, String> {
-    raw(data.map_json(&name, mode.as_deref())?)
+    let json = data.map_json(&name, mode.as_deref())?;
+    let Some(table) = items.loose_categories() else {
+        return raw(json);
+    };
+    let mut map = tarkov_data::parse(&json)?;
+    loose_loot::attach(&mut map, &table);
+    raw(map.to_string())
 }
 
 #[tauri::command(async)]

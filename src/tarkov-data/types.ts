@@ -20,7 +20,10 @@ export type Lock = { id: string; lockType: string; key: string; needsPower: bool
 export type Hazard = Zone & { id?: string; hazardType: string; name: string };
 export type MapSwitch = Zone & { id: string; name: string; switchType: string; activatedBy: unknown; activates: unknown[] };
 export type ContainerSpawn = { lootContainer: string; position: Vec3 };
-export type LooseLoot = { position: Vec3; items: string[] };
+/** `categories` are keys into `GameMapData.looseCategories`; present only with item enrichment on (see `src-tauri/src/loose_loot.rs`). */
+export type LooseLoot = { position: Vec3; items: string[]; categories?: string[] };
+/** A loose loot category; `icon` is an image link or `item:<id>`, a top-level category has no parent. */
+export type LooseCategory = { label: string; icon?: string | null; parent?: string | null };
 
 export type GameMapData = {
   id: string;
@@ -43,6 +46,8 @@ export type GameMapData = {
   switches: MapSwitch[];
   lootContainers: ContainerSpawn[];
   lootLoose: LooseLoot[];
+  /** The categories `lootLoose` uses, and their parents, by key. */
+  looseCategories?: Record<string, LooseCategory>;
   stationaryWeapons: unknown[];
   btrStops: unknown[];
   artillery?: unknown;

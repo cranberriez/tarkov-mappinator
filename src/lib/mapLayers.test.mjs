@@ -231,3 +231,33 @@ test("old container category keys are dropped and ignored by filter equality", a
   b.containers.groups.drawer = true;
   assert.equal(sameFilters(a, b), false);
 });
+
+test("loose loot: one group per item category under its top level, uncategorised spawns last, all off by default", () => {
+  const looseCategories = {
+    "barter-items": { label: "Barter items", icon: "https://assets.tarkov.dev/b.webp" },
+    valuables: { label: "Valuables", icon: "https://assets.tarkov.dev/v.webp", parent: "barter-items" },
+    posters: { label: "Posters", icon: "item:p", parent: "barter-items" },
+    "info-items": { label: "Info items", icon: null },
+  };
+  const markers = buildMarkers(map({ looseCategories, lootLoose: [
+    { position: at(1, 1), items: ["gold", "poster"], categories: ["valuables", "posters"] },
+    { position: at(2, 2), items: ["ssd"], categories: ["info-items"] },
+    { position: at(3, 3), items: ["unknown"], categories: [] },
+  ] }));
+  assert.deepEqual(markers.map((m) => m.groups), [["valuables", "posters"], ["info-items"], ["loose"]]);
+  assert.deepEqual(markers[0].details[0], { label: "Categories", value: "Valuables, Posters" });
+  const layer = layersFor(markers, looseCategories).find((l) => l.key === "loose");
+  assert.deepEqual(layer.categories.map((c) => [c.key, c.label]), [["barter-items", "Barter items"], ["info-items", "Info items"], ["loose", "Uncategorised"]]);
+  assert.deepEqual(layer.groups.map((g) => [g.key, g.parent, g.icon]), [
+    ["info-items", "info-items", "loose_loot"], ["posters", "barter-items", "item:p"],
+    ["valuables", "barter-items", "https://assets.tarkov.dev/v.webp"], ["loose", "loose", "loose_loot"],
+  ]);
+  const filters = defaultFilters("unknown");
+  assert.equal(markers.some((m) => isVisible(m, filters)), false);
+  filters.loose.groups.posters = true;
+  assert.deepEqual(markers.map((m) => isVisible(m, filters)), [true, false, false]);
+  // Without categories (item enrichment off) the layer keeps its single plain group.
+  const plain = buildMarkers(map({ lootLoose: [{ position: at(1, 1), items: ["x"] }] }));
+  assert.deepEqual(plain[0].groups, ["loose"]);
+  assert.equal(layersFor(plain).find((l) => l.key === "loose").categories, undefined);
+});

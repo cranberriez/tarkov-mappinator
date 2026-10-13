@@ -11,7 +11,9 @@
 //! - `shared.json`: `{ items, tables }`; every baseline item, plus the small lookup tables
 //!   (item and handbook categories, flea market, player levels, …)
 //! - `modes/<set>.json`: item id → differing fields (whole items when the baseline lacks them)
+//! - `loose-categories.json`: item id → loose loot category (see `loose_loot`), when handbook categories are kept
 
+use crate::loose_loot;
 use crate::tarkov_data::{self, split, Fetched, SyncState, BASELINE, MAX_AGE, MODES};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -22,10 +24,12 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Mutex,
+        Arc, Mutex,
     },
 };
 use ts_rs::TS;
+
+const LOOSE: &str = "loose-categories.json";
 
 /// Optional parts of each item; everything not core, flea, trader or extra counts as stats.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, TS)]
@@ -134,6 +138,8 @@ pub struct ItemData {
     root: PathBuf,
     status: Mutex<ItemStatus>,
     syncing: AtomicBool,
+    /// The loose loot category table and the download it was read for.
+    loose: Mutex<Option<(String, Option<Arc<Value>>)>>,
 }
 
 impl ItemData {
@@ -155,6 +161,7 @@ impl ItemData {
             }),
             root,
             syncing: AtomicBool::new(false),
+            loose: Mutex::new(None),
         }
     }
 
@@ -201,6 +208,7 @@ impl ItemData {
             return Err("Item data is syncing; try again in a moment.".into());
         }
         let result = self.apply_config(&config);
+        self.forget_loose();
         self.syncing.store(false, Ordering::SeqCst);
         result?;
         let status = self.update(|status| {
@@ -228,6 +236,9 @@ impl ItemData {
             }
             write_atomic(&shared_path, &shared)?;
         }
+        if !pieces.extra {
+            remove(&self.root.join(LOOSE))?;
+        }
         for set in MODES {
             let mode_path = self.root.join("modes").join(format!("{set}.json"));
             if let Some(Value::Object(mut items)) = read::<Value>(&mode_path) {
@@ -252,6 +263,7 @@ impl ItemData {
         }));
         let pieces = self.status().config.pieces;
         let result = fetch_and_store(&self.root, pieces);
+        self.forget_loose();
         publish(&self.update(|status| {
             match result {
                 Ok(stored) => {
@@ -278,7 +290,8 @@ impl ItemData {
             return Err("Item data is syncing; try again in a moment.".into());
         }
         let io = |error: std::io::Error| format!("Unable to clear {}: {error}", self.root.display());
-        let removed = ["shared.json", "state.json"]
+        self.forget_loose();
+        let removed = ["shared.json", "state.json", LOOSE]
             .iter()
             .map(|file| fs::remove_file(self.root.join(file)))
             .chain(std::iter::once(fs::remove_dir_all(self.root.join("modes"))))
@@ -313,6 +326,35 @@ impl ItemData {
         tarkov_data::read_text(&self.root.join("shared.json"))
     }
 
+    /// The loose loot category table (see `loose_loot::build`); None while items are unreadable or lack
+    /// handbook categories. Built from the shared table when a download from before it existed lacks it.
+    pub fn loose_categories(&self) -> Option<Arc<Value>> {
+        self.readable().ok()?;
+        let fetched_at = self.status().fetched_at?;
+        let mut cache = self.loose.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some((_, table)) = cache.as_ref().filter(|(at, _)| *at == fetched_at) {
+            return table.clone();
+        }
+        let path = self.root.join(LOOSE);
+        let table = read::<Value>(&path).or_else(|| {
+            let stored: StoredState = read(&self.root.join("state.json"))?;
+            if !stored.pieces.extra {
+                return None;
+            }
+            let shared: Value = read(&self.root.join("shared.json"))?;
+            let table = loose_loot::build(shared["items"].as_object()?, &shared["tables"])?;
+            let _ = write_atomic(&path, &table);
+            Some(table)
+        });
+        let table = table.map(Arc::new);
+        *cache = Some((fetched_at, table.clone()));
+        table
+    }
+
+    fn forget_loose(&self) {
+        *self.loose.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+    }
+
     /// Item id → fields that differ from the shared table for a set; the baseline has none.
     pub fn mode_json(&self, mode: Option<&str>) -> Result<String, String> {
         self.readable()?;
@@ -336,6 +378,13 @@ fn write_atomic(path: &Path, value: &impl Serialize) -> Result<(), String> {
     let temp = path.with_extension("json.tmp");
     tarkov_data::write_json(&temp, value)?;
     fs::rename(&temp, path).map_err(|error| format!("Unable to write {}: {error}", path.display()))
+}
+
+fn remove(path: &Path) -> Result<(), String> {
+    match fs::remove_file(path) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(format!("Unable to remove {}: {error}", path.display())),
+        _ => Ok(()),
+    }
 }
 
 fn size(root: &Path) -> u64 {
@@ -447,6 +496,10 @@ fn fetch_and_store(root: &Path, pieces: ItemPieces) -> Result<StoredState, Strin
         // One set at a time, so only the baseline and one parsed mode are in memory.
         let (items, tables) = load_set(&agent, set, body, &pieces)?;
         if *set == BASELINE {
+            match loose_loot::build(&items, &tables) {
+                Some(table) => write_atomic(&root.join(LOOSE), &table)?,
+                None => remove(&root.join(LOOSE))?,
+            }
             let shared = serde_json::json!({ "items": items, "tables": tables });
             write_atomic(&root.join("shared.json"), &shared)?;
             baseline = items;

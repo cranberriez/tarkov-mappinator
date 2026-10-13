@@ -79,8 +79,11 @@ export function useNameLookups(status: DataStatus | null, mode: DataMode = "pve"
   return lookups;
 }
 
-/** One map's data for a mode, reloaded when the local mirror is refreshed. */
-export function useMapData(normalizedName: string | null | undefined, status: DataStatus | null, mode: DataMode = "pve"): GameMapData | null {
+/**
+ * One map's data for a mode, reloaded when the local mirror is refreshed, or when `items` changes: a key for the
+ * item data, which the backend adds loose loot categories from.
+ */
+export function useMapData(normalizedName: string | null | undefined, status: DataStatus | null, mode: DataMode = "pve", items?: string): GameMapData | null {
   const [data, setData] = useState<GameMapData | null>(null);
   const fetchedAt = status?.manifest?.fetched_at;
   useEffect(() => {
@@ -89,6 +92,6 @@ export function useMapData(normalizedName: string | null | undefined, status: Da
     let live = true;
     getMapData(normalizedName, mode).then((next) => { if (live) setData(next); }, () => {});
     return () => { live = false; };
-  }, [normalizedName, fetchedAt, mode]);
+  }, [normalizedName, fetchedAt, mode, items]);
   return data;
 }

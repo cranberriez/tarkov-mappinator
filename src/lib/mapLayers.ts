@@ -2,7 +2,7 @@
 // a layer (Extracts, Spawns, …) holds groups (PMC, Scav, …) that switch on and off; the layer itself has no
 // switch of its own, its header sets all its groups at once. A marker belongs to one layer and one or more
 // groups, and shows when any of its groups is on.
-import type { Extract, GameMapData, Mob, Vec3 } from "../tarkov-data/types.ts";
+import type { Extract, GameMapData, LooseCategory, Mob, Vec3 } from "../tarkov-data/types.ts";
 
 /** `icon` is a file stem in `src/maps/assets/icons`, or `item:<tarkov.dev item id>`. */
 type GroupDef = { key: string; label: string; icon: string; /** Colour behind the icon. */ tint?: string; /** Hidden until switched on. */ off?: boolean;
@@ -68,6 +68,7 @@ export const layers: LayerDef[] = [
     { key: "btr", label: "BTR stops", icon: "btr_stop" },
   ] },
   { key: "documents", label: "Battle Pass documents", icon: "quest_item", groups: documentTypes.map(({ key, label, item, tint }) => ({ key, label, tint, icon: `item:${item}` })) },
+  // With item enrichment, one group per item category its spawns may hold, filled in by `layersFor`.
   { key: "loose", label: "Loose loot", icon: "loose_loot", off: true, folded: true, groups: [
     { key: "loose", label: "Loose loot", icon: "loose_loot" },
   ] },
@@ -157,6 +158,7 @@ const containerOff = new Set(["supply", "bodies", "general"]);
 const dynamic: Record<string, { off: (group: string) => boolean; legacy: string[] }> = {
   bosses: { off: (group) => bossOff.has(group), legacy: ["bosses", "raiders"] },
   containers: { off: (group) => containerOff.has(containerGroup(group)), legacy: ["valuables", "medical", "ammo", "caches", "supply", "bodies", "general"] },
+  loose: { off: () => true, legacy: [] },
 };
 
 /** Whether a group is on; one the filter has no entry for (a boss or container type not seen before) takes its default. */
@@ -434,9 +436,13 @@ function pointMarkers(data: GameMapData, lookups: Lookups): MapMarker[] {
           { label: "Document types", value: labels.join(", ") }, { label: "Possible items", items: loot.items.map((id) => ({ id })) }] });
       return;
     }
-    markers.push({ id: `loose:${index}`, layer: "loose", groups: ["loose"], position: loot.position, icon: "loose_loot",
+    // Spawns whose items have no category (or without item enrichment) stay in the plain group.
+    const categories = loot.categories?.length ? loot.categories : undefined;
+    const labels = categories?.map((key) => data.looseCategories?.[key]?.label ?? key);
+    markers.push({ id: `loose:${index}`, layer: "loose", groups: categories ?? ["loose"], position: loot.position, icon: "loose_loot",
       tags: ["Loose loot", `${loot.items.length} possible item${loot.items.length === 1 ? "" : "s"}`],
-      details: [{ label: "Possible items", items: loot.items.map((id) => ({ id })) }] });
+      details: [...labels ? [{ label: "Categories", value: labels.join(", ") }] : [],
+        { label: "Possible items", items: loot.items.map((id) => ({ id })) }] });
   });
   return markers;
 }
@@ -470,9 +476,10 @@ export function countMarkers(markers: MapMarker[]) {
 
 /**
  * Layers with the data-driven groups filled in from the map's markers: one per boss type, the default-on ones
- * first; one per container type, ordered by category then name, under its category as `parent`.
+ * first; one per container type, ordered by category then name, under its category as `parent`; one per loose
+ * loot item category, under its top-level category, both by name (`looseCategories` from the map data).
  */
-export function layersFor(markers: MapMarker[]): LayerDef[] {
+export function layersFor(markers: MapMarker[], looseCategories: Record<string, LooseCategory> = {}): LayerDef[] {
   const bosses = new Map<string, GroupDef>();
   for (const boss of markers.flatMap((marker) => marker.bosses ?? []))
     if (!bosses.has(boss.group)) bosses.set(boss.group, { key: boss.group, label: boss.name, icon: boss.icon, image: boss.image, off: bossOff.has(boss.group) });
@@ -486,7 +493,24 @@ export function layersFor(markers: MapMarker[]): LayerDef[] {
   const order = layers.find((layer) => layer.key === "containers")!.categories!.map((category) => category.key);
   const types = [...containers.values()].sort((a, b) => order.indexOf(a.parent!) - order.indexOf(b.parent!) || a.label.localeCompare(b.label));
   const sorted = [...bosses.values()].sort((a, b) => Number(!!a.off) - Number(!!b.off));
-  return layers.map((layer) => layer.key === "bosses" ? { ...layer, groups: sorted } : layer.key === "containers" ? { ...layer, groups: types } : layer);
+  const loose = looseLayer(markers, looseCategories);
+  return layers.map((layer) => layer.key === "bosses" ? { ...layer, groups: sorted } : layer.key === "containers" ? { ...layer, groups: types }
+    : layer.key === "loose" && loose ? loose : layer);
+}
+
+/** The loose loot layer by item category; undefined when no spawn has one, which leaves the single plain group. */
+function looseLayer(markers: MapMarker[], table: Record<string, LooseCategory>): LayerDef | undefined {
+  const base = layers.find((layer) => layer.key === "loose")!;
+  const keys = new Set(markers.filter((marker) => marker.layer === "loose").flatMap((marker) => marker.groups));
+  if (![...keys].some((key) => key !== "loose")) return undefined;
+  const byName = (a: { key: string; label: string }, b: { key: string; label: string }) =>
+    Number(a.key === "loose") - Number(b.key === "loose") || a.label.localeCompare(b.label);
+  // A category with no parent is its own top level; uncategorised spawns get a top level of their own, listed last.
+  const groups: GroupDef[] = [...keys].map((key) => key === "loose" ? { ...base.groups[0], label: "Uncategorised", parent: "loose" }
+    : { key, label: table[key]?.label ?? key, icon: table[key]?.icon ?? "loose_loot", parent: table[key]?.parent ?? key }).sort(byName);
+  const categories: CategoryDef[] = [...new Set(groups.map((group) => group.parent!))].map((key) => key === "loose"
+    ? { key, label: "Uncategorised", icon: "loose_loot" } : { key, label: table[key]?.label ?? key, icon: table[key]?.icon ?? "loose_loot" }).sort(byName);
+  return { ...base, groups, categories };
 }
 
 /** Whether two filter states show the same markers' switches, ignoring key order; boss and container types missing on one side count as default. */
