@@ -18,6 +18,7 @@ import { ClientList, connectionDetail, PendingPrompts } from "../components/Conn
 import { useNow } from "../lib/useNow";
 import type { AutoShot } from "../lib/useAutoShot";
 import type { ShotCleanup } from "../lib/useShotCleanup";
+import { toastModes, type ToastModeState } from "../lib/useToastMode";
 import type { AutoShotState } from "../bindings/AutoShotState";
 import {
   clearAllData, getCleanupPlan, getHistoryStats, onHistoryReset, onHistoryUpdated, resetPreferences, runCleanup,
@@ -55,8 +56,8 @@ function Switch({ label, detail, on, disabled, onChange }: {
   </button>;
 }
 
-export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup }: {
-  scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot; shotCleanup: ShotCleanup;
+export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup, toastMode }: {
+  scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot; shotCleanup: ShotCleanup; toastMode: ToastModeState;
 }) {
   const { snapshot, running, connected, busy, error, perform, retry } = scanner;
   const [folders, setFolders] = useState<FolderConfig>({ screenshots: "", logs: "" });
@@ -76,6 +77,17 @@ export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup 
         disabled={!mini.desktop} onChange={mini.setMini} />
       <Switch label="Start in mini mode" detail="Open the app as the strip next time." on={mini.startMini}
         disabled={!mini.desktop} onChange={mini.setStartMini} />
+    </section>
+
+    <section className="settings-section">
+      <h2>Notifications</h2>
+      <div className="action-row">
+        <span><strong>Notifications</strong><span className="faint">Pop-ups for live activity.</span></span>
+        <div className="segmented" role="group" aria-label="Notifications">
+          {toastModes.map((option) => <button key={option.value} type="button" className={toastMode.mode === option.value ? "selected" : ""}
+            aria-pressed={toastMode.mode === option.value} onClick={() => toastMode.setMode(option.value)}>{option.label}</button>)}
+        </div>
+      </div>
     </section>
 
     <ConnectionSection connection={connection} />

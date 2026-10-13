@@ -508,9 +508,10 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 
 .map-page { container: map / size; }
 .map-layers { display: flex; flex-direction: column; gap: 2px; padding: 4px;
-  min-height: 0; flex-shrink: 1; overflow: hidden auto; scrollbar-width: thin; border-radius: 9px; background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); }
+  min-height: 0; flex-shrink: 1; overflow: hidden; border-radius: 9px; background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); }
 .map-layers.open { min-width: 188px; }
-.layers-bar { display: flex; align-items: center; gap: 4px; }
+.layers-bar { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.layers-list { min-height: 0; overflow: hidden auto; scrollbar-width: thin; }
 .layers-bar .icon-button:disabled { opacity: .3; pointer-events: none; }
 .presets { display: flex; gap: 4px; margin-left: auto; }
 .preset { width: 22px; height: 22px; border-radius: 50%; border: 1.5px dashed var(--faint); color: transparent;

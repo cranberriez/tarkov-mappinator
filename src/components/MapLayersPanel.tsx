@@ -54,7 +54,7 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
           onClick={() => onChange(structuredClone(defaults))}><ResetIcon /></button>
       </>}
     </div>
-    {open && (shown.length ? shown.map((layer) => {
+    {open && <div className="layers-list">{shown.length ? shown.map((layer) => {
       const state = filters[layer.key];
       const folded = collapsed[layer.key] ?? !!layer.folded;
       // The header speaks for the groups this map has.
@@ -87,7 +87,7 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
           })}
         </div>}
       </div>;
-    }) : <p className="layer-empty faint">No map data</p>)}
+    }) : <p className="layer-empty faint">No map data</p>}</div>}
     {menu && <PresetMenu {...menu} onClose={() => setMenu(null)}
       onOverwrite={() => setPreset(menu.slot, structuredClone(filters))} onClear={() => setPreset(menu.slot, null)} />}
   </div>;
