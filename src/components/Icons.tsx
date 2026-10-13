@@ -25,6 +25,7 @@ export const WindowMaximize = () => <svg width="10" height="10" viewBox="0 0 10 
 export const WindowClose = () => <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0l10 10M10 0 0 10" stroke="currentColor" /></svg>;
 export const PinIcon = () => <Icon size={16}><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></Icon>;
 export const CaretIcon = () => <Icon size={12}><path d="m6 9 6 6 6-6" /></Icon>;
+export const SwitchIcon = () => <Icon size={12}><path d="M4 8h15l-4-4M20 16H5l4 4" /></Icon>;
 export const ResetIcon = () => <Icon size={15}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></Icon>;
 export const TerrainIcon = () => <Icon size={16}><path d="m2.5 19 6-9 4 5.5 2.5-3.5 6.5 7z" /><circle cx="16.5" cy="6.5" r="2" /></Icon>;
 export const ExpandIcon = () => <Icon size={14}><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" /></Icon>;

@@ -335,13 +335,19 @@ input:disabled { opacity: .55; }
   opacity: 0; animation: ping 2.2s ease-out infinite; animation-play-state: running; }
 @keyframes ping { 0% { transform: scale(.7); opacity: calc(var(--fresh) * .8); } 100% { transform: scale(2.1); opacity: 0; } }
 
-.map-chip { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 12px;
-  border-radius: 14px; background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); font-size: 12px; font-weight: 500; }
-.map-switch { position: absolute; top: 50px; right: 14px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.map-switch-button { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; color: var(--muted);
-  background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); }
-.map-switch-button:hover { color: var(--text); }
-.map-switch-button.active { color: var(--accent); }
+.map-switch { position: absolute; top: 14px; right: 14px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.map-chip { display: flex; align-items: center; height: 28px; border-radius: 14px; background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px);
+  font-size: 12px; font-weight: 500; }
+.map-chip-part { display: flex; align-items: center; gap: 8px; height: 100%; padding: 0 12px; border-radius: 14px; font: inherit; color: inherit; }
+.map-chip-part:hover { color: var(--text); }
+.map-chip-jump { padding-right: 4px; }
+.map-chip-jump + .map-chip-part { padding-left: 4px; }
+.map-chip-mark { position: relative; display: grid; place-items: center; width: 12px; height: 12px; }
+.map-chip-mark svg { display: none; color: var(--warn); }
+.map-chip-jump:hover .map-chip-mark svg { display: block; }
+.map-chip-jump:hover .map-chip-mark .dot { display: none; }
+.map-caret { display: grid; color: var(--muted); }
+.map-switch.open .map-caret { color: var(--accent); }
 .map-switch-list { display: flex; flex-direction: column; gap: 2px; padding: 4px; min-width: 150px;
   border-radius: 9px; background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); }
 /* Left column: layers panel at the top, floor picker and toolbar at the bottom; the panels shrink before overlapping. */
