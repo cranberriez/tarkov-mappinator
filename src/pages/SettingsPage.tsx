@@ -24,6 +24,9 @@ import type { ValuableLootState } from "../lib/useValuableLoot";
 import { DEFAULT_GROUP_SITE, type Group } from "../lib/useGroup";
 import { normalizeSite } from "../lib/group";
 import { DEV, type DevFlagsState } from "../lib/useDevFlags";
+import { keys, usePersisted } from "../lib/persist";
+import { FolderIcon } from "../components/Icons";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { AutoShotState } from "../bindings/AutoShotState";
 import {
   clearAllData, getCleanupPlan, getHistoryStats, onHistoryReset, onHistoryUpdated, resetPreferences, runCleanup,
@@ -34,19 +37,26 @@ const statusLabel: Record<SourceHealth["status"], string> = {
   not_configured: "Not set", available: "Accessible", missing: "Missing", not_directory: "Not a folder", unreadable: "No access",
 };
 
-function FolderField({ id, label, value, health, disabled, placeholder, onChange }: {
+/** A source folder: a picker on the left, the path typed or picked, and whether the scanner can read it. */
+function FolderField({ id, label, value, health, disabled, placeholder, onChange, onPick }: {
   id: string; label: string; value: string; health?: SourceHealth; disabled: boolean; placeholder: string;
-  onChange: (value: string) => void;
+  onChange: (value: string) => void; onPick: (value: string) => void;
 }) {
   const ok = health?.status === "available";
+  const pick = () => void openDialog({ directory: true, defaultPath: value || undefined, title: `${label} folder` })
+    .then((chosen) => { if (typeof chosen === "string") onPick(chosen); }, () => {});
   return <div className="field">
     <div className="field-label">
       <label htmlFor={id}>{label}</label>
       <span className={`status ${ok ? "ok" : health && health.status !== "not_configured" ? "bad" : ""}`}>
         <span className="dot" />{health ? statusLabel[health.status] : "Unknown"}</span>
     </div>
-    <input id={id} value={value} placeholder={placeholder} spellCheck={false} disabled={disabled}
-      onChange={(event) => onChange(event.target.value)} />
+    <div className="folder-input">
+      <button type="button" className="secondary folder-pick" title="Choose folder" aria-label={`Choose ${label.toLowerCase()} folder`}
+        disabled={disabled || !isTauri()} onClick={pick}><FolderIcon /></button>
+      <input id={id} value={value} placeholder={placeholder} spellCheck={false} disabled={disabled}
+        onChange={(event) => onChange(event.target.value)} />
+    </div>
     {health && !ok && <p className="faint">{health.detail}</p>}
   </div>;
 }
@@ -61,6 +71,12 @@ function Switch({ label, detail, on, disabled, onChange }: {
   </button>;
 }
 
+type SettingsTab = "preferences" | "sources" | "data" | "developer";
+const tabs: { value: SettingsTab; label: string }[] = [
+  { value: "preferences", label: "Preferences" }, { value: "sources", label: "Sources" }, { value: "data", label: "Data" },
+  ...(DEV ? [{ value: "developer" as const, label: "Developer" }] : []),
+];
+
 export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup, toastMode, valuableLoot, group, dev }: {
   scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot; shotCleanup: ShotCleanup; toastMode: ToastModeState; valuableLoot: ValuableLootState;
   group: Group; dev: DevFlagsState;
@@ -71,80 +87,97 @@ export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup,
   useEffect(() => { if (snapshot && !edited.current) setFolders(snapshot.config); }, [snapshot]);
   const locked = !connected || !!busy || running;
   const itemStatus = useItemStatus();
+  const [stored, setTab] = usePersisted<SettingsTab>(keys.settingsTab, "preferences");
+  // A remembered tab that no longer exists (Developer, in a release build) falls back to the first.
+  const tab = tabs.some((option) => option.value === stored) ? stored : "preferences";
   const update = (patch: Partial<FolderConfig>) => { edited.current = true; setFolders((current) => ({ ...current, ...patch })); };
+  /** A picked folder is saved and checked straight away; a typed one waits for Check folders. */
+  const pick = (patch: Partial<FolderConfig>) => { const next = { ...folders, ...patch }; edited.current = false; setFolders(next); void perform("check", next); };
 
-  return <div className="page">
+  return <div className="page settings-page">
     <header className="page-header"><h1>Settings</h1></header>
+    <div className="tabs" role="tablist" aria-label="Settings sections">
+      {tabs.map((option) => <button key={option.value} type="button" role="tab" aria-selected={tab === option.value}
+        className={tab === option.value ? "selected" : ""} onClick={() => setTab(option.value)}>{option.label}</button>)}
+    </div>
     {error && <div className="error" role="alert">{error}
       {!connected && <button type="button" className="link" onClick={retry}>Retry</button>}</div>}
 
-    <section className="settings-section">
-      <h2>Mini mode</h2>
-      <Switch label="Mini mode" detail="Shrink to a small strip with start, stop and close." on={mini.mini}
-        disabled={!mini.desktop} onChange={mini.setMini} />
-      <Switch label="Start in mini mode" detail="Open the app as the strip next time." on={mini.startMini}
-        disabled={!mini.desktop} onChange={mini.setStartMini} />
-    </section>
+    {tab === "preferences" && <div role="tabpanel">
+      <section className="settings-section">
+        <h2>Mini mode</h2>
+        <Switch label="Mini mode" detail="Shrink to a small strip with start, stop and close." on={mini.mini}
+          disabled={!mini.desktop} onChange={mini.setMini} />
+        <Switch label="Start in mini mode" detail="Open the app as the strip next time." on={mini.startMini}
+          disabled={!mini.desktop} onChange={mini.setStartMini} />
+      </section>
 
-    <section className="settings-section">
-      <h2>Notifications</h2>
-      <div className="action-row">
-        <span><strong>Notifications</strong><span className="faint">Pop-ups for live activity.</span></span>
-        <div className="segmented" role="group" aria-label="Notifications">
-          {toastModes.map((option) => <button key={option.value} type="button" className={toastMode.mode === option.value ? "selected" : ""}
-            aria-pressed={toastMode.mode === option.value} onClick={() => toastMode.setMode(option.value)}>{option.label}</button>)}
+      <section className="settings-section">
+        <h2>Notifications</h2>
+        <div className="action-row">
+          <span><strong>Notifications</strong><span className="faint">Pop-ups for live activity.</span></span>
+          <div className="segmented" role="group" aria-label="Notifications">
+            {toastModes.map((option) => <button key={option.value} type="button" className={toastMode.mode === option.value ? "selected" : ""}
+              aria-pressed={toastMode.mode === option.value} onClick={() => toastMode.setMode(option.value)}>{option.label}</button>)}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section className="settings-section">
-      <h2>Map</h2>
-      <Switch label="Valuable loot icons" detail={itemStatus?.config.enabled ? "Experimental. Loose loot shows its most valuable possible item." : "Needs item enrichment (Item data below)."}
-        on={valuableLoot.on} disabled={!itemStatus?.config.enabled} onChange={valuableLoot.setOn} />
-    </section>
+      <section className="settings-section">
+        <h2>Map</h2>
+        <Switch label="Valuable loot icons" detail={itemStatus?.config.enabled ? "Experimental. Loose loot shows its most valuable possible item." : "Needs item enrichment (Item data, in the Data tab)."}
+          on={valuableLoot.on} disabled={!itemStatus?.config.enabled} onChange={valuableLoot.setOn} />
+      </section>
 
-    <ConnectionSection connection={connection} />
-    <GroupServerSection group={group} />
-    <AutoShotSection autoShot={autoShot} />
+      <ConnectionSection connection={connection} />
+      <GroupServerSection group={group} />
+      <AutoShotSection autoShot={autoShot} />
+    </div>}
 
-    <section className="settings-section">
-      <h2>Sources</h2>
-      <form onSubmit={(event) => { event.preventDefault(); edited.current = false; void perform("check", folders); }}>
-        <FolderField id="screenshots" label="Screenshots" value={folders.screenshots} health={snapshot?.screenshots}
-          disabled={locked} placeholder="Absolute path to the screenshot folder" onChange={(screenshots) => update({ screenshots })} />
-        <FolderField id="logs" label="Game logs" value={folders.logs} health={snapshot?.logs}
-          disabled={locked} placeholder="Tarkov installation Logs folder" onChange={(logs) => update({ logs })} />
-        <div className="form-actions">
-          <button type="submit" className="secondary" disabled={locked}>{busy === "check" ? "Checking…" : "Check folders"}</button>
-          {running && <span className="faint">Stop monitoring to edit.</span>}
+    {tab === "sources" && <div role="tabpanel">
+      <section className="settings-section">
+        <h2>Folders</h2>
+        <form onSubmit={(event) => { event.preventDefault(); edited.current = false; void perform("check", folders); }}>
+          <FolderField id="screenshots" label="Screenshots" value={folders.screenshots} health={snapshot?.screenshots}
+            disabled={locked} placeholder="Absolute path to the screenshot folder" onChange={(screenshots) => update({ screenshots })}
+            onPick={(screenshots) => pick({ screenshots })} />
+          <FolderField id="logs" label="Game logs" value={folders.logs} health={snapshot?.logs}
+            disabled={locked} placeholder="Tarkov installation Logs folder" onChange={(logs) => update({ logs })}
+            onPick={(logs) => pick({ logs })} />
+          <div className="form-actions">
+            <button type="submit" className="secondary" disabled={locked}>{busy === "check" ? "Checking…" : "Check folders"}</button>
+            {running && <span className="faint">Stop monitoring to edit.</span>}
+          </div>
+        </form>
+      </section>
+
+      <section className="settings-section">
+        <h2>Scanner health</h2>
+        <div className="stats compact">
+          <div className="stat"><span>Screenshots seen</span><strong>{snapshot?.screenshots_seen ?? "—"}</strong></div>
+          <div className="stat"><span>Rejected</span><strong>{snapshot?.screenshots_rejected ?? "—"}</strong></div>
+          <div className="stat"><span>Revision</span><strong>{snapshot?.revision ?? "—"}</strong></div>
         </div>
-      </form>
-    </section>
+        {snapshot?.diagnostics.length
+          ? <ul className="diagnostics">{snapshot.diagnostics.map((detail, index) => <li key={index}>{detail}</li>)}</ul>
+          : <p className="faint">{snapshot ? "No issues reported." : "Backend not connected."}</p>}
+      </section>
 
-    <section className="settings-section">
-      <h2>Scanner health</h2>
-      <div className="stats compact">
-        <div className="stat"><span>Screenshots seen</span><strong>{snapshot?.screenshots_seen ?? "—"}</strong></div>
-        <div className="stat"><span>Rejected</span><strong>{snapshot?.screenshots_rejected ?? "—"}</strong></div>
-        <div className="stat"><span>Revision</span><strong>{snapshot?.revision ?? "—"}</strong></div>
-      </div>
-      {snapshot?.diagnostics.length
-        ? <ul className="diagnostics">{snapshot.diagnostics.map((detail, index) => <li key={index}>{detail}</li>)}</ul>
-        : <p className="faint">{snapshot ? "No issues reported." : "Backend not connected."}</p>}
-    </section>
+      <section className="settings-section">
+        <h2>Log coverage</h2>
+        <LogCoveragePanel snapshot={snapshot} />
+      </section>
+    </div>}
 
-    <StoredDataSection shotCleanup={shotCleanup} />
-    <MapDataSection />
-    <ItemDataSection status={itemStatus} />
-    <TileSection />
+    {tab === "data" && <div role="tabpanel">
+      <StoredDataSection shotCleanup={shotCleanup} />
+      <MapDataSection />
+      <ItemDataSection status={itemStatus} />
+      <TileSection />
+      <DangerZone />
+    </div>}
 
-    <section className="settings-section">
-      <h2>Log coverage</h2>
-      <LogCoveragePanel snapshot={snapshot} />
-    </section>
-
-    <DangerZone />
-    {DEV && <DeveloperSection dev={dev} />}
+    {DEV && tab === "developer" && <div role="tabpanel"><DeveloperSection dev={dev} /></div>}
   </div>;
 }
 

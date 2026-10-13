@@ -180,7 +180,17 @@ input:disabled { opacity: .55; }
 .footnote { margin-top: 16px; font-size: 11px; color: var(--faint); }
 
 /* Settings */
+.settings-page .page-header { margin-bottom: 16px; }
+.tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--line); margin-bottom: 28px; }
+.tabs button { height: 34px; margin-bottom: -1px; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; }
+.tabs button:hover { color: var(--text); }
+.tabs .selected { color: var(--text); border-bottom-color: var(--accent); }
 .settings-section { margin-bottom: 40px; }
+.settings-section > h2 { font-size: 15px; color: var(--text); text-transform: none; letter-spacing: 0; }
+.folder-input { display: flex; gap: 6px; }
+.folder-pick { width: 34px; height: 34px; padding: 0; flex-shrink: 0; display: grid; place-items: center; color: var(--muted); }
+.folder-pick:not(:disabled):hover { color: var(--text); }
+.folder-pick:disabled { opacity: .5; }
 .switch-row { width: 100%; max-width: 560px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 8px 0; text-align: left; }
 .switch-row > span:first-child { display: flex; flex-direction: column; gap: 2px; }

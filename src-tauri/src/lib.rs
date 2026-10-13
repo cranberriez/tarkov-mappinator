@@ -471,6 +471,7 @@ fn spawn_data_sync(app: tauri::AppHandle, data: Arc<TarkovData>) {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol("tiles", |context, request, responder| {
             let path = request.uri().path().trim_start_matches('/').to_owned();
             let Some(tiles) = context.app_handle().try_state::<Arc<TileCache>>().map(|tiles| tiles.inner().clone()) else {

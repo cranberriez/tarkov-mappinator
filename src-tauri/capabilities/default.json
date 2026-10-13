@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-window",
-  "description": "Main window: backend updates and custom title bar controls.",
+  "description": "Main window: backend updates, custom title bar controls and folder pickers.",
   "windows": [
     "main"
   ],
@@ -23,6 +23,7 @@
     "core:window:allow-outer-position",
     "core:window:allow-inner-size",
     "core:window:allow-current-monitor",
-    "core:window:allow-scale-factor"
+    "core:window:allow-scale-factor",
+    "dialog:allow-open"
   ]
 }
