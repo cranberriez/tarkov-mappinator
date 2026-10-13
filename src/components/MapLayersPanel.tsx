@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { iconSrc } from "../lib/tiles";
-import { layers, layerState, sameFilters, toggleLayer, type Filters } from "../lib/mapLayers";
+import { assetUrl, iconSrc } from "../lib/tiles";
+import { groupOn, layerState, sameFilters, toggleLayer, type Filters, type LayerDef } from "../lib/mapLayers";
 import { keys, load, save } from "../lib/persist";
 import { CaretIcon, PinIcon, ResetIcon } from "./Icons";
 
@@ -12,8 +12,8 @@ const PRESET_SLOTS = 3;
  * Groups the current map has no markers for are left out. Layers fold behind a caret; three preset
  * slots save and restore the switches (right click a saved slot to overwrite or clear it).
  */
-export function MapLayersPanel({ filters, defaults, counts, open, onOpen, onChange }: {
-  filters: Filters; defaults: Filters; counts: Record<string, number>; open: boolean;
+export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen, onChange }: {
+  layers: LayerDef[]; filters: Filters; defaults: Filters; counts: Record<string, number>; open: boolean;
   onOpen: (open: boolean) => void; onChange: (filters: Filters) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => load(keys.mapLayersCollapsed, {}));
@@ -74,11 +74,13 @@ export function MapLayersPanel({ filters, defaults, counts, open, onOpen, onChan
         </div>
         {!folded && <div className="layer-groups">
           {present.map((group) => {
-            const on = state.groups[group.key];
+            const on = groupOn(state, group.key);
             return <button key={group.key} type="button" className={`layer-row group ${on ? "" : "off"}`} aria-pressed={on}
               title={group.label} onClick={() => setGroup(layer.key, group.key, !on)}>
-              <img src={iconSrc(group.icon)} alt="" className={group.tint ? "tinted" : undefined}
-                style={group.tint ? { "--tint": group.tint } as CSSProperties : undefined} />
+              {group.image ? <img src={assetUrl(group.image)} alt="" className="portrait" draggable={false}
+                onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = iconSrc(group.icon) ?? ""; event.currentTarget.className = ""; }} />
+                : <img src={iconSrc(group.icon)} alt="" className={group.tint ? "tinted" : undefined}
+                  style={group.tint ? { "--tint": group.tint } as CSSProperties : undefined} />}
               <span className="group-name">{group.label}</span>
               <span className="faint">{counts[`${layer.key}.${group.key}`]}</span>
             </button>;

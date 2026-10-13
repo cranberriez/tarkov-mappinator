@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildMarkers, countMarkers, defaultFilters, isVisible, markerIcon, roleOf, withDefaults } from "./mapLayers.ts";
+import { buildMarkers, countMarkers, defaultFilters, groupOn, isVisible, layersFor, markerIcon, roleOf, withDefaults } from "./mapLayers.ts";
 
 const at = (x, z, y = 0) => ({ x, y, z });
 const map = (fields) => ({ extracts: [], transits: [], spawns: [], ...fields });
@@ -112,8 +112,11 @@ test("other layers: containers grouped by name and deduplicated, bosses merged p
   const [shared, pmc] = by("bosses");
   assert.equal(shared.label, "Knight, Cultist Priest");
   assert.deepEqual(shared.tags, ["Bunker", "Knight 50%", "Cultist Priest 15%"]);
-  assert.deepEqual(shared.details[0].boss, { name: "Knight", image: "https://assets.tarkov.dev/knight-portrait.webp", chance: 0.5, raidChance: 0.5, location: "Bunker" });
-  assert.deepEqual(shared.details.find((d) => d.label === "Cultist Priest").boss, { name: "Cultist Priest", image: undefined, chance: 0.15, raidChance: 0.3, location: "Bunker" });
+  assert.deepEqual(shared.groups, ["knight", "cultist-priest"]);
+  const [knight, priest] = shared.bosses;
+  assert.deepEqual([knight.name, knight.image, knight.chance, knight.raidChance, knight.location, knight.entries], ["Knight", "https://assets.tarkov.dev/knight-portrait.webp", 0.5, 0.5, "Bunker", 1]);
+  assert.ok(Math.abs(priest.chance - 0.15) < 1e-9);
+  assert.deepEqual([priest.raidChance, priest.icon], [0.3, "spawn_cultist-priest"]);
   assert.deepEqual(pmc.groups, ["pmcs"]);
   assert.deepEqual(by("hazards").map((m) => [m.groups[0], m.outline.length]), [["minefield", 3], ["artillery", 1]]);
   assert.deepEqual(by("other")[0].position, { x: 1, y: 2, z: 3 });
@@ -123,7 +126,9 @@ test("noisy layers and groups start hidden", () => {
   const filters = defaultFilters("unknown");
   assert.equal(filters.loose.groups.loose, false);
   assert.equal(filters.containers.groups.general, false);
-  assert.equal(filters.bosses.groups.pmcs, false);
+  assert.equal(groupOn(filters.bosses, "pmcs"), false);
+  assert.equal(groupOn(filters.bosses, "raider"), false);
+  assert.equal(groupOn(filters.bosses, "killa"), true);
   assert.equal(defaultFilters("scav").containers.groups.valuables, true);
 });
 
@@ -142,4 +147,45 @@ test("lock and extract details: key, power, faction, roubles, switch names", () 
   assert.deepEqual(by("extract:a").details, [{ label: "Faction", value: "Shared" }, { label: "Requires", value: "5,000 ₽" }, { label: "Switch", value: "Power Switch", mono: false }]);
   assert.deepEqual(by("extract:c").details[1], { label: "Requires", items: [{ id: "x", count: 2 }] });
   assert.deepEqual(by("switch:").details, [{ label: "Type", value: "Open" }, { label: "Opens", value: "Gate" }]);
+});
+
+test("boss types: one group each, same-type entries merged, defaults for unknown groups", () => {
+  const p = at(5, 5);
+  const mobs = { bossBully: { name: "Reshala", normalizedName: "reshala" }, pmcBEAR: { name: "BEAR", normalizedName: "bear" }, pmcUSEC: { name: "USEC", normalizedName: "usec" }, followerBully: { name: "Guard", normalizedName: "guard" }, exUsec: { name: "Rogue", normalizedName: "rogue" } };
+  const location = (chance) => [{ name: "Dorms", chance, positions: [p] }];
+  const markers = buildMarkers(map({ bosses: [
+    { mob: "bossBully", spawnChance: 1, spawnLocations: location(0.5), escorts: [{ mob: "followerBully", amount: [{ chance: 1, count: 2 }] }], spawnTime: 90, spawnTrigger: "Always" },
+    { mob: "bossBully", spawnChance: 0.8, spawnLocations: location(0.5), escorts: [{ mob: "followerBully", amount: [{ chance: 1, count: 2 }] }] },
+    { mob: "pmcBEAR", spawnChance: 1, spawnLocations: location(1) }, { mob: "pmcUSEC", spawnChance: 1, spawnLocations: location(1) },
+    { mob: "exUsec", spawnChance: 1, spawnLocations: location(1) },
+  ] }), { mobs });
+  const [marker] = markers.filter((m) => m.layer === "bosses");
+  assert.deepEqual(marker.groups, ["reshala", "pmcs", "rogue"]);
+  const [reshala, pmcs] = marker.bosses;
+  assert.equal(reshala.entries, 2);
+  assert.equal(reshala.raidChance, undefined);
+  assert.ok(Math.abs(reshala.chance - (1 - 0.5 * 0.6)) < 1e-9);
+  assert.deepEqual(reshala.escorts, [{ name: "Guard", count: "2" }]);
+  assert.deepEqual([reshala.spawnTime, reshala.trigger], ["1:30", "Always"]);
+  assert.deepEqual([pmcs.name, pmcs.entries, pmcs.image], ["PMC bots", 2, undefined]);
+  const defs = layersFor(markers).find((layer) => layer.key === "bosses").groups;
+  assert.deepEqual(defs.map((g) => [g.key, !!g.off]), [["reshala", false], ["pmcs", true], ["rogue", true]]);
+  // Only the default-on type shows; toggling another type on switches the marker's icon over.
+  const filters = defaultFilters("unknown");
+  assert.equal(markerIcon(marker, filters), "spawn_boss");
+  filters.bosses.groups.reshala = false;
+  assert.equal(isVisible(marker, filters), false);
+  filters.bosses.groups.rogue = true;
+  assert.equal(markerIcon(marker, filters), "spawn_rogue");
+});
+
+test("filter equality treats missing boss types as defaults and ignores old boss keys", async () => {
+  const { sameFilters } = await import("./mapLayers.ts");
+  const a = defaultFilters("unknown");
+  const b = structuredClone(a);
+  b.bosses.groups = { killa: true, raiders: false, bosses: false };
+  assert.equal(sameFilters(a, b), true);
+  b.bosses.groups.killa = false;
+  assert.equal(sameFilters(a, b), false);
+  assert.deepEqual(withDefaults({ bosses: { groups: { bosses: false, raiders: true, killa: false } } }, "unknown").bosses.groups, { killa: false });
 });

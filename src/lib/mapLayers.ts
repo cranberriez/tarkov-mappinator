@@ -5,7 +5,8 @@
 import type { Extract, GameMapData, Mob, Vec3 } from "../tarkov-data/types.ts";
 
 /** `icon` is a file stem in `src/maps/assets/icons`, or `item:<tarkov.dev item id>`. */
-type GroupDef = { key: string; label: string; icon: string; /** Colour behind the icon. */ tint?: string; /** Hidden until switched on. */ off?: boolean };
+type GroupDef = { key: string; label: string; icon: string; /** Colour behind the icon. */ tint?: string; /** Hidden until switched on. */ off?: boolean;
+  /** Portrait link shown instead of the icon (boss types). */ image?: string };
 export type LayerDef = {
   key: string; label: string; icon: string; groups: GroupDef[];
   /** All groups hidden until switched on. */ off?: boolean;
@@ -35,11 +36,8 @@ export const layers: LayerDef[] = [
     { key: "pmc", label: "PMC", icon: "spawn_pmc" },
     { key: "scav", label: "Scav", icon: "spawn_scav" },
   ] },
-  { key: "bosses", label: "Bosses", icon: "spawn_boss", folded: true, groups: [
-    { key: "bosses", label: "Bosses", icon: "spawn_boss" },
-    { key: "raiders", label: "Raiders & Rogues", icon: "spawn_rogue", off: true },
-    { key: "pmcs", label: "PMC bots", icon: "spawn_pmc", off: true },
-  ] },
+  // One group per boss type on the map, filled in by `layersFor`.
+  { key: "bosses", label: "Bosses", icon: "spawn_boss", folded: true, groups: [] },
   { key: "hazards", label: "Hazards", icon: "hazard", folded: true, groups: [
     { key: "minefield", label: "Minefields", icon: "hazard" },
     { key: "sniper", label: "Sniper zones", icon: "hazard" },
@@ -71,16 +69,24 @@ export const layers: LayerDef[] = [
 ];
 
 /** One row of a marker's detail card; `items` are item ids, `mono` marks a raw id with no name yet. */
-export type Detail = { label: string; value?: string; items?: { id: string; count?: number }[]; mono?: boolean;
-  /** A boss row: portrait, chance at this spot (`chance`) and in the raid at all (`raidChance`), both 0–1. */
-  boss?: { name: string; image?: string; chance: number; raidChance: number; location: string } };
+export type Detail = { label: string; value?: string; items?: { id: string; count?: number }[]; mono?: boolean };
+
+/** One boss type at a spawn point; several spawn entries of the same type are merged into one. */
+export type BossInfo = {
+  /** Filter group: the mob's normalized name, or "pmcs" for PMC bots. */ group: string;
+  name: string; /** Map icon stem. */ icon: string; /** Portrait link. */ image?: string;
+  /** Chance (0–1) that at least one of them spawns here. */ chance: number;
+  /** Chance (0–1) of spawning in the raid at all; only for a single entry. */ raidChance?: number;
+  /** Number of spawn entries merged in. */ entries: number;
+  location: string; escorts: { name: string; count: string }[]; spawnTime?: string; trigger?: string;
+};
 
 export type MapMarker = {
   id: string;
   layer: string;
   groups: string[];
   position: Vec3;
-  /** Fixed icon stem; extracts and spawns pick theirs from the shown groups instead. */
+  /** Fixed icon stem; extracts, spawns and bosses pick theirs from the shown groups instead. */
   icon?: string;
   /** Footprint for zones (hazards, artillery), drawn in world x/z. */
   outline?: Vec3[];
@@ -90,6 +96,8 @@ export type MapMarker = {
   tags: string[];
   /** Everything else known about it, shown on the detail card. */
   details?: Detail[];
+  /** Boss spawn points: one entry per boss type, shown as stacked cards instead of `details`. */
+  bosses?: BossInfo[];
 };
 
 export type LayerFilter = { groups: Record<string, boolean> };
@@ -124,14 +132,26 @@ export function withDefaults(stored: Partial<Record<string, LayerFilter & { on?:
   return Object.fromEntries(Object.entries(defaults).map(([key, layer]) => {
     const saved = stored?.[key];
     const groups = { ...layer.groups, ...saved?.groups };
+    if (key === "bosses") for (const group of legacyBossGroups) delete groups[group];
     if (saved?.on === false) for (const group of Object.keys(groups)) groups[group] = false;
     return [key, { groups }];
   }));
 }
 
+/**
+ * Boss types start on, except these (matched on the group key: normalized names, and raw mob ids when a
+ * mob has no lookup). Boss groups come from the map's data, so defaults can't list them.
+ */
+const bossOff = new Set(["pmcs", "raider", "rogue", "black-div", "af", "pmcBot", "exUsec", "arenaFighter", "arenaFighterEvent"]);
+/** Older saves held "Bosses" and "Raiders & Rogues" groups; they mean nothing now. */
+const legacyBossGroups = ["bosses", "raiders"];
+
+/** Whether a group is on; one the filter has no entry for (a boss type not seen before) takes its default. */
+export const groupOn = (filter: LayerFilter | undefined, group: string) => filter?.groups[group] ?? !bossOff.has(group);
+
 /** Header state of a layer over the given groups: all on, none on, or some. */
 export function layerState(filter: LayerFilter, groups: string[]): "on" | "off" | "mixed" {
-  const on = groups.filter((group) => filter.groups[group]).length;
+  const on = groups.filter((group) => groupOn(filter, group)).length;
   return on === 0 ? "off" : on === groups.length ? "on" : "mixed";
 }
 
@@ -143,7 +163,7 @@ export function toggleLayer(filter: LayerFilter, groups: string[]): LayerFilter 
 
 export const isVisible = (marker: MapMarker, filters: Filters) => {
   const layer = filters[marker.layer];
-  return !!layer && marker.groups.some((group) => layer.groups[group]);
+  return !!layer && marker.groups.some((group) => groupOn(layer, group));
 };
 
 const ROUBLES = "5449016a4bdc2d6f028b456f";
@@ -247,9 +267,8 @@ type Boss = {
   spawnTime?: number; spawnTimeRandom?: boolean; spawnTrigger?: string | null;
 };
 const PMC_BOTS = new Set(["pmcBEAR", "pmcUSEC"]);
-const bossGroup = (mob: string, normalizedName: string) =>
-  PMC_BOTS.has(mob) ? "pmcs"
-    : (mob.startsWith("boss") || mob === "sectantPriest") && normalizedName !== "black-div" ? "bosses" : "raiders";
+/** Filter group of a boss type; PMC bots share one. */
+const bossGroup = (mob: string, normalizedName: string | undefined) => PMC_BOTS.has(mob) ? "pmcs" : normalizedName || mob;
 /** Escort headcount: "2–4", or each count with its chance when there are only two. */
 function escortCount(amount: { chance: number; count: number }[]) {
   const chances = new Map<number, number>();
@@ -260,48 +279,54 @@ function escortCount(amount: { chance: number; count: number }[]) {
 }
 const bossTime = (seconds: number) => seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
 
-function bossDetails(boss: Boss, name: string, location: { name: string; chance: number }, lookups: Lookups): Detail[] {
-  const time = boss.spawnTime ?? -1;
-  return [
-    { label: name, value: `${percent(boss.spawnChance * location.chance)} · ${location.name}`,
-      boss: { name, image: lookups.mobs?.[boss.mob]?.imagePortraitLink, chance: boss.spawnChance * location.chance, raidChance: boss.spawnChance, location: location.name } },
-    ...(boss.escorts ?? []).map((escort) => ({ label: "Escorts", value: `${lookups.mobs?.[escort.mob]?.name ?? escort.mob} ${escortCount(escort.amount)}` })),
-    ...time >= 0 ? [{ label: "Spawn time", value: `${bossTime(time)}${boss.spawnTimeRandom ? " · random" : ""}` }] : [],
-    ...boss.spawnTrigger ? [{ label: "Trigger", value: boss.spawnTrigger, mono: true }] : [],
-  ];
-}
-
 const bossIcons: Record<string, string> = {
   "cultist-priest": "spawn_cultist-priest", rogue: "spawn_rogue", raider: "spawn_rogue",
   "black-div": "spawn_black-div", af: "spawn_af", bear: "spawn_pmc", usec: "spawn_pmc",
 };
 
-/** Boss spawn points; bosses sharing a point become one marker listing each with its chance there. */
+/** Boss spawn points; bosses sharing a point become one marker with an entry per boss type. */
 function bossMarkers(data: GameMapData, lookups: Lookups): MapMarker[] {
-  const byPoint = new Map<string, MapMarker & { names: string[] }>();
-  for (const boss of (data.bosses ?? []) as Boss[]) {
+  type Type = BossInfo & { miss: number; locations: Set<string>; seen: Set<number> };
+  const byPoint = new Map<string, { position: Vec3; types: Map<string, Type>; counted: Set<string> }>();
+  ((data.bosses ?? []) as Boss[]).forEach((boss, index) => {
     const mob = lookups.mobs?.[boss.mob];
-    const name = mob?.name ?? boss.mob;
-    const group = bossGroup(boss.mob, mob?.normalizedName ?? "");
-    for (const location of boss.spawnLocations ?? []) {
-      const entry = `${name} ${percent(boss.spawnChance * location.chance)}`;
+    const group = bossGroup(boss.mob, mob?.normalizedName);
+    const time = boss.spawnTime ?? -1;
+    boss.spawnLocations?.forEach((location, locationIndex) => {
       for (const position of location.positions ?? []) {
         const key = posKey(position);
-        const existing = byPoint.get(key);
-        if (!existing) {
-          byPoint.set(key, { id: `boss:${key}`, layer: "bosses", groups: [group], position, names: [name],
-            icon: bossIcons[mob?.normalizedName ?? ""] ?? "spawn_boss", tags: [location.name, entry],
-            details: bossDetails(boss, name, location, lookups) });
-          continue;
+        const point = byPoint.get(key) ?? { position, types: new Map(), counted: new Set() };
+        byPoint.set(key, point);
+        // A spot listed twice in one location is still one chance.
+        if (point.counted.has(`${index}|${locationIndex}`)) continue;
+        point.counted.add(`${index}|${locationIndex}`);
+        let type: Type | undefined = point.types.get(group);
+        if (!type) {
+          type = { group, name: group === "pmcs" ? "PMC bots" : mob?.name ?? boss.mob, icon: bossIcons[mob?.normalizedName ?? ""] ?? "spawn_boss",
+            image: group === "pmcs" ? undefined : mob?.imagePortraitLink, chance: 0, raidChance: boss.spawnChance, entries: 0, location: "",
+            escorts: [], spawnTime: time >= 0 ? `${bossTime(time)}${boss.spawnTimeRandom ? " · random" : ""}` : undefined,
+            trigger: boss.spawnTrigger || undefined, miss: 1, locations: new Set(), seen: new Set() };
+          point.types.set(group, type);
         }
-        existing.details!.push(...bossDetails(boss, name, location, lookups));
-        if (!existing.names.includes(name)) existing.names.push(name);
-        if (!existing.tags.includes(entry)) existing.tags.push(entry);
-        if (!existing.groups.includes(group)) existing.groups.push(group);
+        type.miss *= 1 - boss.spawnChance * location.chance;
+        type.locations.add(location.name);
+        if (type.seen.has(index)) continue;
+        type.seen.add(index);
+        type.entries++;
+        for (const escort of boss.escorts ?? []) {
+          const line = { name: lookups.mobs?.[escort.mob]?.name ?? escort.mob, count: escortCount(escort.amount) };
+          if (!type.escorts.some((other) => other.name === line.name && other.count === line.count)) type.escorts.push(line);
+        }
       }
-    }
-  }
-  return [...byPoint.values()].map(({ names, ...marker }) => ({ ...marker, label: names.join(", ") }));
+    });
+  });
+  return [...byPoint].map(([key, { position, types }]) => {
+    const bosses = [...types.values()].map(({ miss, locations, seen, ...type }): BossInfo =>
+      ({ ...type, chance: 1 - miss, raidChance: type.entries === 1 ? type.raidChance : undefined, location: [...locations].join(", ") }));
+    return { id: `boss:${key}`, layer: "bosses", groups: bosses.map((boss) => boss.group), position, bosses,
+      label: bosses.map((boss) => boss.name).join(", "),
+      tags: [...new Set(bosses.flatMap((boss) => boss.location.split(", "))), ...bosses.map((boss) => `${boss.name} ${percent(boss.chance)}`)] };
+  });
 }
 
 type ArtilleryZone = { position: Vec3; outline?: Vec3[]; size?: Vec3; top?: number; botom?: number };
@@ -405,7 +430,8 @@ function pointMarkers(data: GameMapData, lookups: Lookups): MapMarker[] {
 /** Icon key for a marker (a file stem, or `item:<id>` for an item icon), given which of its groups are currently shown. */
 export function markerIcon(marker: MapMarker, filters: Filters): string {
   if (marker.icon) return marker.icon;
-  const shown = marker.groups.filter((group) => filters[marker.layer]?.groups[group]);
+  const shown = marker.groups.filter((group) => groupOn(filters[marker.layer], group));
+  if (marker.bosses) return marker.bosses.find((boss) => groupOn(filters[marker.layer], boss.group))?.icon ?? "spawn_boss";
   if (marker.layer === "documents") return `item:${documentTypes.find((type) => type.key === shown[0])?.item}`;
   if (marker.layer === "spawns") return shown.includes("pmc") ? "spawn_pmc" : "spawn_scav";
   if (shown.includes("transit")) return "extract_transit";
@@ -414,7 +440,7 @@ export function markerIcon(marker: MapMarker, filters: Filters): string {
 
 /** Colour behind a marker's icon, from the first of its groups that is shown. */
 export function markerTint(marker: MapMarker, filters: Filters): string | undefined {
-  const shown = marker.groups.find((group) => filters[marker.layer]?.groups[group]);
+  const shown = marker.groups.find((group) => groupOn(filters[marker.layer], group));
   return layers.find((layer) => layer.key === marker.layer)?.groups.find((group) => group.key === shown)?.tint;
 }
 
@@ -428,7 +454,20 @@ export function countMarkers(markers: MapMarker[]) {
   return counts;
 }
 
-/** Whether two filter states show the same markers' switches, ignoring key order. */
+/** Layers with the bosses layer's groups filled in from the map's markers: one per boss type, the default-on ones first. */
+export function layersFor(markers: MapMarker[]): LayerDef[] {
+  const groups = new Map<string, GroupDef>();
+  for (const boss of markers.flatMap((marker) => marker.bosses ?? []))
+    if (!groups.has(boss.group)) groups.set(boss.group, { key: boss.group, label: boss.name, icon: boss.icon, image: boss.image, off: bossOff.has(boss.group) });
+  const sorted = [...groups.values()].sort((a, b) => Number(!!a.off) - Number(!!b.off));
+  return layers.map((layer) => layer.key === "bosses" ? { ...layer, groups: sorted } : layer);
+}
+
+/** Whether two filter states show the same markers' switches, ignoring key order; boss types missing on one side count as default. */
 export function sameFilters(a: Filters, b: Filters): boolean {
-  return layers.every((layer) => layer.groups.every((group) => a[layer.key]?.groups[group.key] === b[layer.key]?.groups[group.key]));
+  return layers.every((layer) => {
+    const keys = new Set(layer.groups.map((group) => group.key));
+    if (layer.key === "bosses") for (const side of [a, b]) for (const group of Object.keys(side[layer.key]?.groups ?? {})) if (!legacyBossGroups.includes(group)) keys.add(group);
+    return [...keys].every((group) => groupOn(a[layer.key], group) === groupOn(b[layer.key], group));
+  });
 }
