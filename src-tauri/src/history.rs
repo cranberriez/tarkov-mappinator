@@ -466,6 +466,33 @@ impl History {
         }
     }
 
+    /// Permanently deletes the screenshots whose positions are stored for `raid_id`; returns how
+    /// many were deleted. Files already gone are skipped.
+    pub fn delete_raid_screenshots(&self, folder: &str, raid_id: &str) -> Result<u32, String> {
+        if folder.is_empty() {
+            return Ok(0);
+        }
+        let names: Vec<String> = {
+            let db = self.db();
+            let mut query = db.prepare("SELECT filename FROM positions WHERE raid_id = ?1").map_err(text)?;
+            let rows = query.query_map([raid_id], |row| row.get(0)).map_err(text)?;
+            rows.collect::<rusqlite::Result<_>>().map_err(text)?
+        };
+        let (mut deleted, mut failed) = (0, None);
+        for name in names {
+            // Bare capture names only, so a stored name can never reach outside the folder.
+            if Path::new(&name).file_name() != Some(name.as_ref()) || !scanner::is_position_capture(&name) {
+                continue;
+            }
+            match fs::remove_file(Path::new(folder).join(&name)) {
+                Ok(()) => deleted += 1,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => failed = failed.or(Some(format!("Unable to delete screenshot {name}: {error}"))),
+            }
+        }
+        failed.map_or(Ok(deleted), Err)
+    }
+
     /// Moves the current candidates of `kind` to the Recycle Bin; returns how many were moved.
     pub fn cleanup(&self, config: &scanner::FolderConfig, kind: CleanupKind) -> Result<u32, String> {
         let candidates = match kind {
@@ -558,6 +585,30 @@ mod tests {
         history.record(&HistoryBatch { raids: vec![raid("x", "2026-10-11 11:00:00.000", None)], ..Default::default() }).unwrap();
         let version: i32 = Connection::open(&path).unwrap().query_row("PRAGMA user_version", [], |row| row.get(0)).unwrap();
         assert_eq!(version, 99);
+    }
+
+    #[test]
+    fn deletes_only_the_ended_raids_stored_screenshots() {
+        let dir = tempfile::tempdir().unwrap();
+        let shots = dir.path().join("shots");
+        fs::create_dir(&shots).unwrap();
+        let name = |minute: u32| {
+            format!("2026-10-11[11-{minute:02}]_176.89, 4.38, 164.86_-0.00534, 0.99448, -0.06416, -0.08281_9.79 (0).png")
+        };
+        let (ours, other, loose, unstored) = (name(1), name(2), name(3), name(4));
+        for file in [&ours, &other, &loose, &unstored] {
+            fs::write(shots.join(file), b"png").unwrap();
+        }
+        let history = History::open(dir.path().join("history.sqlite3"));
+        let positions = vec![position(&ours, Some("r1")), position(&other, Some("r2")), position(&loose, None)];
+        history.record(&HistoryBatch { raids: vec![], positions, activity: vec![] }).unwrap();
+
+        let folder = shots.to_string_lossy();
+        assert_eq!(history.delete_raid_screenshots(&folder, "r1"), Ok(1));
+        assert!(!shots.join(&ours).exists());
+        assert!([&other, &loose, &unstored].iter().all(|file| shots.join(file).exists()));
+        // Already gone is not an error.
+        assert_eq!(history.delete_raid_screenshots(&folder, "r1"), Ok(0));
     }
 
     #[test]

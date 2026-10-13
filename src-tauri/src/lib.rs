@@ -59,7 +59,39 @@ fn record_history(app: &tauri::AppHandle, batch: HistoryBatch) {
         Ok(delta) => {
             let _ = app.emit("history:updated", delta);
         }
-        Err(error) => eprintln!("{error}"),
+        Err(error) => {
+            eprintln!("{error}");
+            return;
+        }
+    }
+    if app.state::<ShotCleanup>().0.load(Ordering::SeqCst) {
+        delete_ended_raid_screenshots(app, &batch);
+    }
+}
+
+/// Whether screenshots stored for a raid are deleted once it ends; the UI owns the saved value.
+#[derive(Default)]
+struct ShotCleanup(AtomicBool);
+
+#[tauri::command]
+fn screenshot_cleanup_configure(delete_after_raid: bool, cleanup: State<'_, ShotCleanup>) {
+    cleanup.0.store(delete_after_raid, Ordering::SeqCst);
+}
+
+/// Runs only after `batch` is stored, so a file is never deleted before its position is saved.
+fn delete_ended_raid_screenshots(app: &tauri::AppHandle, batch: &HistoryBatch) {
+    let ended: Vec<_> = batch.raids.iter().filter(|raid| raid.ended_at.is_some()).collect();
+    if ended.is_empty() {
+        return;
+    }
+    let Ok(folder) = app.state::<Mutex<ScannerService>>().lock().map(|service| service.snapshot().config.screenshots) else {
+        return;
+    };
+    let history = app.state::<Arc<History>>();
+    for raid in ended {
+        if let Err(error) = history.delete_raid_screenshots(&folder, &raid.id) {
+            eprintln!("{error}");
+        }
     }
 }
 
@@ -391,6 +423,7 @@ pub fn run() {
         })
         .manage(Mutex::new(ScannerService::new()))
         .manage(ImportControl::default())
+        .manage(ShotCleanup::default())
         .setup(|app| {
             app.manage(Arc::new(History::open(app.path().app_data_dir()?.join("history.sqlite3"))));
             let store = app.path().app_data_dir()?.join("tarkov-data");
@@ -462,6 +495,7 @@ pub fn run() {
             companion_revoke,
             autoshot_status,
             autoshot_configure,
+            screenshot_cleanup_configure,
             start_import,
             cancel_import,
             commit_import,

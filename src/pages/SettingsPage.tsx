@@ -17,6 +17,7 @@ import { connectionLabel, connectionTone } from "../lib/companion";
 import { ClientList, connectionDetail, PendingPrompts } from "../components/ConnectionPanel";
 import { useNow } from "../lib/useNow";
 import type { AutoShot } from "../lib/useAutoShot";
+import type { ShotCleanup } from "../lib/useShotCleanup";
 import type { AutoShotState } from "../bindings/AutoShotState";
 import {
   clearAllData, getCleanupPlan, getHistoryStats, onHistoryReset, onHistoryUpdated, resetPreferences, runCleanup,
@@ -54,8 +55,8 @@ function Switch({ label, detail, on, disabled, onChange }: {
   </button>;
 }
 
-export function SettingsPage({ scanner, mini, connection, autoShot }: {
-  scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot;
+export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup }: {
+  scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot; shotCleanup: ShotCleanup;
 }) {
   const { snapshot, running, connected, busy, error, perform, retry } = scanner;
   const [folders, setFolders] = useState<FolderConfig>({ screenshots: "", logs: "" });
@@ -106,7 +107,7 @@ export function SettingsPage({ scanner, mini, connection, autoShot }: {
         : <p className="faint">{snapshot ? "No issues reported." : "Backend not connected."}</p>}
     </section>
 
-    <StoredDataSection />
+    <StoredDataSection shotCleanup={shotCleanup} />
     <MapDataSection />
     <TileSection />
 
@@ -131,7 +132,7 @@ function ConfirmButton({ label, confirm, busy, disabled, onConfirm }: {
     {busy ?? (asking ? confirm : label)}</button>;
 }
 
-function StoredDataSection() {
+function StoredDataSection({ shotCleanup }: { shotCleanup: ShotCleanup }) {
   const desktop = isTauri();
   const [stats, setStats] = useState<HistoryStats | null>(null);
   const [plan, setPlan] = useState<CleanupPlan | null>(null);
@@ -171,6 +172,9 @@ function StoredDataSection() {
       <div className="stat"><span>Last import</span><strong>{stats ? ago(stats.last_import_at) : "—"}</strong></div>
     </div>
     {!desktop && <p className="faint">Desktop app only.</p>}
+    <Switch label="Delete raid screenshots" detail="When a raid ends, permanently delete its screenshots. Positions stay stored."
+      on={shotCleanup.deleteAfterRaid} disabled={!desktop} onChange={shotCleanup.setDeleteAfterRaid} />
+    {shotCleanup.error && <p className="diagnostics">{shotCleanup.error}</p>}
     {plan && <>
       <div className="action-row">
         <span><strong>Imported screenshots</strong>
