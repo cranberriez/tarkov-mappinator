@@ -1,8 +1,10 @@
+mod companion;
 mod scanner;
 mod tarkov_data;
 mod tile_cache;
 mod window_anim;
 
+use companion::{model::CompanionStatus, Companion};
 use scanner::{import, FolderConfig, ScannerService, ScannerSnapshot};
 use serde_json::value::RawValue;
 use tarkov_data::{DataStatus, TarkovData};
@@ -13,24 +15,39 @@ use std::sync::{
 };
 use tauri::{Emitter, Manager, State};
 
-#[tauri::command]
+/// Scanner commands are async: the poll thread holds the scanner lock while it reads logs, and
+/// starting reads recent logs itself, so a sync command would freeze the window meanwhile.
+#[tauri::command(async)]
 fn scanner_snapshot(service: State<'_, Mutex<ScannerService>>) -> Result<ScannerSnapshot, String> {
     let service = service.lock().map_err(|_| "Scanner state unavailable")?;
     Ok(service.snapshot())
 }
 
-#[tauri::command]
+/// Sends a scanner snapshot to the UI and the companion journal. Call without the scanner lock held.
+fn publish_snapshot(app: &tauri::AppHandle, snapshot: &ScannerSnapshot) {
+    // State is authoritative; a disconnected view recovers using scanner_snapshot.
+    if let Err(error) = app.emit("scanner:updated", snapshot) {
+        eprintln!("Unable to publish scanner update: {error}");
+    }
+    let (Some(companion), Some(data)) = (app.try_state::<Arc<Companion>>(), app.try_state::<Arc<TarkovData>>()) else {
+        return;
+    };
+    let maps = data.status().manifest.map(|manifest| manifest.maps).unwrap_or_default();
+    companion.observe(snapshot, &|raw: &str| {
+        maps.iter()
+            .find(|map| map.name_id.eq_ignore_ascii_case(raw) || map.scene.eq_ignore_ascii_case(raw))
+            .map(|map| map.normalized_name.clone())
+    });
+}
+
+#[tauri::command(async)]
 fn check_folders(
     config: FolderConfig,
     app: tauri::AppHandle,
     service: State<'_, Mutex<ScannerService>>,
 ) -> Result<ScannerSnapshot, String> {
-    let mut service = service.lock().map_err(|_| "Scanner state unavailable")?;
-    let snapshot = service.check_folders(config);
-    // State is authoritative; a disconnected view recovers using scanner_snapshot.
-    if let Err(error) = app.emit("scanner:updated", &snapshot) {
-        eprintln!("Unable to publish scanner update: {error}");
-    }
+    let snapshot = service.lock().map_err(|_| "Scanner state unavailable")?.check_folders(config);
+    publish_snapshot(&app, &snapshot);
     Ok(snapshot)
 }
 
@@ -202,14 +219,29 @@ pub fn run() {
             app.manage(Arc::new(TileCache::open(tiles)));
 
             let handle = app.handle().clone();
+            let companion = Companion::new(
+                app.path().app_data_dir()?.join("companion").join("clients.json"),
+                app.package_info().version.to_string(),
+                Box::new(move |status| {
+                    let _ = handle.emit("companion:updated", status);
+                }),
+            );
+            app.manage(companion.clone());
+            // Ages connected → stale and expires pairing requests.
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                companion.tick();
+            });
+
+            let handle = app.handle().clone();
             std::thread::spawn(move || loop {
                 std::thread::sleep(std::time::Duration::from_secs(1));
                 let state = handle.state::<Mutex<ScannerService>>();
-                if let Ok(mut service) = state.lock() {
-                    if service.poll() {
-                        let _ = handle.emit("scanner:updated", service.snapshot());
-                    }
-                };
+                // Published after the lock is released.
+                let changed = state.lock().ok().and_then(|mut service| service.poll().then(|| service.snapshot()));
+                if let Some(snapshot) = changed {
+                    publish_snapshot(&handle, &snapshot);
+                }
             });
             Ok(())
         })
@@ -218,6 +250,11 @@ pub fn run() {
             check_folders,
             start_scanner,
             stop_scanner,
+            companion_status,
+            companion_start,
+            companion_stop,
+            companion_respond,
+            companion_revoke,
             start_import,
             cancel_import,
             tarkov_data_status,
@@ -239,24 +276,53 @@ pub fn run() {
         .expect("Unable to launch Tarkov Mappinator");
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn start_scanner(
     config: FolderConfig,
     app: tauri::AppHandle,
     service: State<'_, Mutex<ScannerService>>,
 ) -> Result<ScannerSnapshot, String> {
-    let mut service = service.lock().map_err(|_| "Scanner state unavailable")?;
-    let snapshot = service.start(config);
-    let _ = app.emit("scanner:updated", &snapshot);
+    let snapshot = service.lock().map_err(|_| "Scanner state unavailable")?.start(config);
+    publish_snapshot(&app, &snapshot);
     Ok(snapshot)
 }
-#[tauri::command]
+
+#[tauri::command(async)]
 fn stop_scanner(
     app: tauri::AppHandle,
     service: State<'_, Mutex<ScannerService>>,
 ) -> Result<ScannerSnapshot, String> {
-    let mut service = service.lock().map_err(|_| "Scanner state unavailable")?;
-    let snapshot = service.stop();
-    let _ = app.emit("scanner:updated", &snapshot);
+    let snapshot = service.lock().map_err(|_| "Scanner state unavailable")?.stop();
+    publish_snapshot(&app, &snapshot);
     Ok(snapshot)
+}
+
+#[tauri::command(async)]
+fn companion_status(companion: State<'_, Arc<Companion>>) -> CompanionStatus {
+    companion.status()
+}
+
+/// Starts the loopback server; a bind failure is reported in the status, not as an error.
+#[tauri::command(async)]
+fn companion_start(companion: State<'_, Arc<Companion>>) -> CompanionStatus {
+    companion.start()
+}
+
+#[tauri::command(async)]
+fn companion_stop(companion: State<'_, Arc<Companion>>) -> CompanionStatus {
+    companion.stop()
+}
+
+#[tauri::command(async)]
+fn companion_respond(
+    pairing_id: String,
+    allow: bool,
+    companion: State<'_, Arc<Companion>>,
+) -> Result<CompanionStatus, String> {
+    companion.respond(&pairing_id, allow)
+}
+
+#[tauri::command(async)]
+fn companion_revoke(client_id: String, companion: State<'_, Arc<Companion>>) -> CompanionStatus {
+    companion.revoke(&client_id)
 }

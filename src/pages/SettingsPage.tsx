@@ -12,6 +12,10 @@ import {
   type CacheStats, type PrefetchStatus,
 } from "../lib/tiles";
 import { isTauri } from "../lib/scanner";
+import type { CompanionConnection } from "../lib/useCompanion";
+import { connectionLabel, connectionTone } from "../lib/companion";
+import { ClientList, connectionDetail, PendingPrompts } from "../components/ConnectionPanel";
+import { useNow } from "../lib/useNow";
 
 const statusLabel: Record<SourceHealth["status"], string> = {
   not_configured: "Not set", available: "Accessible", missing: "Missing", not_directory: "Not a folder", unreadable: "No access",
@@ -44,7 +48,7 @@ function Switch({ label, detail, on, disabled, onChange }: {
   </button>;
 }
 
-export function SettingsPage({ scanner, mini }: { scanner: Scanner; mini: MiniMode }) {
+export function SettingsPage({ scanner, mini, connection }: { scanner: Scanner; mini: MiniMode; connection: CompanionConnection }) {
   const { snapshot, running, connected, busy, error, perform, retry } = scanner;
   const [folders, setFolders] = useState<FolderConfig>({ screenshots: "", logs: "" });
   const edited = useRef(false);
@@ -64,6 +68,8 @@ export function SettingsPage({ scanner, mini }: { scanner: Scanner; mini: MiniMo
       <Switch label="Start in mini mode" detail="Open the app as the strip next time." on={mini.startMini}
         disabled={!mini.desktop} onChange={mini.setStartMini} />
     </section>
+
+    <ConnectionSection connection={connection} />
 
     <section className="settings-section">
       <h2>Sources</h2>
@@ -99,6 +105,29 @@ export function SettingsPage({ scanner, mini }: { scanner: Scanner; mini: MiniMo
       <LogCoveragePanel snapshot={snapshot} />
     </section>
   </div>;
+}
+
+function ConnectionSection({ connection }: { connection: CompanionConnection }) {
+  const now = useNow();
+  const kind = connection.connection;
+  const detail = connectionDetail(connection, now);
+  return <section className="settings-section">
+    <h2>Site connection</h2>
+    <Switch label="Connect to Tarkov Hideout"
+      detail="Lets tarkovhideout.com, in a browser on this PC, read your quest accepts, completions and failures, your current raid (map, mode, phase), your latest screenshot position and this connection's status. Sites must be allowed here first; nothing else is shared."
+      on={connection.enabled} disabled={!connection.desktop} onChange={connection.setEnabled} />
+    {connection.enabled && <div className="connection-settings">
+      <div className="row">
+        <span className={`status ${kind === "error" ? "bad" : ""}`}><span className={`dot ${connectionTone[kind]}`} />{connectionLabel[kind]}</span>
+        {connection.status?.port && <span className="faint">Port {connection.status.port}</span>}
+        {detail && <span className={kind === "error" ? "bad-text" : "faint"}>{detail}</span>}
+        {kind === "error" && <button type="button" className="link" onClick={() => void connection.retry()}>Retry</button>}
+      </div>
+      <PendingPrompts connection={connection} />
+    </div>}
+    {connection.error && <p className="diagnostics">{connection.error}</p>}
+    {(connection.enabled || !!connection.status?.clients.length) && <ClientList connection={connection} now={now} />}
+  </section>;
 }
 
 function MapDataSection() {

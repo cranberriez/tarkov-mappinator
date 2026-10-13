@@ -4,7 +4,9 @@ import type { Scanner } from "../lib/useScanner";
 import type { MiniMode } from "../lib/useMiniMode";
 import { lifecycleLabel } from "../lib/format";
 import { mapName } from "../maps";
-import { CaretIcon, ExpandIcon, PlayIcon, StopIcon, WindowClose, WindowMaximize, WindowMinimize } from "./Icons";
+import type { CompanionConnection } from "../lib/useCompanion";
+import { connectionLabel, connectionTone, siteName } from "../lib/companion";
+import { CaretIcon, CheckIcon, ExpandIcon, LinkIcon, PlayIcon, StopIcon, WindowClose, WindowMaximize, WindowMinimize } from "./Icons";
 
 const appWindow = () => getCurrentWindow();
 
@@ -47,7 +49,7 @@ export function TitleBar({ scanner, mini }: { scanner: Scanner; mini: MiniMode }
             ? <button type="button" role="menuitem" onClick={() => { setMenu(false); void mini.setMini(true); }}>Switch to mini mode</button>
             : <button type="button" role="menuitem" disabled={!connected || !!busy}
               onClick={() => {
-                // Start after the animation: starting blocks the window thread while it reads recent logs.
+                // Start after the animation so reading recent logs doesn't compete with it.
                 setMenu(false); void mini.setMini(true).then(() => perform("start"));
               }}>Start in mini mode</button>}
         </StartMenu>}
@@ -82,16 +84,31 @@ function StartMenu({ onClose, children }: { onClose: () => void; children: React
 }
 
 /** The whole window in mini mode: drag anywhere that isn't a button. */
-export function MiniBar({ scanner, mini }: { scanner: Scanner; mini: MiniMode }) {
+export function MiniBar({ scanner, mini, connection }: { scanner: Scanner; mini: MiniMode; connection: CompanionConnection }) {
   const { running, busy, connected, error, perform } = scanner;
   const { live, text } = raidSummary(scanner);
   const status = error ? "Error" : busy === "start" ? "Starting" : busy === "stop" ? "Stopping"
     : text ?? (running ? "Monitoring" : "Stopped");
+  const request = connection.enabled ? connection.status?.pending[0] : undefined;
+  const kind = connection.connection;
 
   return <div className="mini" data-tauri-drag-region>
     <span className="brand-mark" aria-hidden="true" data-tauri-drag-region />
-    <span className={`mini-status ${live ? "live" : running ? "running" : ""} ${error ? "bad" : ""}`}
-      title={error ?? undefined} data-tauri-drag-region><span className="dot" data-tauri-drag-region />{status}</span>
+    {request
+      // A pairing request takes over the status text until answered.
+      ? <span className="mini-status attention" role="alert" title={request.origin}>
+        <span className="dot warn pulse" />{siteName(request.origin)} wants to connect</span>
+      : <span className={`mini-status ${live ? "live" : running ? "running" : ""} ${error ? "bad" : ""}`}
+        title={error ?? undefined} data-tauri-drag-region><span className="dot" data-tauri-drag-region />{status}</span>}
+    {request && <>
+      <button type="button" className="mini-button allow" aria-label="Allow" title={`Allow ${request.origin}`}
+        onClick={() => void connection.respond(request.id, true)}><CheckIcon /></button>
+      <button type="button" className="mini-button deny" aria-label="Deny" title="Deny"
+        onClick={() => void connection.respond(request.id, false)}><WindowClose /></button>
+    </>}
+    {connection.enabled && !request && <span className={`mini-connection ${connectionTone[kind]}`} role="img"
+      aria-label={`Site connection: ${connectionLabel[kind]}`} title={`Site connection: ${connectionLabel[kind]}`}
+      data-tauri-drag-region><LinkIcon /></span>}
     <button type="button" className={`mini-button ${running ? "on" : "start"}`} disabled={!connected || !!busy}
       aria-label={running ? "Stop monitoring" : "Start monitoring"} title={running ? "Stop monitoring" : "Start monitoring"}
       onClick={() => void perform(running ? "stop" : "start")}>{running ? <StopIcon /> : <PlayIcon />}</button>

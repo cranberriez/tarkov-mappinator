@@ -5,8 +5,10 @@ mod parsers;
 mod sources;
 
 use chrono::{Local, NaiveDateTime};
-pub use model::{FolderConfig, ScannerSnapshot};
-use model::{LogCoverage, MonitoringStatus, PositionObservation};
+use model::LogCoverage;
+pub use model::{
+    FolderConfig, MonitoringStatus, PositionObservation, ScannerSnapshot, SourceStatus,
+};
 use parsers::LogEvent;
 use std::{
     collections::{HashMap, HashSet, VecDeque},

@@ -3,6 +3,7 @@ import { useScanner } from "./lib/useScanner";
 import { useImport } from "./lib/useImport";
 import { MiniBar, TitleBar } from "./components/TitleBar";
 import { useMiniMode } from "./lib/useMiniMode";
+import { useCompanion } from "./lib/useCompanion";
 import { Sidebar, type Page } from "./components/Sidebar";
 import { Toasts } from "./components/Toasts";
 import { OverviewPage } from "./pages/OverviewPage";
@@ -17,6 +18,7 @@ const COLLAPSED_KEY = "sidebar-collapsed";
 export function App() {
   const scanner = useScanner();
   const mini = useMiniMode();
+  const connection = useCompanion();
   // App-level so an import keeps streaming while other pages are open.
   const importer = useImport(scanner.importHistory);
   const [page, setPage] = useState<Page>("map");
@@ -24,19 +26,19 @@ export function App() {
   useEffect(() => { localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0"); }, [collapsed]);
 
   // State above this point survives mini mode, so leaving it returns to the same page.
-  if (mini.view) return <MiniBar scanner={scanner} mini={mini} />;
+  if (mini.view) return <MiniBar scanner={scanner} mini={mini} connection={connection} />;
 
   return <div className="shell">
     <TitleBar scanner={scanner} mini={mini} />
     <div className="body">
-      <Sidebar page={page} onNavigate={setPage} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
+      <Sidebar page={page} onNavigate={setPage} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} connection={connection} />
       <main className="content">
         {page === "overview" && <OverviewPage scanner={scanner} onNavigate={setPage} />}
         {page === "map" && <MapPage scanner={scanner} />}
         {page === "timeline" && <TimelinePage scanner={scanner} />}
         {page === "activity" && <ActivityPage scanner={scanner} />}
         {page === "import" && <ImportPage scanner={scanner} importer={importer} onNavigate={setPage} />}
-        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} />}
+        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} />}
       </main>
     </div>
     <Toasts events={scanner.snapshot?.activity} />

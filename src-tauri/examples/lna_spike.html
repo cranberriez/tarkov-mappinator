@@ -1,0 +1,225 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Companion test page</title>
+<style>
+  body { font: 13px system-ui, sans-serif; margin: 16px; background: #15171a; color: #ddd; }
+  h3 { margin: 18px 0 6px; } h3:first-child { margin-top: 0; }
+  button, input { font: inherit; margin: 2px; }
+  label { margin-right: 10px; }
+  pre { background: #0d0e10; padding: 8px; height: 34vh; overflow: auto; margin: 6px 0; }
+  .bad { color: #f77; } .ok { color: #7d7; } .warn { color: #db6; } .faint { color: #888; }
+  #state { display: flex; gap: 18px; flex-wrap: wrap; }
+  #state b { font-weight: 500; color: #fff; }
+  details { margin-top: 18px; }
+</style>
+<p class="faint">Origin <b id="origin"></b> is treated as public only with
+  <code>--ip-address-space-overrides=127.0.0.1:47690=public</code>; the app accepts it in debug builds only.</p>
+
+<h3>Companion: behaves like the site</h3>
+<div id="state">
+  <span>App <b id="s-port">not found</b></span>
+  <span>Pairing <b id="s-pair">—</b></span>
+  <span>Cursor <b id="s-cursor">0</b></span>
+  <span>Raid <b id="s-raid">—</b></span>
+  <span>Polling <b id="s-poll">stopped</b></span>
+</div>
+<div>
+  <button id="find">Find app</button>
+  <button id="pair">Pair</button>
+  <button id="start">Start polling</button>
+  <button id="stop">Stop polling</button>
+  <button id="sync0">Resync from 0</button>
+  <button id="unpair">Unpair</button>
+  <button id="forget">Forget token</button>
+  <label>Idle s <input id="idle" type="number" value="30" min="1" style="width:4em"></label>
+  <label>In raid s <input id="raid" type="number" value="3" min="1" style="width:4em"></label>
+</div>
+<pre id="clog"></pre>
+
+<details>
+  <summary>Phase 0 spike: raw requests to the spike listener</summary>
+  <div>
+    <label>API <input id="api" value="http://127.0.0.1:47614" size="26"></label>
+    <label><input type="checkbox" id="auth" checked> Authorization header (forces CORS preflight)</label>
+    <label><input type="checkbox" id="space"> <code>targetAddressSpace: "loopback"</code></label>
+    <label>Extra query <input id="query" placeholder="nopna=1" size="12"></label>
+  </div>
+  <div>
+    <button id="once">Fetch once</button>
+    <label>Interval s <input id="interval" type="number" value="30" min="1" style="width:4em"></label>
+    <button id="sstart">Start polling</button>
+    <button id="sstop">Stop</button>
+    <button id="perm">Query permission</button>
+  </div>
+  <pre id="log"></pre>
+</details>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  $("origin").textContent = location.origin;
+  const t0 = performance.now();
+  const stamp = () => `${new Date().toLocaleTimeString()} [${document.visibilityState}]`;
+  const write = (target, text, cls = "") => {
+    const line = document.createElement("div");
+    line.className = cls;
+    line.textContent = `${stamp()} ${text}`;
+    $(target).prepend(line);
+  };
+
+  // ---- Companion client: the flow the real site will implement ----
+  const PORTS = [47615, 47616, 47617, 47618, 47619];
+  const store = {
+    get: () => JSON.parse(localStorage.getItem("companion-test") ?? "{}"),
+    set: (patch) => localStorage.setItem("companion-test", JSON.stringify({ ...store.get(), ...patch })),
+  };
+  const clog = (text, cls) => write("clog", text, cls);
+  let timer = null, polling = false, lastState = "";
+
+  function render() {
+    const s = store.get();
+    $("s-port").textContent = s.port ?? "not found";
+    $("s-pair").textContent = s.token ? "paired" : "not paired";
+    $("s-cursor").textContent = s.cursor ?? 0;
+    $("s-poll").textContent = polling ? "on" : "stopped";
+  }
+
+  async function api(method, path, { token, port = store.get().port } = {}) {
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const response = await fetch(`http://127.0.0.1:${port}${path}`, { method, headers, cache: "no-store" });
+    const text = await response.text();
+    return { status: response.status, body: text ? JSON.parse(text) : null };
+  }
+
+  async function find() {
+    for (const port of [store.get().port, ...PORTS].filter(Boolean)) {
+      try {
+        const { status, body } = await api("GET", "/v1/status", { port });
+        if (status === 200 && body?.app === "tarkov-mappinator") {
+          store.set({ port }); render();
+          clog(`Found app ${body.version} (protocol ${body.protocol}) on ${port}`, "ok");
+          return port;
+        }
+        clog(`Port ${port}: ${status} ${JSON.stringify(body)}`, "bad");
+      } catch { /* closed */ }
+    }
+    clog("App not found. Is Site connection enabled?", "bad");
+    return null;
+  }
+
+  async function pair() {
+    if (!store.get().port && !(await find())) return;
+    const requested = await api("POST", "/v1/pair");
+    if (requested.status !== 202) { clog(`Pairing refused: ${requested.status} ${requested.body?.error}`, "bad"); return; }
+    const id = requested.body.pairing_id;
+    clog(`Waiting for Allow/Deny in the app (expires in ${requested.body.expires_in_secs}s)…`, "warn");
+    for (;;) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const { body } = await api("GET", `/v1/pair/${id}`);
+      if (body?.state === "pending") continue;
+      if (body?.state === "allowed") {
+        store.set({ token: body.token, cursor: 0, epoch: null }); render();
+        clog("Allowed. Token stored.", "ok");
+        start();
+      } else clog(`Pairing ${body?.state}.`, "bad");
+      return;
+    }
+  }
+
+  function describe(e) {
+    const where = (map) => map ? (map.normalized_name ?? map.raw) : "?";
+    const tail = [e.recovered && "recovered", e.mode].filter(Boolean).join(", ");
+    const what = e.kind === "quest" ? `quest ${e.action} ${e.quest_id}`
+      : e.kind === "raid" ? `raid ${e.phase} ${where(e.map)}`
+      : `position ${where(e.map)} ${e.x.toFixed(1)}, ${e.y.toFixed(1)}, ${e.z.toFixed(1)} yaw ${e.yaw?.toFixed(0) ?? "?"}`;
+    return `#${e.seq} ${what}${tail ? ` (${tail})` : ""}`;
+  }
+
+  async function syncOnce() {
+    const s = store.get();
+    if (!s.token) { clog("Not paired.", "bad"); stop(); return null; }
+    let response;
+    try { response = await api("GET", `/v1/sync?since=${s.cursor ?? 0}`, { token: s.token }); }
+    catch (error) { clog(`Request failed: ${error}`, "bad"); return null; }
+    if (response.status === 401) {
+      clog(`Rejected (${response.body?.error}): revoked in the app. Pair again.`, "bad");
+      store.set({ token: null }); stop(); render(); return null;
+    }
+    if (response.status === 400 && response.body?.error === "bad_cursor") {
+      clog("Cursor ahead of the app (restarted). Resyncing from 0.", "warn");
+      store.set({ cursor: 0, epoch: null }); return syncOnce();
+    }
+    if (response.status !== 200) { clog(`${response.status} ${JSON.stringify(response.body)}`, "bad"); return null; }
+    const sync = response.body;
+    if (s.epoch && sync.epoch !== s.epoch) {
+      clog("App restarted (new epoch). Resyncing from 0.", "warn");
+      store.set({ cursor: 0, epoch: sync.epoch }); return syncOnce();
+    }
+    for (const event of sync.events) clog(describe(event));
+    store.set({ cursor: sync.seq, epoch: sync.epoch });
+    const raid = sync.state.raid;
+    $("s-raid").textContent = raid ? `${raid.phase} ${raid.map?.normalized_name ?? raid.map?.raw ?? ""}` : "none";
+    const state = JSON.stringify(sync.state);
+    if (state !== lastState) { clog(`state: ${state}`, "faint"); lastState = state; }
+    render();
+    return sync;
+  }
+
+  async function loop() {
+    if (!polling) return;
+    const sync = await syncOnce();
+    if (!polling) return;
+    const seconds = Number(sync?.state.raid?.phase === "in_raid" ? $("raid").value : $("idle").value);
+    timer = setTimeout(loop, seconds * 1000);
+  }
+  function start() { if (polling) return; polling = true; render(); clog("Polling started."); loop(); }
+  function stop() { clearTimeout(timer); polling = false; render(); }
+
+  // Catch up as soon as the tab is visible again, as the site will.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && polling) { clearTimeout(timer); loop(); }
+  });
+
+  $("find").onclick = find;
+  $("pair").onclick = pair;
+  $("start").onclick = start;
+  $("stop").onclick = () => { stop(); clog("Polling stopped."); };
+  $("sync0").onclick = () => { store.set({ cursor: 0 }); syncOnce(); };
+  $("unpair").onclick = async () => {
+    const { status } = await api("DELETE", "/v1/pair", { token: store.get().token });
+    clog(`Unpair: ${status}`, status === 204 ? "ok" : "bad");
+    store.set({ token: null }); stop();
+  };
+  $("forget").onclick = () => { store.set({ token: null, cursor: 0, epoch: null }); stop(); clog("Token forgotten (the app still lists the client)."); };
+  render();
+  if (store.get().token) start(); else find();
+
+  // ---- Phase 0 spike ----
+  let spikeTimer = null, spikeLast = null, count = 0;
+  const log = (text, cls) => write("log", `+${((performance.now() - t0) / 1000).toFixed(1)}s ${text}`, cls);
+  async function hit() {
+    const now = performance.now();
+    const gap = spikeLast == null ? "-" : `${((now - spikeLast) / 1000).toFixed(1)}s`;
+    spikeLast = now; count++;
+    const extra = $("query").value.trim();
+    const url = `${$("api").value}/v1/status?n=${count}${extra ? "&" + extra : ""}`;
+    const init = { cache: "no-store" };
+    if ($("auth").checked) init.headers = { Authorization: "Bearer spike" };
+    if ($("space").checked) init.targetAddressSpace = "loopback";
+    try {
+      const response = await fetch(url, init);
+      log(`#${count} gap ${gap} ${response.status} ${await response.text()}`, response.ok ? "ok" : "bad");
+    } catch (error) {
+      log(`#${count} gap ${gap} FAILED ${error}`, "bad");
+    }
+  }
+  async function chain() { await hit(); spikeTimer = setTimeout(chain, Number($("interval").value) * 1000); }
+  $("once").onclick = hit;
+  $("sstart").onclick = () => { clearTimeout(spikeTimer); spikeLast = null; chain(); };
+  $("sstop").onclick = () => { clearTimeout(spikeTimer); log("stopped"); };
+  $("perm").onclick = async () => {
+    for (const name of ["local-network-access", "loopback-network", "local-network"]) {
+      try { log(`permission ${name}: ${(await navigator.permissions.query({ name })).state}`); }
+      catch (error) { log(`permission ${name}: ${error.message}`); }
+    }
+  };
+</script>
