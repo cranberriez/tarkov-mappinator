@@ -2,10 +2,14 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: "127.0.0.1", port: 1420, strictPort: true,
-    watch: { ignored: ["**/src-tauri/**", "**/.local/**"] },
-  },
-  clearScreen: false,
+	plugins: [react()],
+	server: {
+		host: "127.0.0.1",
+		port: 1420,
+		strictPort: true,
+		watch: { ignored: ["**/src-tauri/**", "**/.local/**"] },
+	},
+	// Emit every asset as a file: inlined `data:` URLs are blocked by the Tauri CSP's img-src.
+	build: { assetsInlineLimit: 0 },
+	clearScreen: false,
 });
