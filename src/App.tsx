@@ -3,6 +3,7 @@ import { useScanner } from "./lib/useScanner";
 import { useImport } from "./lib/useImport";
 import { MiniBar, TitleBar } from "./components/TitleBar";
 import { useMiniMode } from "./lib/useMiniMode";
+import { useAutoShot } from "./lib/useAutoShot";
 import { useCompanion } from "./lib/useCompanion";
 import { Sidebar, type Page } from "./components/Sidebar";
 import { Toasts } from "./components/Toasts";
@@ -19,6 +20,7 @@ export function App() {
   const scanner = useScanner();
   const mini = useMiniMode();
   const connection = useCompanion();
+  const autoShot = useAutoShot();
   // App-level so an import keeps streaming while other pages are open.
   const importer = useImport(scanner.importHistory);
   const [page, setPage] = useState<Page>("map");
@@ -38,7 +40,7 @@ export function App() {
         {page === "timeline" && <TimelinePage scanner={scanner} />}
         {page === "activity" && <ActivityPage scanner={scanner} />}
         {page === "import" && <ImportPage scanner={scanner} importer={importer} onNavigate={setPage} />}
-        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} />}
+        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} />}
       </main>
     </div>
     <Toasts events={scanner.snapshot?.activity} />

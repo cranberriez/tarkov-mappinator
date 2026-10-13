@@ -15,7 +15,7 @@ use std::{
     fs,
     io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 struct Tail {
@@ -36,7 +36,14 @@ pub struct ScannerService {
     pending_screenshots: HashMap<PathBuf, (u64, SystemTime)>,
     activity_seen: HashSet<u64>,
     activity_order: VecDeque<u64>,
+    /// App-sent screenshot key presses not yet matched to a file; see `note_auto_press`.
+    auto_presses: Vec<SystemTime>,
 }
+
+/// A screenshot file created this soon after an app-sent press is taken to be that press's capture.
+const AUTO_SHOT_WINDOW: Duration = Duration::from_secs(5);
+const CLOCK_SLACK: Duration = Duration::from_millis(100);
+
 impl ScannerService {
     pub fn new() -> Self {
         let time = SystemTime::now()
@@ -57,7 +64,29 @@ impl ScannerService {
             pending_screenshots: HashMap::new(),
             activity_seen: HashSet::new(),
             activity_order: VecDeque::new(),
+            auto_presses: Vec::new(),
         }
+    }
+    /// Monitoring is on and the logs show a raid in progress.
+    pub fn in_live_raid(&self) -> bool {
+        self.snapshot.monitoring == MonitoringStatus::Running && self.snapshot.raid.lifecycle == "active"
+    }
+    /// Records an app-sent screenshot key press. The first position screenshot created within
+    /// `AUTO_SHOT_WINDOW` after it is deleted once parsed.
+    pub fn note_auto_press(&mut self, at: SystemTime) {
+        self.auto_presses.push(at);
+    }
+    /// Consumes the press a file was created for, if any. Ambiguous when a manual capture lands in
+    /// the same window: the earliest file created after the press is claimed.
+    fn claim_auto_shot(&mut self, meta: &fs::Metadata) -> bool {
+        let Ok(created) = meta.created().or_else(|_| meta.modified()) else {
+            return false;
+        };
+        // File times come from a coarse clock and can read slightly before the press itself.
+        let claimed = self.auto_presses.iter().position(|press| {
+            created.duration_since(*press - CLOCK_SLACK).is_ok_and(|after| after <= AUTO_SHOT_WINDOW + CLOCK_SLACK)
+        });
+        claimed.map(|index| self.auto_presses.remove(index)).is_some()
     }
     pub fn snapshot(&self) -> ScannerSnapshot {
         self.snapshot.clone()
@@ -176,6 +205,10 @@ impl ScannerService {
             return false;
         }
         let before = self.snapshot.clone();
+        // Presses whose file never arrived (game ignored the key, not focused, ...) expire.
+        let now = SystemTime::now();
+        self.auto_presses
+            .retain(|press| now.duration_since(*press).map_or(true, |age| age <= AUTO_SHOT_WINDOW * 2));
         self.snapshot.logs = sources::probe_directory(&self.snapshot.config.logs);
         self.snapshot.screenshots = sources::probe_directory(&self.snapshot.config.screenshots);
         self.poll_logs(false);
@@ -217,6 +250,12 @@ impl ScannerService {
                 .to_string_lossy()
                 .into_owned();
             let result = parsers::position_filename(&name);
+            if result.is_ok() && self.claim_auto_shot(&meta) {
+                // Position is in the filename; the image itself is never used.
+                if let Err(error) = fs::remove_file(&path) {
+                    self.diagnostic(format!("Unable to delete auto-screenshot {name}: {error}"));
+                }
+            }
             match result {
                 Ok(position)
                     if position.captured >= self.boundary
@@ -825,6 +864,27 @@ mod tests {
         let position = parsers::position_filename(name).unwrap();
         assert_eq!(position.xyz, [176.89, 4.38, 164.86]);
         assert!(parsers::position_filename("unknown.png").is_err());
+    }
+    #[test]
+    fn deletes_only_files_created_after_an_auto_press() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut service = ScannerService::new();
+        service.start(FolderConfig { screenshots: dir.path().to_string_lossy().into(), logs: String::new() });
+        let later = (Local::now() + chrono::Duration::minutes(-1)).format("%Y-%m-%d[%H-%M]");
+        service.boundary = Local::now().naive_local() - chrono::Duration::minutes(5);
+        let manual = format!("{later}_1.0, 2.0, 3.0_0.0, 0.0, 0.0, 1.0_0.00 (0).png");
+        fs::write(dir.path().join(&manual), "").unwrap();
+        service.poll();
+        service.poll();
+        service.note_auto_press(SystemTime::now());
+        let auto = format!("{later}_4.0, 5.0, 6.0_0.0, 0.0, 0.0, 1.0_0.00 (1).png");
+        fs::write(dir.path().join(&auto), "").unwrap();
+        service.poll();
+        service.poll();
+        assert!(dir.path().join(&manual).exists());
+        assert!(!dir.path().join(&auto).exists());
+        assert_eq!(service.snapshot.latest_position.unwrap().xyz, [4.0, 5.0, 6.0]);
+        assert!(service.auto_presses.is_empty());
     }
     fn setup_logs(fixture: &str) -> (tempfile::TempDir, ScannerService) {
         let dir = tempfile::tempdir().unwrap();

@@ -29,6 +29,10 @@ Existing logs can recover context when starting mid-raid, explicitly marked reco
 
 Preferences across app restarts, tray behavior, and saved markers remain out of scope.
 
+## Auto-screenshot
+
+Experimental and a ban risk: optional, off by default, and turned on only past a warning (Settings). While monitoring shows a live raid and the foreground window is titled `EscapeFromTarkov`, the app taps the configured key as a hardware scancode after a random 5–15 s wait (millisecond resolution, not configurable), holding it for a random 40–120 ms. A screenshot file created within 5 s of a press is attributed to it and, if enabled, deleted once its filename is parsed; a manual capture in that window can be claimed instead. This sends synthetic input to the game, unlike the rest of the app: Windows flags it as injected (`LLKHF_INJECTED`), and the EULA (4.2.11, 4.3.4) prohibits automated scripts acting on the game.
+
 ## Log activity
 
 Quest acceptance and completion notifications are validated against local captures. The parser uses the numeric message type, quest template ID, and original message timestamp; notification text can be misleading. Replayed notifications are deduplicated, and recovered history is labeled. Failure notifications are supported from corroborating protocol evidence and synthetic tests, but no real local failure notification has been captured yet. A quest-failure HTTP request is shown separately without claiming a quest ID or successful failure.

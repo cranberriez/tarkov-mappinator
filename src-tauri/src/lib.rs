@@ -1,9 +1,11 @@
+mod autoshot;
 mod companion;
 mod scanner;
 mod tarkov_data;
 mod tile_cache;
 mod window_anim;
 
+use autoshot::{AutoShot, AutoShotConfig, AutoShotStatus};
 use companion::{model::CompanionStatus, Companion};
 use scanner::{import, FolderConfig, ScannerService, ScannerSnapshot};
 use serde_json::value::RawValue;
@@ -234,6 +236,22 @@ pub fn run() {
             });
 
             let handle = app.handle().clone();
+            let autoshot = AutoShot::new(Box::new(move |status| {
+                let _ = handle.emit("autoshot:updated", status);
+            }));
+            app.manage(autoshot.clone());
+            let (raid, press) = (app.handle().clone(), app.handle().clone());
+            autoshot::spawn(
+                autoshot,
+                move || raid.state::<Mutex<ScannerService>>().lock().is_ok_and(|service| service.in_live_raid()),
+                move |at| {
+                    if let Ok(mut service) = press.state::<Mutex<ScannerService>>().lock() {
+                        service.note_auto_press(at);
+                    }
+                },
+            );
+
+            let handle = app.handle().clone();
             std::thread::spawn(move || loop {
                 std::thread::sleep(std::time::Duration::from_secs(1));
                 let state = handle.state::<Mutex<ScannerService>>();
@@ -255,6 +273,8 @@ pub fn run() {
             companion_stop,
             companion_respond,
             companion_revoke,
+            autoshot_status,
+            autoshot_configure,
             start_import,
             cancel_import,
             tarkov_data_status,
@@ -325,4 +345,14 @@ fn companion_respond(
 #[tauri::command(async)]
 fn companion_revoke(client_id: String, companion: State<'_, Arc<Companion>>) -> CompanionStatus {
     companion.revoke(&client_id)
+}
+
+#[tauri::command]
+fn autoshot_status(autoshot: State<'_, Arc<AutoShot>>) -> AutoShotStatus {
+    autoshot.status()
+}
+
+#[tauri::command]
+fn autoshot_configure(config: AutoShotConfig, autoshot: State<'_, Arc<AutoShot>>) -> Result<AutoShotStatus, String> {
+    autoshot.configure(config)
 }

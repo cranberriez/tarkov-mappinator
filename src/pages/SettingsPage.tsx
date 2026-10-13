@@ -16,6 +16,8 @@ import type { CompanionConnection } from "../lib/useCompanion";
 import { connectionLabel, connectionTone } from "../lib/companion";
 import { ClientList, connectionDetail, PendingPrompts } from "../components/ConnectionPanel";
 import { useNow } from "../lib/useNow";
+import type { AutoShot } from "../lib/useAutoShot";
+import type { AutoShotState } from "../bindings/AutoShotState";
 
 const statusLabel: Record<SourceHealth["status"], string> = {
   not_configured: "Not set", available: "Accessible", missing: "Missing", not_directory: "Not a folder", unreadable: "No access",
@@ -48,7 +50,9 @@ function Switch({ label, detail, on, disabled, onChange }: {
   </button>;
 }
 
-export function SettingsPage({ scanner, mini, connection }: { scanner: Scanner; mini: MiniMode; connection: CompanionConnection }) {
+export function SettingsPage({ scanner, mini, connection, autoShot }: {
+  scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot;
+}) {
   const { snapshot, running, connected, busy, error, perform, retry } = scanner;
   const [folders, setFolders] = useState<FolderConfig>({ screenshots: "", logs: "" });
   const edited = useRef(false);
@@ -70,6 +74,7 @@ export function SettingsPage({ scanner, mini, connection }: { scanner: Scanner; 
     </section>
 
     <ConnectionSection connection={connection} />
+    <AutoShotSection autoShot={autoShot} />
 
     <section className="settings-section">
       <h2>Sources</h2>
@@ -212,5 +217,62 @@ function TileSection() {
       <button type="button" className="secondary" disabled={!desktop || running || !stats?.files}
         onClick={() => act(clearTileCache())}>Clear tiles</button>
     </div>
+  </section>;
+}
+
+const shotLabel: Record<AutoShotState, string> = { off: "Off", waiting: "Waiting", armed: "Capturing", error: "Error" };
+const shotTone: Record<AutoShotState, string> = { off: "", waiting: "warn", armed: "ok", error: "bad" };
+/** `KeyboardEvent.code` as printed on the key. */
+const keyName = (code: string) => code.replace(/^Key|^Digit/, "").replace("PrintScreen", "Print Screen");
+
+function KeyCapture({ value, disabled, onChange }: { value: string; disabled?: boolean; onChange: (code: string) => void }) {
+  const [listening, setListening] = useState(false);
+  useEffect(() => {
+    if (!listening) return;
+    // Windows swallows Print Screen's keydown, so keyup is accepted too.
+    const take = (event: KeyboardEvent) => {
+      event.preventDefault();
+      if (event.code !== "Escape") onChange(event.code);
+      setListening(false);
+    };
+    window.addEventListener("keydown", take);
+    window.addEventListener("keyup", take);
+    return () => { window.removeEventListener("keydown", take); window.removeEventListener("keyup", take); };
+  }, [listening, onChange]);
+  return <button type="button" className="secondary key-capture" disabled={disabled} onClick={() => setListening(true)}>
+    {listening ? "Press a key…" : keyName(value)}</button>;
+}
+
+function AutoShotSection({ autoShot }: { autoShot: AutoShot }) {
+  const { desktop, config, status, error, setConfig } = autoShot;
+  const now = useNow();
+  const state = status?.state ?? "off";
+  const next = status?.next_at ? Math.max(0, Math.ceil((Date.parse(status.next_at) - now) / 1000)) : null;
+  // Turning on takes a second, explicit click past the risk warning.
+  const [confirming, setConfirming] = useState(false);
+  return <section className="settings-section">
+    <h2>Auto-screenshot <span className="experimental">Experimental</span></h2>
+    <p className="warn-text section-note">Risks a ban. Sends key presses that Windows marks as injected, and Tarkov's terms
+      prohibit automated scripts acting on the game.</p>
+    <Switch label="Auto-screenshot" detail="Presses your in-game screenshot key every 5–15s, at random, during raids while the game is in front."
+      on={config.enabled || confirming} disabled={!desktop}
+      onChange={(enabled) => enabled ? setConfirming(true) : (setConfirming(false), setConfig({ enabled: false }))} />
+    {confirming && <div className="form-actions">
+      <button type="button" className="secondary danger" onClick={() => { setConfirming(false); setConfig({ enabled: true }); }}>Turn on anyway</button>
+      <button type="button" className="link" onClick={() => setConfirming(false)}>Cancel</button>
+    </div>}
+    {config.enabled && <div className="connection-settings">
+      <div className="row autoshot-row">
+        <KeyCapture value={config.key} disabled={!desktop} onChange={(key) => setConfig({ key })} />
+      </div>
+      <div className="row">
+        <span className={`status ${state === "error" ? "bad" : ""}`}><span className={`dot ${shotTone[state]}`} />{shotLabel[state]}</span>
+        <span className={state === "error" ? "bad-text" : "faint"}>{state === "armed" && next !== null ? `Next in ${next}s` : status?.detail}</span>
+        {!!status?.presses && <span className="faint">{status.presses} taken</span>}
+      </div>
+    </div>}
+    {config.enabled && <Switch label="Delete after reading" detail="Removes screenshots taken by this, once their position is read."
+      on={config.delete_after} disabled={!desktop} onChange={(delete_after) => setConfig({ delete_after })} />}
+    {error && <p className="diagnostics">{error}</p>}
   </section>;
 }

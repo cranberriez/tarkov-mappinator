@@ -556,3 +556,8 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .mini-connection svg { width: 15px; height: 15px; }
 .connection-settings { display: flex; flex-direction: column; gap: 12px; max-width: 560px; font-size: 12px; }
 .connection-settings .row { display: flex; align-items: center; gap: 14px; }
+.autoshot-row { flex-wrap: wrap; }
+.key-capture { min-width: 110px; }
+.experimental { margin-left: 8px; font-size: 11px; font-weight: 500; color: var(--warn); }
+.warn-text { color: var(--warn); }
+.secondary.danger { color: var(--bad); }
