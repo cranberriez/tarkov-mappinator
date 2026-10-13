@@ -276,7 +276,8 @@ input:disabled { opacity: .55; }
 .tile-grid { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
   grid-auto-rows: min-content; gap: 4px; padding: 3px 3px 16px; margin: -3px; align-content: start; scrollbar-gutter: stable; }
 .tile { position: relative; aspect-ratio: 1; border-radius: 5px; overflow: hidden; background: var(--surface-hover);
-  animation: tile-in .25s ease-out both; transition: opacity .25s, filter .25s; }
+  animation: tile-in .25s ease-out both; transition: opacity .25s, filter .25s;
+  content-visibility: auto; contain-intrinsic-size: auto 58px; }
 .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tile.log { display: flex; flex-direction: column; justify-content: space-between; padding: 6px; }
 .tile-source { font: 600 10px var(--mono); letter-spacing: .04em; color: var(--muted); }

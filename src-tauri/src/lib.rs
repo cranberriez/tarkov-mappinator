@@ -3,6 +3,7 @@ mod companion;
 mod history;
 mod scanner;
 mod tarkov_data;
+mod thumb;
 mod tile_cache;
 mod window_anim;
 
@@ -15,7 +16,9 @@ use scanner::{
 };
 use serde_json::value::RawValue;
 use tarkov_data::{DataStatus, TarkovData};
+use thumb::ThumbCache;
 use tile_cache::{CacheStats, PrefetchStatus, Tile, TileCache, TileJob};
+use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
@@ -102,7 +105,7 @@ fn start_import(
     if let Ok(mut pending) = control.pending.lock() {
         *pending = None;
     }
-    // Thumbnails load the screenshots themselves through the asset protocol.
+    // Previews are only served for files in this folder (see `serve_thumb`).
     if !config.screenshots.is_empty() {
         if let Err(error) = app.asset_protocol_scope().allow_directory(&config.screenshots, false) {
             eprintln!("Unable to allow screenshot previews: {error}");
@@ -131,10 +134,18 @@ fn commit_import(
     app: tauri::AppHandle,
     control: State<'_, ImportControl>,
     history: State<'_, Arc<History>>,
+    thumbs: State<'_, ThumbCache>,
 ) -> Result<(), String> {
     let pending = control.pending.lock().map_err(|_| "Import state unavailable")?.take();
     let (result, files) = pending.ok_or("Nothing to import; scan again.")?;
     history.import(&result, &files)?;
+    // Committed screenshots leave the Import page for good, so their previews are dead weight.
+    thumbs.forget(
+        files
+            .iter()
+            .filter(|file| file.kind == import::ImportFileKind::Screenshot)
+            .map(|file| std::path::Path::new(&file.path)),
+    );
     history_reset(&app);
     Ok(())
 }
@@ -189,7 +200,7 @@ fn cleanup_run(
     history.cleanup(&source_folders(&service)?, kind)
 }
 
-/// Deletes everything the app stored: history, map tiles, map data and paired sites.
+/// Deletes everything the app stored: history, map tiles, screenshot previews, map data and paired sites.
 /// Preferences live in the webview and are reset by the UI. Map data downloads again.
 #[tauri::command(async)]
 fn clear_all_data(
@@ -197,6 +208,7 @@ fn clear_all_data(
     control: State<'_, ImportControl>,
     history: State<'_, Arc<History>>,
     tiles: State<'_, Arc<TileCache>>,
+    thumbs: State<'_, ThumbCache>,
     data: State<'_, Arc<TarkovData>>,
     companion: State<'_, Arc<Companion>>,
 ) -> Result<(), String> {
@@ -204,6 +216,7 @@ fn clear_all_data(
         return Err("Cancel the running import first.".into());
     }
     tiles.clear()?;
+    thumbs.clear()?;
     let status = data.clear()?;
     let _ = app.emit("tarkov-data:updated", status);
     companion.revoke_all();
@@ -321,6 +334,27 @@ fn serve_tile(tiles: Arc<TileCache>, path: String) -> tauri::http::Response<Vec<
     .expect("static response parts")
 }
 
+/// `thumb://localhost/<encoded path>` (`http://thumb.localhost/...` on Windows): JPEG preview of a
+/// screenshot, only for files the asset protocol scope allows (the import's screenshots folder).
+fn serve_thumb(app: &tauri::AppHandle, thumbs: &ThumbCache, encoded: &str) -> tauri::http::Response<Vec<u8>> {
+    let response = tauri::http::Response::builder().header("Access-Control-Allow-Origin", "*");
+    let Ok(path) = percent_encoding::percent_decode_str(encoded).decode_utf8().map(|path| PathBuf::from(path.as_ref())) else {
+        return response.status(400).body(Vec::new()).expect("static response parts");
+    };
+    if !app.asset_protocol_scope().is_allowed(&path) {
+        return response.status(403).body(Vec::new()).expect("static response parts");
+    }
+    match thumbs.get(&path) {
+        Ok(bytes) => response
+            .status(200)
+            .header("Content-Type", "image/jpeg")
+            .header("Cache-Control", "max-age=604800")
+            .body(bytes),
+        Err(error) => response.status(502).body(error.into_bytes()),
+    }
+    .expect("static response parts")
+}
+
 /// Checks tarkov.dev at startup and whenever the last check is older than `tarkov_data::MAX_AGE`.
 fn spawn_data_sync(app: tauri::AppHandle, data: Arc<TarkovData>) {
     std::thread::spawn(move || loop {
@@ -344,6 +378,17 @@ pub fn run() {
             };
             std::thread::spawn(move || responder.respond(serve_tile(tiles, path)));
         })
+        .register_asynchronous_uri_scheme_protocol("thumb", |context, request, responder| {
+            let encoded = request.uri().path().trim_start_matches('/').to_owned();
+            let app = context.app_handle().clone();
+            std::thread::spawn(move || {
+                let response = match app.try_state::<ThumbCache>() {
+                    Some(thumbs) => serve_thumb(&app, &thumbs, &encoded),
+                    None => tauri::http::Response::builder().status(503).body(Vec::new()).unwrap(),
+                };
+                responder.respond(response);
+            });
+        })
         .manage(Mutex::new(ScannerService::new()))
         .manage(ImportControl::default())
         .setup(|app| {
@@ -354,6 +399,7 @@ pub fn run() {
             spawn_data_sync(app.handle().clone(), data);
             let tiles = app.path().app_data_dir()?.join("tile-cache");
             app.manage(Arc::new(TileCache::open(tiles)));
+            app.manage(ThumbCache::open(app.path().app_data_dir()?.join("thumb-cache")));
 
             let handle = app.handle().clone();
             let companion = Companion::new(

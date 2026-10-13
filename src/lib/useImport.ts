@@ -12,7 +12,7 @@ export type ImportTile = ImportFile & { raid_id: string | null; detail: string |
 /** Delay that lets the import animation play before data lands. */
 const IMPORT_ANIMATION_MS = 2000;
 
-export const previewSrc = (path: string) => (isTauri() && path ? convertFileSrc(path) : undefined);
+export const previewSrc = (path: string) => (isTauri() && path ? convertFileSrc(path, "thumb") : undefined);
 
 export function useImport() {
   const desktop = isTauri();
