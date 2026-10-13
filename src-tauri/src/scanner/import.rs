@@ -190,9 +190,10 @@ fn minute(time: NaiveDateTime) -> NaiveDateTime {
     time.with_second(0).and_then(|t| t.with_nanosecond(0)).unwrap_or(time)
 }
 
-/// Index of the raid a capture belongs to. Captures have minute precision, so raid
-/// bounds are compared at minute resolution. `raids` must be sorted by start.
+/// Index of the raid a capture belongs to. Captures are matched at the filename's minute precision,
+/// so raid bounds are compared at minute resolution. `raids` must be sorted by start.
 pub fn raid_for_capture(captured: NaiveDateTime, raids: &[RaidRecord]) -> Option<usize> {
+    let captured = minute(captured);
     let parse = |value: &str| NaiveDateTime::parse_from_str(value, LOG_TIMESTAMP).ok();
     let index = raids
         .iter()
@@ -390,7 +391,8 @@ pub fn run(config: &FolderConfig, known: &Known, cancel: &AtomicBool, mut emit: 
             cancelled = true;
             break;
         }
-        match parsers::position_filename(&file.name) {
+        let modified = stamp.as_ref().map(|stamp| UNIX_EPOCH + std::time::Duration::from_millis(stamp.modified.max(0) as u64));
+        match parsers::position_file(&file.name, modified) {
             Err(reason) => {
                 batch.push(file.id, ImportFileStatus::Skipped, None, Some(reason.into()));
                 read.extend(stamp.clone());
@@ -415,7 +417,7 @@ pub fn run(config: &FolderConfig, known: &Known, cancel: &AtomicBool, mut emit: 
                             .earliest()
                             .map(|t| t.to_rfc3339())
                             .unwrap_or_default(),
-                        captured_at: Some(position.captured.to_string()),
+                        captured_at: Some(parsers::capture_text(&position.captured)),
                         raid_id: Some(raid_id.clone()),
                         filename: file.name.clone(),
                     });

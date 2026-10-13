@@ -1,6 +1,6 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Duration, Local, NaiveDateTime};
 use regex::Regex;
-use std::sync::LazyLock;
+use std::{sync::LazyLock, time::SystemTime};
 
 #[derive(Debug, PartialEq)]
 pub enum LogEvent {
@@ -91,6 +91,23 @@ pub struct ParsedPosition {
     pub xyz: [f64; 3],
     pub quaternion: [f64; 4],
     pub heading_degrees: Option<f64>,
+}
+
+/// A screenshot's position, timed by the file's modified time when that falls in the filename's minute:
+/// the filename alone cannot order several shots taken within a minute. A modified time outside it means
+/// the file was copied, restored or synced later, so the filename's minute is kept.
+pub fn position_file(filename: &str, modified: Option<SystemTime>) -> Result<ParsedPosition, &'static str> {
+    let mut position = position_filename(filename)?;
+    let modified = modified.map(|time| DateTime::<Local>::from(time).naive_local());
+    if let Some(modified) = modified.filter(|time| (position.captured..position.captured + Duration::minutes(1)).contains(time)) {
+        position.captured = modified;
+    }
+    Ok(position)
+}
+
+/// Stored capture time, to the millisecond like log timestamps.
+pub fn capture_text(captured: &NaiveDateTime) -> String {
+    captured.format("%Y-%m-%d %H:%M:%S%.3f").to_string()
 }
 
 pub fn position_filename(filename: &str) -> Result<ParsedPosition, &'static str> {
@@ -204,6 +221,21 @@ mod tests {
         }) {
             assert!(log_record(line).is_none());
         }
+    }
+
+    #[test]
+    fn modified_time_orders_captures_only_within_the_filename_minute() {
+        let name = "2026-10-11[11-06]_176.89, 4.38, 164.86_-0.00534, 0.99448, -0.06416, -0.08281_9.79 (0).png";
+        let at = |time: &str| {
+            let local = NaiveDateTime::parse_from_str(time, "%Y-%m-%d %H:%M:%S%.f").unwrap();
+            Some(SystemTime::from(local.and_local_timezone(Local).unwrap()))
+        };
+        let captured = |modified| capture_text(&position_file(name, modified).unwrap().captured);
+        assert_eq!(captured(at("2026-10-11 11:06:50.25")), "2026-10-11 11:06:50.250");
+        // Copied or synced later, or no modified time: the filename's minute.
+        assert_eq!(captured(at("2026-10-12 09:00:00")), "2026-10-11 11:06:00.000");
+        assert_eq!(captured(at("2026-10-11 11:07:00")), "2026-10-11 11:06:00.000");
+        assert_eq!(captured(None), "2026-10-11 11:06:00.000");
     }
 
     #[test]

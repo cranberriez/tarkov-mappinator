@@ -17,6 +17,12 @@ export function freshness(observedAt: string, now: number, window = 120_000): nu
 /** Map plane: world X → right, world Z → up (screen Y is inverted). */
 export const toPlane = (position: PositionObservation) => ({ x: position.xyz[0], y: -position.xyz[2] });
 
+/** Capture order: filename capture minute, then receipt time. */
+export function inCaptureOrder(positions: PositionHistory): PositionHistory {
+  const time = (value: string | null) => value ? Date.parse(value.replace(" ", "T")) || 0 : 0;
+  return [...positions].sort((a, b) => time(a.captured_at) - time(b.captured_at) || time(a.observed_at) - time(b.observed_at));
+}
+
 const captureOrder = (position: PositionObservation) =>
   Date.parse((position.captured_at ?? position.observed_at).replace(" ", "T")) || 0;
 

@@ -251,6 +251,8 @@ input:disabled { opacity: .55; }
 /* Start/end echo the in-game "Get ready" orange and "Extracted" green. */
 .tl-point.first { stroke: #e9a04a; stroke-width: 10; }
 .tl-point.last { stroke: #8fd17a; stroke-width: 11; }
+.tl-open { display: block; width: 100%; padding: 0; border-radius: var(--radius); }
+.tl-open:hover .tl-map { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 14%); }
 .tl-empty { padding: 4px 0; color: var(--muted); }
 
 /* Import */
@@ -343,10 +345,24 @@ input:disabled { opacity: .55; }
 .map-switch-list { display: flex; flex-direction: column; gap: 2px; padding: 4px; min-width: 150px;
   border-radius: 9px; background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); }
 /* Left column: layers panel at the top, floor picker and toolbar at the bottom; the panels shrink before overlapping. */
-.map-left { position: absolute; left: 14px; top: 14px; bottom: 14px; z-index: 3; display: flex; flex-direction: column;
+.map-left { position: absolute; left: 14px; right: 14px; top: 14px; bottom: 14px; z-index: 3; display: flex; flex-direction: column;
   justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; }
 .map-left > *, .map-left-bottom > * { pointer-events: auto; }
-.map-left-bottom { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 0; flex-shrink: 1; }
+.map-left-bottom { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 0; flex-shrink: 1; align-self: stretch; }
+/* Toolbar, then (viewing a past raid) the scrubber taking the rest of the row. */
+.map-left-bottom > .map-bottom-row { display: flex; gap: 8px; align-self: stretch; flex-shrink: 0; min-width: 0; pointer-events: none; }
+.map-bottom-row > * { pointer-events: auto; }
+.map-scrubber { flex: 1; min-width: 140px; display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px;
+  border-radius: 9px; background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); font-size: 12px; }
+.scrub-swatch { width: 8px; height: 8px; border-radius: 50%; background: var(--raid); flex-shrink: 0; }
+.scrub-title { font-weight: 500; white-space: nowrap; }
+.scrub-track { flex: 1; min-width: 60px; height: 30px; padding: 0 8px; display: flex; align-items: center; cursor: pointer; touch-action: none; border-radius: 6px; }
+.scrub-rail { position: relative; flex: 1; height: 2px; border-radius: 1px; background: rgb(255 255 255 / 12%); }
+.scrub-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 1px; background: var(--raid); opacity: .6; }
+.scrub-dot { position: absolute; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgb(255 255 255 / 28%); }
+.scrub-dot.past { background: var(--raid); }
+.scrub-dot.current { width: 12px; height: 12px; margin: -6px 0 0 -6px; background: var(--raid); box-shadow: 0 0 0 3px rgb(15 16 17 / 90%); }
+.scrub-readout { display: flex; gap: 8px; font: 12px var(--mono); white-space: nowrap; }
 .map-tools { display: flex; align-items: center; gap: 4px; padding: 4px; flex-shrink: 0;
   border-radius: 9px; background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); }
 .map-tools .icon-button:disabled { opacity: .3; pointer-events: none; }
@@ -522,6 +538,9 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .layer-empty { margin: 4px 8px 6px; font-size: 12px; }
 
 /* Short map: groups sit beside each other as icon + count. */
+/* Narrow map: the scrubber keeps its track and drops its labels, then the toolbar drops its readout. */
+@container map (max-width: 820px) { .scrub-title, .scrub-swatch { display: none; } }
+@container map (max-width: 640px) { .map-bottom-row:has(.map-scrubber) .map-readout, .scrub-readout .faint { display: none; } }
 @container map (max-height: 440px) {
   .layer-groups { display: flex; gap: 2px; }
   .layer-row.group { width: auto; padding: 0 6px; }

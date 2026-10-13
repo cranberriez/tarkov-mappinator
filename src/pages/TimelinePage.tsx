@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import type { Scanner } from "../lib/useScanner";
 import type { PositionHistory } from "../lib/positions";
-import { positionsForRaid, toPlane } from "../lib/positions";
+import { inCaptureOrder, positionsForRaid, toPlane } from "../lib/positions";
 import { parseTime, raidColor, raidStatus, type RaidRecord, type RaidStatus } from "../lib/raids";
 import { longSpan, span } from "../lib/format";
 import { ModeChip } from "../components/ModeChip";
@@ -19,13 +19,7 @@ function when(value: string | null) {
   return today ? date.toLocaleTimeString(undefined, time) : date.toLocaleString(undefined, { month: "short", day: "numeric", ...time });
 }
 
-/** Capture order: filename capture minute, then receipt time. */
-function inOrder(positions: PositionHistory) {
-  return [...positions].sort((a, b) =>
-    (parseTime(a.captured_at) || 0) - (parseTime(b.captured_at) || 0) || parseTime(a.observed_at) - parseTime(b.observed_at));
-}
-
-export function TimelinePage({ scanner }: { scanner: Scanner }) {
+export function TimelinePage({ scanner, onOpenRaid }: { scanner: Scanner; onOpenRaid: (raidId: string) => void }) {
   const { raids, positions, snapshot, clearHistory } = scanner;
   const now = useNow(10_000);
   const [confirming, setConfirming] = useState(false);
@@ -44,7 +38,7 @@ export function TimelinePage({ scanner }: { scanner: Scanner }) {
         const status = raidStatus(raid, index, snapshot?.raid);
         const end = status === "active" ? now : parseTime(raid.ended_at);
         const elapsed = end - parseTime(raid.started_at);
-        const track = inOrder(positionsForRaid(positions, raid.id));
+        const track = inCaptureOrder(positionsForRaid(positions, raid.id));
         // With a track the end row carries the duration; without one it fills the empty span instead.
         const duration = track.length ? span(elapsed) : null;
         return <li key={raid.id} className={`tl-raid ${status}`} style={{ "--raid": raidColor(raid) } as CSSProperties}>
@@ -55,7 +49,8 @@ export function TimelinePage({ scanner }: { scanner: Scanner }) {
           </div>
           <div className="tl-span">
             {track.length
-              ? <RaidTrack raid={raid} positions={track} />
+              ? <button type="button" className="tl-open" title="Open on the map" onClick={() => onOpenRaid(raid.id)}>
+                <RaidTrack raid={raid} positions={track} /></button>
               : <p className="tl-empty">{longSpan(elapsed) ?? "Duration unknown"}<span className="faint"> · no positions</span></p>}
           </div>
           <div className="tl-node">

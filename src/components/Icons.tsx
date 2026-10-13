@@ -29,4 +29,5 @@ export const ResetIcon = () => <Icon size={15}><path d="M3 12a9 9 0 1 0 3-6.7L3 
 export const TerrainIcon = () => <Icon size={16}><path d="m2.5 19 6-9 4 5.5 2.5-3.5 6.5 7z" /><circle cx="16.5" cy="6.5" r="2" /></Icon>;
 export const ExpandIcon = () => <Icon size={14}><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" /></Icon>;
 export const LinkIcon = () => <Icon><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></Icon>;
+export const CloseIcon = () => <Icon size={14}><path d="M6 6l12 12M18 6 6 18" /></Icon>;
 export const CheckIcon = () => <Icon size={14}><path d="m5 12 5 5 9-10" /></Icon>;

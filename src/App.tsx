@@ -24,6 +24,10 @@ export function App() {
   // App-level so an import keeps streaming while other pages are open.
   const importer = useImport();
   const [page, setPage] = useState<Page>("map");
+  // A past raid opened from the timeline; the map shows it instead of the live raid until closed.
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const viewing = scanner.raids.find((raid) => raid.id === viewingId) ?? null;
+  const navigate = (next: Page) => { setViewingId(null); setPage(next); };
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === "1");
   useEffect(() => { localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0"); }, [collapsed]);
 
@@ -33,13 +37,13 @@ export function App() {
   return <div className="shell">
     <TitleBar scanner={scanner} mini={mini} />
     <div className="body">
-      <Sidebar page={page} onNavigate={setPage} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} connection={connection} />
+      <Sidebar page={page} onNavigate={navigate} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} connection={connection} />
       <main className="content">
-        {page === "overview" && <OverviewPage scanner={scanner} onNavigate={setPage} />}
-        {page === "map" && <MapPage scanner={scanner} />}
-        {page === "timeline" && <TimelinePage scanner={scanner} />}
+        {page === "overview" && <OverviewPage scanner={scanner} onNavigate={navigate} />}
+        {page === "map" && <MapPage key={viewing?.id ?? "live"} scanner={scanner} viewing={viewing} onCloseViewing={() => setViewingId(null)} />}
+        {page === "timeline" && <TimelinePage scanner={scanner} onOpenRaid={(id) => { setViewingId(id); setPage("map"); }} />}
         {page === "activity" && <ActivityPage scanner={scanner} />}
-        {page === "import" && <ImportPage scanner={scanner} importer={importer} onNavigate={setPage} />}
+        {page === "import" && <ImportPage scanner={scanner} importer={importer} onNavigate={navigate} />}
         {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} />}
       </main>
     </div>

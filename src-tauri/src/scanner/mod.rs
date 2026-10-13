@@ -201,7 +201,7 @@ impl ScannerService {
             .iter()
             .filter_map(|path| {
                 let name = path.file_name()?.to_string_lossy().into_owned();
-                let position = parsers::position_filename(&name).ok()?;
+                let position = parsers::position_file(&name, fs::metadata(path).and_then(|m| m.modified()).ok()).ok()?;
                 (position.captured >= started && position.captured <= now)
                     .then(|| (position.captured, name, position))
             })
@@ -217,7 +217,7 @@ impl ScannerService {
                 heading_degrees: position.heading_degrees,
                 heading_convention: parsers::HEADING_CONVENTION.into(),
                 observed_at: observed_at.clone(),
-                captured_at: Some(position.captured.to_string()),
+                captured_at: Some(parsers::capture_text(&position.captured)),
                 raid_id: self.snapshot.raid.id.clone(),
                 filename: name,
             })
@@ -250,13 +250,12 @@ impl ScannerService {
         let mut candidates = candidates;
         candidates.retain(|p| !self.seen.contains(p));
         candidates.sort_by_key(|p| {
+            let modified = fs::metadata(p).and_then(|m| m.modified()).ok();
             (
-                parsers::position_filename(&p.file_name().unwrap_or_default().to_string_lossy())
+                parsers::position_file(&p.file_name().unwrap_or_default().to_string_lossy(), modified)
                     .ok()
                     .map(|v| v.captured),
-                fs::metadata(p)
-                    .and_then(|m| m.modified())
-                    .unwrap_or(UNIX_EPOCH),
+                modified.unwrap_or(UNIX_EPOCH),
                 p.file_name().unwrap_or_default().to_os_string(),
             )
         });
@@ -279,7 +278,7 @@ impl ScannerService {
                 .unwrap_or_default()
                 .to_string_lossy()
                 .into_owned();
-            let result = parsers::position_filename(&name);
+            let result = parsers::position_file(&name, meta.modified().ok());
             if result.is_ok() && self.claim_auto_shot(&meta) {
                 // Position is in the filename; the image itself is never used.
                 if let Err(error) = fs::remove_file(&path) {
@@ -305,7 +304,7 @@ impl ScannerService {
                         .latest_position
                         .as_ref()
                         .and_then(|p| p.captured_at.as_ref())
-                        .and_then(|v| NaiveDateTime::parse_from_str(v, "%Y-%m-%d %H:%M:%S").ok());
+                        .and_then(|v| NaiveDateTime::parse_from_str(v, "%Y-%m-%d %H:%M:%S%.f").ok());
                     if previous.is_some_and(|p| p > position.captured) {
                         self.diagnostic(format!("Ignored older capture {name}."));
                         continue;
@@ -316,7 +315,7 @@ impl ScannerService {
                         heading_degrees: position.heading_degrees,
                         heading_convention: parsers::HEADING_CONVENTION.into(),
                         observed_at: Local::now().to_rfc3339(),
-                        captured_at: Some(position.captured.to_string()),
+                        captured_at: Some(parsers::capture_text(&position.captured)),
                         raid_id,
                         filename: name,
                     };
