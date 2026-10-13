@@ -23,7 +23,7 @@ export function MapMarkerCard({ marker, filters, floorName, pinned, onClose, get
   ];
   const close = pinned && <button type="button" className="icon-button" title="Close" onClick={onClose}><CloseIcon /></button>;
   if (marker.bosses) {
-    const bosses = marker.bosses.filter((boss) => groupOn(filters[marker.layer], boss.group));
+    const bosses = marker.bosses.filter((boss) => groupOn(filters[marker.layer], boss.group, marker.layer));
     const places = [...new Set(marker.bosses.flatMap((boss) => boss.location.split(", ")))].join(" · ");
     return <div className="marker-cards">
       {bosses.map((boss, index) => <div key={boss.group} className="marker-card">

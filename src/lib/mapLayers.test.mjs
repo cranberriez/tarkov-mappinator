@@ -54,11 +54,11 @@ test("the header turns all present groups off when any is on, otherwise all on",
   const { layerState, toggleLayer } = await import("./mapLayers.ts");
   const present = ["pmc", "scav"];
   const mixed = { groups: { pmc: true, scav: false, transit: true } };
-  assert.equal(layerState(mixed, present), "mixed");
-  const off = toggleLayer(mixed, present);
+  assert.equal(layerState(mixed, present, "extracts"), "mixed");
+  const off = toggleLayer(mixed, present, "extracts");
   assert.deepEqual(off.groups, { pmc: false, scav: false, transit: true });
-  assert.equal(layerState(off, present), "off");
-  assert.deepEqual(toggleLayer(off, present).groups, { pmc: true, scav: true, transit: true });
+  assert.equal(layerState(off, present, "extracts"), "off");
+  assert.deepEqual(toggleLayer(off, present, "extracts").groups, { pmc: true, scav: true, transit: true });
 });
 
 test("role defaults hide the other faction; scavs cannot transit", () => {
@@ -91,7 +91,7 @@ test("filter equality ignores key order and unknown keys", async () => {
   assert.equal(sameFilters(a, b), false);
 });
 
-test("other layers: containers grouped by name and deduplicated, bosses merged per point, zones keep outlines", () => {
+test("other layers: containers keyed by type and deduplicated, bosses merged per point, zones keep outlines", () => {
   const p = at(5, 5, 1);
   const markers = buildMarkers(map({
     lootContainers: [{ lootContainer: "c1", position: p }, { lootContainer: "c1", position: p }, { lootContainer: "c2", position: at(9, 9) }],
@@ -108,7 +108,7 @@ test("other layers: containers grouped by name and deduplicated, bosses merged p
     mobs: { bossKnight: { name: "Knight", normalizedName: "knight", imagePortraitLink: "https://assets.tarkov.dev/knight-portrait.webp" }, sectantPriest: { name: "Cultist Priest", normalizedName: "cultist-priest" } },
   });
   const by = (layer) => markers.filter((m) => m.layer === layer);
-  assert.deepEqual(by("containers").map((m) => [m.groups[0], m.icon]), [["valuables", "container_safe"], ["bodies", "container_dead-scav"]]);
+  assert.deepEqual(by("containers").map((m) => [m.groups[0], m.icon]), [["safe", "container_safe"], ["pmc-body", "container_dead-scav"]]);
   const [shared, pmc] = by("bosses");
   assert.equal(shared.label, "Knight, Cultist Priest");
   assert.deepEqual(shared.tags, ["Bunker", "Knight 50%", "Cultist Priest 15%"]);
@@ -125,11 +125,9 @@ test("other layers: containers grouped by name and deduplicated, bosses merged p
 test("noisy layers and groups start hidden", () => {
   const filters = defaultFilters("unknown");
   assert.equal(filters.loose.groups.loose, false);
-  assert.equal(filters.containers.groups.general, false);
-  assert.equal(groupOn(filters.bosses, "pmcs"), false);
-  assert.equal(groupOn(filters.bosses, "raider"), false);
-  assert.equal(groupOn(filters.bosses, "killa"), true);
-  assert.equal(defaultFilters("scav").containers.groups.valuables, true);
+  assert.equal(groupOn(filters.bosses, "pmcs", "bosses"), false);
+  assert.equal(groupOn(filters.bosses, "raider", "bosses"), false);
+  assert.equal(groupOn(filters.bosses, "killa", "bosses"), true);
 });
 
 test("lock and extract details: key, power, faction, roubles, switch names", () => {
@@ -188,4 +186,48 @@ test("filter equality treats missing boss types as defaults and ignores old boss
   b.bosses.groups.killa = false;
   assert.equal(sameFilters(a, b), false);
   assert.deepEqual(withDefaults({ bosses: { groups: { bosses: false, raiders: true, killa: false } } }, "unknown").bosses.groups, { killa: false });
+});
+
+test("container types: one group each under a category, categories off by default decide the type's default", async () => {
+  const { sameFilters, layerState, toggleLayer } = await import("./mapLayers.ts");
+  const markers = buildMarkers(map({ lootContainers: [
+    { lootContainer: "c1", position: at(1, 1) }, { lootContainer: "c2", position: at(2, 2) }, { lootContainer: "c3", position: at(3, 3) },
+    { lootContainer: "c4", position: at(4, 4) }, { lootContainer: "unknown-id", position: at(5, 5) },
+  ] }), { containers: {
+    c1: { name: "Safe", normalizedName: "safe" }, c2: { name: "Jacket", normalizedName: "jacket" },
+    c3: { name: "Dead Scav", normalizedName: "dead-scav" }, c4: { name: "Drawer", normalizedName: "drawer" },
+  } });
+  assert.deepEqual(markers.map((m) => m.groups), [["safe"], ["jacket"], ["dead-scav"], ["drawer"], ["unknown-id"]]);
+  assert.equal(countMarkers(markers)["containers.safe"], 1);
+  const defs = layersFor(markers).find((layer) => layer.key === "containers").groups;
+  assert.deepEqual(defs.map((g) => [g.key, g.label, g.parent, !!g.off]), [
+    ["jacket", "Jacket", "valuables", false], ["safe", "Safe", "valuables", false],
+    ["dead-scav", "Dead Scav", "bodies", true], ["drawer", "Drawer", "general", true], ["unknown-id", "unknown-id", "general", true],
+  ]);
+  assert.equal(defs.find((g) => g.key === "safe").icon, "container_safe");
+  const filters = defaultFilters("unknown");
+  const [safe, jacket, scav] = markers;
+  assert.deepEqual([isVisible(safe, filters), isVisible(scav, filters), isVisible(markers[3], filters)], [true, false, false]);
+  // Switching one type leaves its category mixed; the category click then turns the rest off, and again turns all on.
+  filters.containers.groups.jacket = false;
+  const valuables = ["safe", "jacket"];
+  assert.equal(layerState(filters.containers, valuables, "containers"), "mixed");
+  assert.equal(isVisible(jacket, filters), false);
+  assert.equal(isVisible(safe, filters), true);
+  const off = toggleLayer(filters.containers, valuables, "containers");
+  assert.deepEqual([off.groups.safe, off.groups.jacket], [false, false]);
+  assert.deepEqual([toggleLayer(off, valuables, "containers").groups.safe, groupOn(off, "dead-scav", "containers")], [true, false]);
+  filters.containers.groups["dead-scav"] = true;
+  assert.equal(isVisible(scav, filters), true);
+});
+
+test("old container category keys are dropped and ignored by filter equality", async () => {
+  const { sameFilters } = await import("./mapLayers.ts");
+  assert.deepEqual(withDefaults({ containers: { groups: { valuables: false, general: true, safe: false } } }, "unknown").containers.groups, { safe: false });
+  const a = defaultFilters("unknown");
+  const b = structuredClone(a);
+  b.containers.groups = { valuables: false, general: true, safe: true, drawer: false };
+  assert.equal(sameFilters(a, b), true);
+  b.containers.groups.drawer = true;
+  assert.equal(sameFilters(a, b), false);
 });

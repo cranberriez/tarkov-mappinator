@@ -6,9 +6,13 @@ import type { Extract, GameMapData, Mob, Vec3 } from "../tarkov-data/types.ts";
 
 /** `icon` is a file stem in `src/maps/assets/icons`, or `item:<tarkov.dev item id>`. */
 type GroupDef = { key: string; label: string; icon: string; /** Colour behind the icon. */ tint?: string; /** Hidden until switched on. */ off?: boolean;
-  /** Portrait link shown instead of the icon (boss types). */ image?: string };
+  /** Portrait link shown instead of the icon (boss types). */ image?: string;
+  /** Key of the layer category it sits under in the panel (container types). */ parent?: string };
+/** A panel-only level between a layer and its groups; it has no filter state of its own. */
+export type CategoryDef = { key: string; label: string; icon: string };
 export type LayerDef = {
   key: string; label: string; icon: string; groups: GroupDef[];
+  /** Groups are listed under these, in this order, by their `parent`. */ categories?: CategoryDef[];
   /** All groups hidden until switched on. */ off?: boolean;
   /** Folded in the panel until opened. */ folded?: boolean;
 };
@@ -44,14 +48,15 @@ export const layers: LayerDef[] = [
     { key: "artillery", label: "Artillery", icon: "hazard_mortar" },
     { key: "other", label: "Other", icon: "hazard" },
   ] },
-  { key: "containers", label: "Containers", icon: "container_safe", folded: true, groups: [
+  // One group per container type on the map, filled in by `layersFor`.
+  { key: "containers", label: "Containers", icon: "container_safe", folded: true, groups: [], categories: [
     { key: "valuables", label: "Valuables", icon: "container_safe" },
     { key: "medical", label: "Medical", icon: "container_medbag" },
     { key: "ammo", label: "Ammo & grenades", icon: "container_grenade-box" },
     { key: "caches", label: "Caches", icon: "container_buried-barrel-cache" },
-    { key: "supply", label: "Supply crates", icon: "container_crate", off: true },
-    { key: "bodies", label: "Bodies", icon: "container_dead-scav", off: true },
-    { key: "general", label: "General", icon: "container_duffle-bag", off: true },
+    { key: "supply", label: "Supply crates", icon: "container_crate" },
+    { key: "bodies", label: "Bodies", icon: "container_dead-scav" },
+    { key: "general", label: "General", icon: "container_duffle-bag" },
   ] },
   { key: "access", label: "Keys & switches", icon: "key", folded: true, groups: [
     { key: "door", label: "Locked doors", icon: "lock" },
@@ -132,7 +137,7 @@ export function withDefaults(stored: Partial<Record<string, LayerFilter & { on?:
   return Object.fromEntries(Object.entries(defaults).map(([key, layer]) => {
     const saved = stored?.[key];
     const groups = { ...layer.groups, ...saved?.groups };
-    if (key === "bosses") for (const group of legacyBossGroups) delete groups[group];
+    for (const group of dynamic[key]?.legacy ?? []) delete groups[group];
     if (saved?.on === false) for (const group of Object.keys(groups)) groups[group] = false;
     return [key, { groups }];
   }));
@@ -143,27 +148,35 @@ export function withDefaults(stored: Partial<Record<string, LayerFilter & { on?:
  * mob has no lookup). Boss groups come from the map's data, so defaults can't list them.
  */
 const bossOff = new Set(["pmcs", "raider", "rogue", "black-div", "af", "pmcBot", "exUsec", "arenaFighter", "arenaFighterEvent"]);
-/** Older saves held "Bosses" and "Raiders & Rogues" groups; they mean nothing now. */
-const legacyBossGroups = ["bosses", "raiders"];
+/** Container types start on, except those in these categories (see `containerGroup`). */
+const containerOff = new Set(["supply", "bodies", "general"]);
+/**
+ * Layers whose groups come from the map's data (see `layersFor`), so the layer can't list them: whether a group
+ * not seen before starts off, and old group keys that mean nothing now (saves from before they were split up).
+ */
+const dynamic: Record<string, { off: (group: string) => boolean; legacy: string[] }> = {
+  bosses: { off: (group) => bossOff.has(group), legacy: ["bosses", "raiders"] },
+  containers: { off: (group) => containerOff.has(containerGroup(group)), legacy: ["valuables", "medical", "ammo", "caches", "supply", "bodies", "general"] },
+};
 
-/** Whether a group is on; one the filter has no entry for (a boss type not seen before) takes its default. */
-export const groupOn = (filter: LayerFilter | undefined, group: string) => filter?.groups[group] ?? !bossOff.has(group);
+/** Whether a group is on; one the filter has no entry for (a boss or container type not seen before) takes its default. */
+export const groupOn = (filter: LayerFilter | undefined, group: string, layer: string) => filter?.groups[group] ?? !dynamic[layer]?.off(group);
 
 /** Header state of a layer over the given groups: all on, none on, or some. */
-export function layerState(filter: LayerFilter, groups: string[]): "on" | "off" | "mixed" {
-  const on = groups.filter((group) => groupOn(filter, group)).length;
+export function layerState(filter: LayerFilter, groups: string[], layer: string): "on" | "off" | "mixed" {
+  const on = groups.filter((group) => groupOn(filter, group, layer)).length;
   return on === 0 ? "off" : on === groups.length ? "on" : "mixed";
 }
 
 /** The header click: any of the groups on turns them all off, otherwise all on. Other groups are left alone. */
-export function toggleLayer(filter: LayerFilter, groups: string[]): LayerFilter {
-  const on = layerState(filter, groups) === "off";
+export function toggleLayer(filter: LayerFilter, groups: string[], layer: string): LayerFilter {
+  const on = layerState(filter, groups, layer) === "off";
   return { groups: { ...filter.groups, ...Object.fromEntries(groups.map((group) => [group, on])) } };
 }
 
 export const isVisible = (marker: MapMarker, filters: Filters) => {
   const layer = filters[marker.layer];
-  return !!layer && marker.groups.some((group) => groupOn(layer, group));
+  return !!layer && marker.groups.some((group) => groupOn(layer, group, marker.layer));
 };
 
 const ROUBLES = "5449016a4bdc2d6f028b456f";
@@ -349,6 +362,7 @@ function zoneMarkers(data: GameMapData): MapMarker[] {
   return [...hazards, ...artillery];
 }
 
+/** Container types by category; types not listed are "general". */
 const containerGroups: Record<string, string[]> = {
   valuables: ["safe", "bank-safe", "shturmans-stash", "pc-block", "weapon-box", "cash-register", "bank-cash-register", "jacket", "plastic-suitcase"],
   medical: ["medbag", "medcase", "medical-supply-crate"],
@@ -379,7 +393,7 @@ function pointMarkers(data: GameMapData, lookups: Lookups): MapMarker[] {
     seen.add(id);
     const named = lookups.containers?.[container.lootContainer];
     const name = named?.normalizedName ?? "";
-    markers.push({ id, layer: "containers", groups: [containerGroup(name)], position: container.position,
+    markers.push({ id, layer: "containers", groups: [name || container.lootContainer], position: container.position,
       icon: `container_${containerIconAlias[name] ?? (name || "crate")}`, tags: [named?.name ?? "Container"],
       details: [{ label: "Container", value: container.lootContainer, mono: true }] });
   }
@@ -430,8 +444,8 @@ function pointMarkers(data: GameMapData, lookups: Lookups): MapMarker[] {
 /** Icon key for a marker (a file stem, or `item:<id>` for an item icon), given which of its groups are currently shown. */
 export function markerIcon(marker: MapMarker, filters: Filters): string {
   if (marker.icon) return marker.icon;
-  const shown = marker.groups.filter((group) => groupOn(filters[marker.layer], group));
-  if (marker.bosses) return marker.bosses.find((boss) => groupOn(filters[marker.layer], boss.group))?.icon ?? "spawn_boss";
+  const shown = marker.groups.filter((group) => groupOn(filters[marker.layer], group, marker.layer));
+  if (marker.bosses) return marker.bosses.find((boss) => groupOn(filters[marker.layer], boss.group, marker.layer))?.icon ?? "spawn_boss";
   if (marker.layer === "documents") return `item:${documentTypes.find((type) => type.key === shown[0])?.item}`;
   if (marker.layer === "spawns") return shown.includes("pmc") ? "spawn_pmc" : "spawn_scav";
   if (shown.includes("transit")) return "extract_transit";
@@ -440,7 +454,7 @@ export function markerIcon(marker: MapMarker, filters: Filters): string {
 
 /** Colour behind a marker's icon, from the first of its groups that is shown. */
 export function markerTint(marker: MapMarker, filters: Filters): string | undefined {
-  const shown = marker.groups.find((group) => groupOn(filters[marker.layer], group));
+  const shown = marker.groups.find((group) => groupOn(filters[marker.layer], group, marker.layer));
   return layers.find((layer) => layer.key === marker.layer)?.groups.find((group) => group.key === shown)?.tint;
 }
 
@@ -454,20 +468,33 @@ export function countMarkers(markers: MapMarker[]) {
   return counts;
 }
 
-/** Layers with the bosses layer's groups filled in from the map's markers: one per boss type, the default-on ones first. */
+/**
+ * Layers with the data-driven groups filled in from the map's markers: one per boss type, the default-on ones
+ * first; one per container type, ordered by category then name, under its category as `parent`.
+ */
 export function layersFor(markers: MapMarker[]): LayerDef[] {
-  const groups = new Map<string, GroupDef>();
+  const bosses = new Map<string, GroupDef>();
   for (const boss of markers.flatMap((marker) => marker.bosses ?? []))
-    if (!groups.has(boss.group)) groups.set(boss.group, { key: boss.group, label: boss.name, icon: boss.icon, image: boss.image, off: bossOff.has(boss.group) });
-  const sorted = [...groups.values()].sort((a, b) => Number(!!a.off) - Number(!!b.off));
-  return layers.map((layer) => layer.key === "bosses" ? { ...layer, groups: sorted } : layer);
+    if (!bosses.has(boss.group)) bosses.set(boss.group, { key: boss.group, label: boss.name, icon: boss.icon, image: boss.image, off: bossOff.has(boss.group) });
+  const containers = new Map<string, GroupDef>();
+  for (const marker of markers) {
+    const key = marker.layer === "containers" ? marker.groups[0] : undefined;
+    // An unnamed container has no display name, only its raw id.
+    if (key !== undefined && !containers.has(key)) containers.set(key, { key, label: marker.tags[0] === "Container" ? key : marker.tags[0], icon: marker.icon ?? "container_crate",
+      parent: containerGroup(key), off: dynamic.containers.off(key) });
+  }
+  const order = layers.find((layer) => layer.key === "containers")!.categories!.map((category) => category.key);
+  const types = [...containers.values()].sort((a, b) => order.indexOf(a.parent!) - order.indexOf(b.parent!) || a.label.localeCompare(b.label));
+  const sorted = [...bosses.values()].sort((a, b) => Number(!!a.off) - Number(!!b.off));
+  return layers.map((layer) => layer.key === "bosses" ? { ...layer, groups: sorted } : layer.key === "containers" ? { ...layer, groups: types } : layer);
 }
 
-/** Whether two filter states show the same markers' switches, ignoring key order; boss types missing on one side count as default. */
+/** Whether two filter states show the same markers' switches, ignoring key order; boss and container types missing on one side count as default. */
 export function sameFilters(a: Filters, b: Filters): boolean {
   return layers.every((layer) => {
     const keys = new Set(layer.groups.map((group) => group.key));
-    if (layer.key === "bosses") for (const side of [a, b]) for (const group of Object.keys(side[layer.key]?.groups ?? {})) if (!legacyBossGroups.includes(group)) keys.add(group);
-    return [...keys].every((group) => groupOn(a[layer.key], group) === groupOn(b[layer.key], group));
+    const legacy = dynamic[layer.key]?.legacy;
+    if (legacy) for (const side of [a, b]) for (const group of Object.keys(side[layer.key]?.groups ?? {})) if (!legacy.includes(group)) keys.add(group);
+    return [...keys].every((group) => groupOn(a[layer.key], group, layer.key) === groupOn(b[layer.key], group, layer.key));
   });
 }
