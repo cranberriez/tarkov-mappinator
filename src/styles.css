@@ -318,7 +318,7 @@ input:disabled { opacity: .55; }
   background-position: var(--ox) var(--oy); }
 .map-canvas:active { cursor: grabbing; }
 .map-canvas.calibrated { background-image: none; }
-.map-art { position: absolute; pointer-events: none; }
+.map-art { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; }
 .map-axis { position: absolute; background: rgb(205 182 139 / 12%); pointer-events: none; }
 .map-axis.x { left: 0; right: 0; height: 1px; }
 .map-axis.y { top: 0; bottom: 0; width: 1px; }
@@ -484,7 +484,8 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .overlay-marker.hazards { transform: translate(-9px, -50%); }
 .split-label { position: absolute; transform: translate(-50%, -100%); padding-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: 11px; font-weight: 500; color: var(--muted); text-shadow: 0 0 3px #000, 0 1px 2px #000; pointer-events: none; }
-.overlay-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+.overlay-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; will-change: transform; }
+.map-canvas.dragging .overlay-marker { pointer-events: none; }
 .overlay-zones { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .overlay-zones-scale { transform: scale(var(--s)); }
 .zone { fill: rgb(227 123 108 / 14%); stroke: rgb(227 123 108 / 70%); stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
