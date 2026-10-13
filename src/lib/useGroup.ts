@@ -3,6 +3,8 @@ import { Apinator, type Channel, type PresenceChannel } from "@apinator/client";
 import type { Scanner } from "./useScanner";
 import { positionsForRaid } from "./positions";
 import { keys, usePersisted } from "./persist";
+import { DEV } from "./useDevFlags";
+import { useFakeGroup } from "./useFakeGroup";
 import {
   applyPosition, applyRaid, assignColors, authUrlOf, channelOf, createPacer, defaultName, newCode, newUserId, parsePosition, parseRaid,
   normalizeSite, POSITION_EVENT, RAID_EVENT, waiting, type GroupMember, type MemberState, type PositionMessage, type RaidMessage,
@@ -28,7 +30,7 @@ type Credentials = { appKey: string; cluster: string };
  * send each other only two client events, raid status and their newest position. App-level so the group
  * stays joined on every page and in mini mode.
  */
-export function useGroup(scanner: Scanner) {
+export function useGroup(scanner: Scanner, { fakePlayers = false } = {}) {
   // On/off and the group joined last only last the session: every launch starts with groups off.
   const [enabled, setEnabled] = useState(false);
   const [name, setName] = usePersisted(keys.groupName, defaultName());
@@ -191,10 +193,15 @@ export function useGroup(scanner: Scanner) {
     };
   }, [client, code, userId, flush]);
 
+  // Dev builds: simulated members alongside the real ones while in a group. DEV is a build-time constant, so the hook order never changes.
+  const fakes = DEV ? useFakeGroup(fakePlayers && !!code, raidMap) : null;
+
   const members = useMemo((): GroupMember[] => {
-    colors.current = assignColors(roster.map((member) => member.id), colors.current);
-    return roster.map((member) => ({ ...member, color: colors.current.get(member.id)!, ...(states[member.id] ?? waiting) }));
-  }, [roster, states]);
+    const everyone = fakes ? [...roster, ...fakes.roster] : roster;
+    const latest = fakes ? { ...states, ...fakes.states } : states;
+    colors.current = assignColors(everyone.map((member) => member.id), colors.current);
+    return everyone.map((member) => ({ ...member, color: colors.current.get(member.id)!, ...(latest[member.id] ?? waiting) }));
+  }, [roster, states, fakes]);
 
   return {
     /** The site in use, and the Settings override (empty: default). */

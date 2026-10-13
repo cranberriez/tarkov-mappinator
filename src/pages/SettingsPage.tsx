@@ -23,6 +23,7 @@ import { toastModes, type ToastModeState } from "../lib/useToastMode";
 import type { ValuableLootState } from "../lib/useValuableLoot";
 import { DEFAULT_GROUP_SITE, type Group } from "../lib/useGroup";
 import { normalizeSite } from "../lib/group";
+import { DEV, type DevFlagsState } from "../lib/useDevFlags";
 import type { AutoShotState } from "../bindings/AutoShotState";
 import {
   clearAllData, getCleanupPlan, getHistoryStats, onHistoryReset, onHistoryUpdated, resetPreferences, runCleanup,
@@ -60,9 +61,9 @@ function Switch({ label, detail, on, disabled, onChange }: {
   </button>;
 }
 
-export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup, toastMode, valuableLoot, group }: {
+export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup, toastMode, valuableLoot, group, dev }: {
   scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot; shotCleanup: ShotCleanup; toastMode: ToastModeState; valuableLoot: ValuableLootState;
-  group: Group;
+  group: Group; dev: DevFlagsState;
 }) {
   const { snapshot, running, connected, busy, error, perform, retry } = scanner;
   const [folders, setFolders] = useState<FolderConfig>({ screenshots: "", logs: "" });
@@ -143,6 +144,7 @@ export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup,
     </section>
 
     <DangerZone />
+    {DEV && <DeveloperSection dev={dev} />}
   </div>;
 }
 
@@ -241,6 +243,15 @@ function GroupServerSection({ group }: { group: Group }) {
         {group.siteOverride && <button type="button" className="link" onClick={() => group.setSiteOverride("")}>Use default</button>}
       </div>
     </form>
+  </section>;
+}
+
+/** Dev builds only (see useDevFlags). */
+function DeveloperSection({ dev }: { dev: DevFlagsState }) {
+  return <section className="settings-section">
+    <h2>Developer</h2>
+    <Switch label="Fake players" detail="Five simulated members join any group you're in." on={dev.flags.fakePlayers}
+      onChange={(fakePlayers) => dev.set({ fakePlayers })} />
   </section>;
 }
 

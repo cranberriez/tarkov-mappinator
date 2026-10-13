@@ -10,6 +10,7 @@ import { useToastMode } from "./lib/useToastMode";
 import { useValuableLoot } from "./lib/useValuableLoot";
 import { useGameMode } from "./lib/useGameMode";
 import { useGroup } from "./lib/useGroup";
+import { useDevFlags } from "./lib/useDevFlags";
 import { Sidebar, type Page } from "./components/Sidebar";
 import { Toasts } from "./components/Toasts";
 import { OverviewPage } from "./pages/OverviewPage";
@@ -33,7 +34,8 @@ export function App() {
   // App-level so an import keeps streaming while other pages are open.
   const importer = useImport();
   // App-level so the group stays joined on every page and in mini mode.
-  const group = useGroup(scanner);
+  const dev = useDevFlags();
+  const group = useGroup(scanner, dev.flags);
   const [memberFocus, setMemberFocus] = useState<MemberFocus | null>(null);
   const [page, setPage] = useState<Page>("map");
   // A past raid opened from the timeline; the map shows it instead of the live raid until closed.
@@ -65,7 +67,7 @@ export function App() {
         {page === "timeline" && <TimelinePage scanner={scanner} onOpenRaid={(id) => { setViewingId(id); setPage("map"); }} />}
         {page === "activity" && <ActivityPage scanner={scanner} />}
         {page === "import" && <ImportPage scanner={scanner} importer={importer} onNavigate={navigate} />}
-        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} valuableLoot={valuableLoot} group={group} />}
+        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} valuableLoot={valuableLoot} group={group} dev={dev} />}
       </main>
     </div>
     <Toasts events={scanner.snapshot?.activity} mode={toastMode.mode} />
