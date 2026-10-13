@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
-import { floorAt, type FloorSelection } from "./floors.ts";
+import { floorAt, floorById, type FloorSelection } from "./floors.ts";
 import { MapArt } from "./MapArt.tsx";
 import { MapOverlay, type OverlayArea } from "./MapOverlay.tsx";
 import { MapTiles } from "./MapTiles.tsx";
@@ -21,9 +21,14 @@ const SPLIT_LABEL_MIN_PX = 36;
 /** Overlay markers are culled and thinned for zoom steps of this many per doubling, so zooming only redraws them on a step. */
 const OVERLAY_ZOOM_STEPS = 4;
 
-/** The art a map is drawn with: the preferred style when it has it, else the other, else none (a plain grid). */
-export function artStyleOf(map: MapCalibration | null, preferred: ArtStyle = "svg"): ArtStyle | null {
+/**
+ * The art a map is drawn with: the preferred style when it has it, else the other, else none (a plain grid).
+ * A shown floor with vector art but no tiles (Interchange's upper floors) is drawn with the vector art even when tiles are preferred.
+ */
+export function artStyleOf(map: MapCalibration | null, preferred: ArtStyle = "svg", floor: FloorSelection = null): ArtStyle | null {
   if (!map) return null;
+  const shown = floorById(map, floor);
+  if (preferred === "tiles" && map.svg && shown && !shown.base && shown.svgLayer && !shown.tilePath) return "svg";
   if (map.svg && (preferred === "svg" || !map.tilePath)) return "svg";
   return map.tilePath ? "tiles" : map.svg ? "svg" : null;
 }
@@ -86,7 +91,7 @@ const noFilters: Filters = {};
 export function TarkovMap({ map, art: preferred = "svg", floor, split = false, players = [], follow = null, centre = null, onUserPan,
   markers = noMarkers, filters = noFilters, preset, lootIcons, selected, onMarkerHover, onMarkerTap, onMapTap, className, children, ref }: TarkovMapProps) {
   const projection = useMemo(() => map ? projectionFor(map) : metricProjection, [map]);
-  const style = artStyleOf(map, preferred);
+  const style = artStyleOf(map, preferred, floor);
   const art = useMemo((): PlaneRect | null => style === "svg" ? artRect(map!, projection) : style === "tiles" ? tileBounds(map!) : null, [map, style, projection]);
   const splitOn = split && style !== null;
   const layout = useSplitLayout(map, style, splitOn, art);
