@@ -66,6 +66,15 @@ code { font: 12px var(--mono); }
 .scan-split.on .scan-more { background: transparent; color: var(--ok); }
 .scan-split.on .scan-more:hover { background: var(--surface-hover); }
 .context-menu.start-menu { position: absolute; top: calc(100% + 6px); right: 0; white-space: nowrap; }
+.mode-picker { position: relative; display: flex; align-items: center; gap: 2px; }
+.mode-picker > .mode-chip:hover { filter: brightness(1.25); }
+.mode-reset { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border-radius: 4px; color: var(--faint); }
+.mode-reset:hover { color: var(--text); background: var(--surface-hover); }
+.mode-reset svg { width: 12px; height: 12px; }
+.context-menu.mode-menu { position: absolute; top: calc(100% + 6px); left: 0; min-width: 130px; }
+.mode-menu button { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mode-menu button.selected { background: var(--surface-hover); }
+.mode-menu .faint { font-size: 11px; }
 .window-controls { display: flex; height: 100%; }
 .window-controls button { width: 46px; height: 100%; display: grid; place-items: center; color: var(--muted); }
 .window-controls button:hover { background: var(--surface-hover); color: var(--text); }

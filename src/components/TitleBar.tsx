@@ -6,7 +6,9 @@ import { lifecycleLabel } from "../lib/format";
 import { mapName } from "../maps";
 import type { CompanionConnection } from "../lib/useCompanion";
 import { connectionLabel, connectionTone, siteName } from "../lib/companion";
-import { CaretIcon, CheckIcon, ExpandIcon, LinkIcon, PlayIcon, StopIcon, WindowClose, WindowMaximize, WindowMinimize } from "./Icons";
+import { gameModes, type GameMode } from "../lib/useGameMode";
+import { modeChip } from "./ModeChip";
+import { CaretIcon, CheckIcon, ExpandIcon, LinkIcon, PlayIcon, ResetIcon, StopIcon, WindowClose, WindowMaximize, WindowMinimize } from "./Icons";
 
 const appWindow = () => getCurrentWindow();
 
@@ -20,7 +22,7 @@ function raidSummary(scanner: Scanner) {
   };
 }
 
-export function TitleBar({ scanner, mini }: { scanner: Scanner; mini: MiniMode }) {
+export function TitleBar({ scanner, mini, gameMode }: { scanner: Scanner; mini: MiniMode; gameMode: GameMode }) {
   const { running, busy, connected, desktop, perform } = scanner;
   const { live, text: raidText } = raidSummary(scanner);
   const [menu, setMenu] = useState(false);
@@ -29,6 +31,7 @@ export function TitleBar({ scanner, mini }: { scanner: Scanner; mini: MiniMode }
     <div className="titlebar-brand" data-tauri-drag-region>
       <span className="brand-mark" aria-hidden="true" />
       <span data-tauri-drag-region>Mappinator</span>
+      <ModePicker gameMode={gameMode} />
     </div>
     <div className="titlebar-center" data-tauri-drag-region>
       {raidText && <span className={`raid-pill ${live ? "live" : ""}`} data-tauri-drag-region>
@@ -63,7 +66,27 @@ export function TitleBar({ scanner, mini }: { scanner: Scanner; mini: MiniMode }
   </div>;
 }
 
-function StartMenu({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+/** The map's game mode; picking another shows that mode's data until a raid starts or one is opened. */
+function ModePicker({ gameMode }: { gameMode: GameMode }) {
+  const { mode, inferred, pick } = gameMode;
+  const [open, setOpen] = useState(false);
+  const chip = modeChip(mode)!;
+  const logLabel = modeChip(inferred)!.label;
+  return <div className="mode-picker">
+    <button type="button" className={`mode-chip ${chip.tone}`} title={mode === inferred ? "Game mode from logs" : "Game mode picked"}
+      aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{chip.label}</button>
+    {mode !== inferred && <button type="button" className="mode-reset" aria-label={`Back to ${logLabel} from logs`}
+      title={`Back to ${logLabel} from logs`} onClick={() => pick(inferred)}><ResetIcon /></button>}
+    {open && <StartMenu className="mode-menu" onClose={() => setOpen(false)}>
+      {gameModes.map((option) => <button key={option} type="button" role="menuitemradio" aria-checked={option === mode}
+        className={option === mode ? "selected" : ""} onClick={() => { setOpen(false); pick(option); }}>
+        {modeChip(option)!.label}{option === inferred && <span className="faint">from logs</span>}
+      </button>)}
+    </StartMenu>}
+  </div>;
+}
+
+function StartMenu({ className = "start-menu", onClose, children }: { className?: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const away = (event: PointerEvent) => {
@@ -80,7 +103,7 @@ function StartMenu({ onClose, children }: { onClose: () => void; children: React
       window.removeEventListener("keydown", escape);
     };
   }, [onClose]);
-  return <div ref={ref} className="context-menu start-menu" role="menu">{children}</div>;
+  return <div ref={ref} className={`context-menu ${className}`} role="menu">{children}</div>;
 }
 
 /** The whole window in mini mode: drag anywhere that isn't a button. */
