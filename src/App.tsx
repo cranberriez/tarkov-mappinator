@@ -43,7 +43,7 @@ export function App() {
   const groupDot = !group.enabled ? null
     : group.connection === "online" && group.membership === "joined" ? { tone: "ok" as const, label: `in group ${group.code}` }
     : group.connection === "error" || group.membership === "error" ? { tone: "bad" as const, label: "not connected" }
-    : group.code ? { tone: "warn" as const, label: "connecting" } : null;
+    : group.code ? { tone: "warn" as const, label: group.connection === "reconnecting" ? "reconnecting" : "connecting" } : null;
   // The mode comes from the raid on the map; a mode picked in the title bar lasts until a raid starts or another is opened.
   const live = scanner.snapshot?.raid;
   const gameMode = useGameMode(viewing ? viewing.game_mode : live?.game_mode, `${viewingId}|${live?.id}|${live?.started_at}`);

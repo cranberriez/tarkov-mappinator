@@ -5,7 +5,7 @@ import { mapName } from "../maps";
 
 const connectionText: Record<GroupConnection, string> = {
   off: "Share raid status and positions with friends.", checking: "Signing in…", "needs-key": "Needs an access key.",
-  connecting: "Connecting…", online: "Connected", error: "Not connected",
+  connecting: "Connecting…", reconnecting: "Reconnecting…", online: "Connected", error: "Not connected",
 };
 const statusText: Record<MemberStatus, string> = { waiting: "Waiting", "in-raid": "In raid", "out-of-raid": "Out of raid" };
 

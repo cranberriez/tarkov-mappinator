@@ -18,7 +18,7 @@ const RETRY_MS = 30_000;
 /** Members joining together get one re-send of everyone's state. */
 const RESEND_DEBOUNCE_MS = 1000;
 
-export type GroupConnection = "off" | "checking" | "needs-key" | "connecting" | "online" | "error";
+export type GroupConnection = "off" | "checking" | "needs-key" | "connecting" | "reconnecting" | "online" | "error";
 export type GroupMembership = "none" | "joining" | "joined" | "error";
 
 type Credentials = { appKey: string; cluster: string };
@@ -29,10 +29,11 @@ type Credentials = { appKey: string; cluster: string };
  * stays joined on every page and in mini mode.
  */
 export function useGroup(scanner: Scanner) {
-  const [enabled, setEnabled] = usePersisted(keys.groupEnabled, false);
+  // On/off and the group joined last only last the session: every launch starts with groups off.
+  const [enabled, setEnabled] = useState(false);
   const [name, setName] = usePersisted(keys.groupName, defaultName());
   const [userId] = usePersisted(keys.groupUser, newUserId());
-  const [code, setCode] = usePersisted<string | null>(keys.groupCode, null);
+  const [code, setCode] = useState<string | null>(null);
   const [accessKey, setAccessKey] = usePersisted(keys.groupAccessKey, "");
   /** Site override from Settings; empty uses the default. */
   const [siteOverride, setSiteOverride] = usePersisted(keys.groupSite, "");
@@ -77,9 +78,10 @@ export function useGroup(scanner: Scanner) {
         authHeaders: { "X-Group-User": userId, "X-Group-Name": name, ...(accessKey ? { "X-Group-Key": accessKey } : {}) },
       });
       socket.bind("state_change", (data) => {
-        const { current } = data as { current: string };
+        const { previous, current } = data as { previous: string; current: string };
         if (current === "connected") { setConnection("online"); setError(null); }
-        else if (current === "connecting") setConnection("connecting");
+        // A drop from a live connection: the SDK retries on its own, and the group stays shown meanwhile.
+        else if (current === "connecting") setConnection(previous === "connected" ? "reconnecting" : "connecting");
         else if (current === "unavailable" || current === "disconnected") {
           setConnection("error");
           setError("Lost connection. Retrying…");
