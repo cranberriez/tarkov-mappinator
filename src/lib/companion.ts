@@ -4,8 +4,9 @@ import type { CompanionStatus } from "../bindings/CompanionStatus";
 import type { ConnectionState } from "../bindings/ConnectionState";
 import type { PairedClient } from "../bindings/PairedClient";
 import type { PendingPairing } from "../bindings/PendingPairing";
+import type { RevokedSite } from "../bindings/RevokedSite";
 
-export type { CompanionStatus, ConnectionState, PairedClient, PendingPairing };
+export type { CompanionStatus, ConnectionState, PairedClient, PendingPairing, RevokedSite };
 export type ConnectionKind = ConnectionState["state"];
 
 export const getCompanionStatus = () => invoke<CompanionStatus>("companion_status");
@@ -14,6 +15,7 @@ export const stopCompanion = () => invoke<CompanionStatus>("companion_stop");
 export const respondToPairing = (pairingId: string, allow: boolean) =>
   invoke<CompanionStatus>("companion_respond", { pairingId, allow });
 export const revokeClient = (clientId: string) => invoke<CompanionStatus>("companion_revoke", { clientId });
+export const allowSite = (origin: string) => invoke<CompanionStatus>("companion_allow_site", { origin });
 export const onCompanionStatus = (receive: (status: CompanionStatus) => void) =>
   listen<CompanionStatus>("companion:updated", (event) => receive(event.payload));
 
@@ -32,6 +34,7 @@ export function siteName(origin: string) {
     const { host } = new URL(origin);
     if (host === "tarkovhideout.com" || host === "www.tarkovhideout.com") return "Tarkov Hideout";
     if (host === "dev.tarkovhideout.com") return "Tarkov Hideout (dev)";
+    if (host === "localhost:3000" || host === "127.0.0.1:3000") return "Tarkov Hideout (local)";
     if (host === "127.0.0.1:47690") return "Test page";
     return host;
   } catch {

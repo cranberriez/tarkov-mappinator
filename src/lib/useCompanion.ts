@@ -3,7 +3,7 @@ import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { isTauri } from "./scanner";
 import { keys, load, save } from "./persist";
 import {
-  getCompanionStatus, onCompanionStatus, respondToPairing, revokeClient, startCompanion, stopCompanion,
+  allowSite, getCompanionStatus, onCompanionStatus, respondToPairing, revokeClient, startCompanion, stopCompanion,
   type CompanionStatus,
 } from "./companion";
 
@@ -54,6 +54,7 @@ export function useCompanion() {
     connection: enabled ? status?.connection.state ?? "waiting" : "off",
     respond: (pairingId: string, allow: boolean) => act(() => respondToPairing(pairingId, allow)),
     revoke: (clientId: string) => act(() => revokeClient(clientId)),
+    allowSite: (origin: string) => act(() => allowSite(origin)),
     retry: () => act(startCompanion),
   };
 }

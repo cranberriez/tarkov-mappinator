@@ -10,7 +10,7 @@ use api::{Method, Request, Response, PROTOCOL};
 use chrono::{DateTime, Utc};
 use model::{
     CompanionStatus, ConnectionState, PairRequested, PairedClient, PairingState, PendingPairing,
-    SourceState, StatusResponse, SyncResponse,
+    RevokedSite, SourceState, StatusResponse, SyncResponse,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -39,6 +39,20 @@ struct StoredClient {
     token_hash: String,
     paired_at: String,
     last_seen: Option<String>,
+}
+
+/// What `store` holds. Older builds wrote the bare client array.
+#[derive(Default, Serialize, Deserialize)]
+struct Stored {
+    clients: Vec<StoredClient>,
+    #[serde(default)]
+    revoked: Vec<StoredRevoked>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct StoredRevoked {
+    origin: String,
+    revoked_at: String,
 }
 
 struct Client {
@@ -73,8 +87,11 @@ struct Inner {
     running: Option<server::Running>,
     error: Option<String>,
     clients: Vec<Client>,
+    revoked: Vec<StoredRevoked>,
     pairings: Vec<Pairing>,
     denied: Vec<(String, Instant)>,
+    /// Pairing attempts from revoked origins, newest per origin. In memory only.
+    blocked: Vec<(String, Instant)>,
     journal: journal::Journal,
     health: Health,
     persisted: Instant,
@@ -116,10 +133,19 @@ fn source_state(status: &crate::scanner::SourceStatus) -> SourceState {
 impl Companion {
     /// `store` is the paired-clients file; `notify` receives every status change.
     pub fn new(store: PathBuf, version: String, notify: Notify) -> Arc<Self> {
-        let clients = std::fs::read(&store)
+        let bytes = std::fs::read(&store).unwrap_or_default();
+        let Stored { clients, revoked } = serde_json::from_slice::<Stored>(&bytes)
             .ok()
-            .and_then(|bytes| serde_json::from_slice::<Vec<StoredClient>>(&bytes).ok())
-            .unwrap_or_default()
+            .or_else(|| {
+                serde_json::from_slice::<Vec<StoredClient>>(&bytes)
+                    .ok()
+                    .map(|clients| Stored {
+                        clients,
+                        revoked: Vec::new(),
+                    })
+            })
+            .unwrap_or_default();
+        let clients = clients
             .into_iter()
             .map(|stored| Client {
                 stored,
@@ -131,8 +157,10 @@ impl Companion {
                 running: None,
                 error: None,
                 clients,
+                revoked,
                 pairings: Vec::new(),
                 denied: Vec::new(),
+                blocked: Vec::new(),
                 journal: journal::Journal::default(),
                 health: Health::default(),
                 persisted: Instant::now(),
@@ -154,11 +182,14 @@ impl Companion {
 
     fn persist(&self, inner: &mut Inner) {
         inner.persisted = Instant::now();
-        let stored: Vec<_> = inner
-            .clients
-            .iter()
-            .map(|client| client.stored.clone())
-            .collect();
+        let stored = Stored {
+            clients: inner
+                .clients
+                .iter()
+                .map(|client| client.stored.clone())
+                .collect(),
+            revoked: inner.revoked.clone(),
+        };
         let result = self
             .store
             .parent()
@@ -213,6 +244,19 @@ impl Companion {
                     last_seen: client.stored.last_seen.clone(),
                 })
                 .collect(),
+            revoked: inner
+                .revoked
+                .iter()
+                .map(|site| RevokedSite {
+                    origin: site.origin.clone(),
+                    revoked_at: site.revoked_at.clone(),
+                    attempted_at: inner
+                        .blocked
+                        .iter()
+                        .find(|(origin, at)| *origin == site.origin && now - *at < PAIRING_TTL)
+                        .map(|(_, at)| wall(*at)),
+                })
+                .collect(),
             pending: inner
                 .pairings
                 .iter()
@@ -249,6 +293,7 @@ impl Companion {
             }
         });
         inner.denied.retain(|(_, at)| now - *at < DENY_COOLDOWN);
+        inner.blocked.retain(|(_, at)| now - *at < PAIRING_TTL);
         if !orphaned.is_empty() {
             inner
                 .clients
@@ -343,7 +388,30 @@ impl Companion {
 
     pub fn revoke(&self, client_id: &str) -> CompanionStatus {
         let mut inner = self.lock();
+        let origin = inner
+            .clients
+            .iter()
+            .find(|client| client.stored.id == client_id)
+            .map(|client| client.stored.origin.clone());
         inner.clients.retain(|client| client.stored.id != client_id);
+        if let Some(origin) = origin {
+            if !inner.revoked.iter().any(|site| site.origin == origin) {
+                inner.revoked.push(StoredRevoked {
+                    origin,
+                    revoked_at: Utc::now().to_rfc3339(),
+                });
+            }
+        }
+        self.persist(&mut inner);
+        self.publish(inner);
+        self.status()
+    }
+
+    /// Lifts the block only; the site still has to pair and be approved.
+    pub fn allow_site(&self, origin: &str) -> CompanionStatus {
+        let mut inner = self.lock();
+        inner.revoked.retain(|site| site.origin != origin);
+        inner.blocked.retain(|(blocked, _)| blocked != origin);
         self.persist(&mut inner);
         self.publish(inner);
         self.status()
@@ -352,6 +420,8 @@ impl Companion {
     pub fn revoke_all(&self) -> CompanionStatus {
         let mut inner = self.lock();
         inner.clients.clear();
+        inner.revoked.clear();
+        inner.blocked.clear();
         self.persist(&mut inner);
         self.publish(inner);
         self.status()
@@ -514,6 +584,15 @@ impl Companion {
                 )
             }
             (Method::Post, ["v1", "pair"]) => {
+                if inner.revoked.iter().any(|site| site.origin == origin) {
+                    inner.blocked.retain(|(blocked, _)| *blocked != origin);
+                    inner.blocked.push((origin, Instant::now()));
+                    return Response::error(
+                        403,
+                        "revoked",
+                        "Access was revoked in Mappinator. Allow this site again there.",
+                    );
+                }
                 if let Some(existing) = inner.pairings.iter().find(|pairing| {
                     pairing.origin == origin && matches!(pairing.decision, Decision::Pending)
                 }) {
@@ -779,6 +858,73 @@ mod tests {
                 .status,
             200
         );
+    }
+
+    #[test]
+    fn revoked_sites_cannot_pair_until_allowed() {
+        let (dir, companion) = companion();
+        pair(&companion);
+        let id = companion.status().clients[0].id.clone();
+        let status = companion.revoke(&id);
+        assert!(status.clients.is_empty());
+        assert_eq!(status.revoked.len(), 1);
+        assert_eq!(status.revoked[0].origin, "https://tarkovhideout.com");
+        let blocked = companion.handle(&request(Method::Post, "/v1/pair", SITE, None));
+        assert_eq!(blocked.status, 403);
+        assert!(blocked.body.contains("revoked"));
+        // Survives a restart.
+        let reloaded = Companion::new(
+            dir.path().join("clients.json"),
+            "test".into(),
+            Box::new(|_| {}),
+        );
+        assert_eq!(reloaded.status().revoked.len(), 1);
+        let status = companion.allow_site("https://tarkovhideout.com");
+        assert!(status.revoked.is_empty() && status.clients.is_empty());
+        let again = companion.handle(&request(Method::Post, "/v1/pair", SITE, None));
+        assert_eq!(again.status, 202);
+    }
+
+    #[test]
+    fn blocked_attempt_is_reported_until_allowed() {
+        let (_dir, companion) = companion();
+        pair(&companion);
+        let id = companion.status().clients[0].id.clone();
+        companion.revoke(&id);
+        assert!(companion.status().revoked[0].attempted_at.is_none());
+        let blocked = companion.handle(&request(Method::Post, "/v1/pair", SITE, None));
+        assert_eq!(blocked.status, 403);
+        assert!(companion.status().revoked[0].attempted_at.is_some());
+        let status = companion.allow_site("https://tarkovhideout.com");
+        assert!(status.revoked.is_empty());
+        companion.revoke_all();
+        assert!(companion.lock().blocked.is_empty());
+    }
+
+    #[test]
+    fn revoke_all_clears_revoked() {
+        let (_dir, companion) = companion();
+        pair(&companion);
+        let id = companion.status().clients[0].id.clone();
+        companion.revoke(&id);
+        assert_eq!(companion.status().revoked.len(), 1);
+        let status = companion.revoke_all();
+        assert!(status.revoked.is_empty() && status.clients.is_empty());
+    }
+
+    #[test]
+    fn legacy_client_array_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("clients.json");
+        std::fs::write(
+            &path,
+            r#"[{"id":"a","origin":"https://tarkovhideout.com","token_hash":"x","paired_at":"2026-01-01T00:00:00Z","last_seen":null}]"#,
+        )
+        .unwrap();
+        let companion = Companion::new(path, "test".into(), Box::new(|_| {}));
+        let status = companion.status();
+        assert_eq!(status.clients.len(), 1);
+        assert!(status.revoked.is_empty());
     }
 
     #[test]

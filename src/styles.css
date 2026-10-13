@@ -599,6 +599,7 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .pairing-actions button { height: 28px; }
 .client-list { list-style: none; margin: 0; padding: 0; max-width: 560px; }
 .client-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.client-subhead { margin: 10px 0 0; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .client-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .link.danger { color: var(--bad); }
 .mini-status.attention { color: var(--text); }

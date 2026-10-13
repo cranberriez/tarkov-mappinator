@@ -19,7 +19,7 @@ export function Sidebar({ page, onNavigate, collapsed, onToggle, connection }: {
 }) {
   const [panel, setPanel] = useState(false);
   const kind = connection.connection;
-  const pending = !!connection.status?.pending.length;
+  const pending = !!connection.status?.pending.length || !!connection.status?.revoked.some((site) => site.attempted_at);
   // A new pairing request opens the panel so Allow/Deny is right there.
   useEffect(() => { if (pending && !collapsed) setPanel(true); }, [pending, collapsed]);
   const link = (item: { page: Page; label: string; icon: ReactNode }) =>

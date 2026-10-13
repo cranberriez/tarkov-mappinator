@@ -567,6 +567,7 @@ pub fn run() {
             companion_stop,
             companion_respond,
             companion_revoke,
+            companion_allow_site,
             autoshot_status,
             autoshot_configure,
             screenshot_cleanup_configure,
@@ -658,6 +659,11 @@ fn companion_respond(
 #[tauri::command(async)]
 fn companion_revoke(client_id: String, companion: State<'_, Arc<Companion>>) -> CompanionStatus {
     companion.revoke(&client_id)
+}
+
+#[tauri::command(async)]
+fn companion_allow_site(origin: String, companion: State<'_, Arc<Companion>>) -> CompanionStatus {
+    companion.allow_site(&origin)
 }
 
 #[tauri::command]

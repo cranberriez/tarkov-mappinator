@@ -246,7 +246,7 @@ function DangerZone() {
 function ConnectionSection({ connection }: { connection: CompanionConnection }) {
   const now = useNow();
   const kind = connection.connection;
-  const detail = connectionDetail(connection, now);
+  const detail = connectionDetail(connection);
   return <section className="settings-section">
     <h2>Site connection</h2>
     <Switch label="Connect to Tarkov Hideout"
@@ -262,7 +262,7 @@ function ConnectionSection({ connection }: { connection: CompanionConnection }) 
       <PendingPrompts connection={connection} />
     </div>}
     {connection.error && <p className="diagnostics">{connection.error}</p>}
-    {(connection.enabled || !!connection.status?.clients.length) && <ClientList connection={connection} now={now} />}
+    {(connection.enabled || !!connection.status?.clients.length || !!connection.status?.revoked.length) && <ClientList connection={connection} now={now} revoked="all" />}
   </section>;
 }
 

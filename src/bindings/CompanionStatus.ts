@@ -2,6 +2,7 @@
 import type { ConnectionState } from "./ConnectionState";
 import type { PairedClient } from "./PairedClient";
 import type { PendingPairing } from "./PendingPairing";
+import type { RevokedSite } from "./RevokedSite";
 
 export type CompanionStatus = { connection: ConnectionState, 
 /**
@@ -15,4 +16,4 @@ last_poll: string | null,
 /**
  * A paired site counts as stale after this long without polling.
  */
-stale_after_secs: number, clients: Array<PairedClient>, pending: Array<PendingPairing>, };
+stale_after_secs: number, clients: Array<PairedClient>, pending: Array<PendingPairing>, revoked: Array<RevokedSite>, };

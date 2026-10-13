@@ -31,6 +31,15 @@ pub struct PendingPairing {
     pub expires_at: String,
 }
 
+/// A site whose access was revoked; it can't request pairing until allowed again.
+#[derive(Clone, Debug, Serialize, PartialEq, TS)]
+pub struct RevokedSite {
+    pub origin: String,
+    pub revoked_at: String,
+    /// Last pairing attempt while revoked, if it was within the pairing window.
+    pub attempted_at: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize, PartialEq, TS)]
 pub struct CompanionStatus {
     pub connection: ConnectionState,
@@ -42,6 +51,7 @@ pub struct CompanionStatus {
     pub stale_after_secs: u32,
     pub clients: Vec<PairedClient>,
     pub pending: Vec<PendingPairing>,
+    pub revoked: Vec<RevokedSite>,
 }
 
 /// Raid phase from the scanner's lifecycle; `unknown` is not sent.
