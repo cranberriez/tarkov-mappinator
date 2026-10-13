@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import type { Scanner } from "../lib/useScanner";
 import { inCaptureOrder, positionsForRaid, toPlayerPosition } from "../lib/positions";
@@ -22,6 +22,9 @@ import { MapSwitcher, type MapState } from "../components/MapSwitcher";
 import { MapFloorPanel } from "../components/MapFloorPanel";
 import { RaidScrubber } from "../components/RaidScrubber";
 import type { GroupMember } from "../lib/group";
+
+/** First letter of a name, for markers and the member list. */
+const initial = (name: string) => name.charAt(0).toUpperCase();
 
 /** A request to show a group member: their map, centred on them once. `nonce` makes a repeat click count. */
 export type MemberFocus = { id: string; nonce: number };
@@ -62,7 +65,7 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
   // Group members on the shown map: their newest position only, in their colour. Not over a past raid.
   const peers = useMemo((): PlayerTrack[] => viewing ? [] : members
     .filter((member) => member.position && member.map && resolveGame(member.map)?.key === shownKey)
-    .map((member) => ({ id: `peer:${member.id}`, label: member.name, color: member.color, className: "peer", positions: [member.position!] })),
+    .map((member) => ({ id: `peer:${member.id}`, label: member.name, color: member.color, className: "peer", badge: initial(member.name), positions: [member.position!] })),
   [members, viewing, shownKey]);
   // This player first: with nothing followed, the map opens on the first track. Peers' markers sit below (styles).
   const players = useMemo((): PlayerTrack[] => [
@@ -142,20 +145,24 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
 
   // Jumping to a member shows their map and centres on them once; following stays with this player.
   const [centre, setCentre] = useState<{ key: string; map: string; point: PlayerPosition } | null>(null);
-  useEffect(() => {
-    const member = focus && members.find((other) => other.id === focus.id);
+  const showMember = (member: GroupMember | undefined, nonce: number) => {
     const key = member?.map ? resolveGame(member.map)?.key : null;
-    if (!focus || !member || !key) return;
+    if (!member || !key) return;
+    if (viewing) onCloseViewing();
     setBrowsed(key);
     setFollow(false);
     setChosenFloor(null);
-    setCentre(member.position ? { key: `${member.id}|${focus.nonce}`, map: key, point: member.position } : null);
-  }, [focus?.nonce]);
+    setCentre(member.position ? { key: `${member.id}|${nonce}`, map: key, point: member.position } : null);
+  };
+  useEffect(() => { if (focus) showMember(members.find((other) => other.id === focus.id), focus.nonce); }, [focus?.nonce]);
   const mapOptions = useMemo(() => games.filter((game) => game.art && calibrations[game.art])
     .map((game) => ({ key: game.key, label: game.name })), []);
 
   const status = !desktop ? "preview" : connected ? "online" : "offline";
   const liveRaid = scanner.running && live?.lifecycle === "active";
+  // Members in a raid on this player's live raid map (maybe not the same raid; nothing says which).
+  const liveKey = liveRaid ? resolveGame(live.map)?.key ?? null : null;
+  const mapmates = liveKey ? members.filter((member) => member.status === "in-raid" && member.map && resolveGame(member.map)?.key === liveKey) : [];
   const mapState: MapState = status === "offline" ? "offline" : liveRaid && (viewing || shownKey !== (resolveGame(live.map)?.key ?? null)) ? "elsewhere" : liveRaid ? "live" : "idle";
 
   return <MapAssetsContext.Provider value={appAssets}><div className="map-page">
@@ -203,7 +210,16 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
 
     <MapSwitcher maps={mapOptions} current={shownKey} label={mapName(shownMap) ?? (status === "online" ? "No map" : status === "offline" ? "Disconnected" : "Preview")}
       floor={shownFloor && !shownFloor.base ? shownFloor.name : undefined} state={mapState} liveName={mapName(live?.map)} onSelect={chooseMap}
-      onSwitch={() => { if (viewing) onCloseViewing(); setFollow(true); setCentre(null); }} />
+      onSwitch={() => { if (viewing) onCloseViewing(); setFollow(true); setCentre(null); }}>
+      {mapmates.length > 0 && <ul className="mapmates" aria-label="Group members on this map">
+        {mapmates.map((member) => <li key={member.id}>
+          <button type="button" className="mapmate" disabled={!member.position} title={member.position ? "Show on map" : "No position yet"}
+            onClick={() => showMember(member, Date.now())}>
+            <span className="mapmate-icon" style={{ "--player": member.color } as CSSProperties}><span>{initial(member.name)}</span></span>{member.name}
+          </button>
+        </li>)}
+      </ul>}
+    </MapSwitcher>
   </div></MapAssetsContext.Provider>;
 }
 

@@ -205,18 +205,20 @@ function PlayerMarkers({ players, at, heading }: {
     return <div key={track.id} className={`player-track ${track.className ?? ""}`} style={colour as CSSProperties}>
       {older.map((position, index) => <Marker key={position.key} at={at(position)} heading={rotation(position)}
         className="marker old" style={{ opacity: 0.18 + (index + 1) / (older.length + 1) * 0.4 } as CSSProperties} title={title(position)} />)}
-      {newest && <Marker at={at(newest)} heading={rotation(newest)} className="marker newest"
+      {newest && <Marker at={at(newest)} heading={rotation(newest)} className="marker newest" badge={track.badge}
         style={{ "--fresh": track.live && newest.at ? freshness(newest.at, now) : 0 } as CSSProperties}
         title={[track.label, title(newest)].filter(Boolean).join(" · ") || undefined} />}
     </div>;
   })}</>;
 }
 
-function Marker({ at, heading, className, style, title }: {
-  at: { left: number; top: number }; heading: number | null; className: string; style?: CSSProperties; title?: string;
+function Marker({ at, heading, className, style, title, badge }: {
+  at: { left: number; top: number }; heading: number | null; className: string; style?: CSSProperties; title?: string; badge?: string;
 }) {
   // The sharp corner sits top-left; +45° turns it to "up", then heading rotates clockwise from screen up.
   const pointer = heading !== null;
   return <div className={`${className} ${pointer ? "pointer" : ""}`} title={title}
-    style={{ ...style, left: at.left, top: at.top, "--rot": `${(heading ?? 0) + 45}deg` } as CSSProperties} />;
+    style={{ ...style, left: at.left, top: at.top, "--rot": `${(heading ?? 0) + 45}deg` } as CSSProperties}>
+    {badge && <span className="marker-badge">{badge}</span>}
+  </div>;
 }

@@ -21,6 +21,8 @@ export type PlayerTrack = {
   live?: boolean;
   /** Extra class on the track's element, for styling a kind of player (e.g. other group members). */
   className?: string;
+  /** A character or two drawn upright inside the newest marker, e.g. the player's initial. */
+  badge?: string;
   positions: PlayerPosition[];
 };
 

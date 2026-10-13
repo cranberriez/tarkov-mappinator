@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { CaretIcon, SwitchIcon } from "./Icons";
 
 export type MapOption = { key: string; label: string };
@@ -10,7 +10,7 @@ export type MapState = "live" | "elsewhere" | "idle" | "offline";
  * in the map view until the view goes back to following the raid. While a raid is live elsewhere, the dot
  * and name turn into a button that jumps back to it.
  */
-export function MapSwitcher({ maps, current, label, floor, state, liveName, onSelect, onSwitch }: {
+export function MapSwitcher({ maps, current, label, floor, state, liveName, onSelect, onSwitch, children }: {
   maps: MapOption[];
   /** Key of the map being shown. */
   current: string | null;
@@ -24,6 +24,8 @@ export function MapSwitcher({ maps, current, label, floor, state, liveName, onSe
   onSelect: (key: string) => void;
   /** Go to the live raid's map. */
   onSwitch: () => void;
+  /** Shown under the pill (and the map list when open). */
+  children?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const toggle = () => setOpen(!open);
@@ -48,5 +50,6 @@ export function MapSwitcher({ maps, current, label, floor, state, liveName, onSe
         className={`floor-row ${map.key === current ? "active" : ""}`}
         onClick={() => { onSelect(map.key); setOpen(false); }}>{map.label}</button>)}
     </div>}
+    {children}
   </div>;
 }
