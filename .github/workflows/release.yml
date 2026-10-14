@@ -24,6 +24,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -38,7 +40,20 @@ jobs:
 
       - run: npm ci
 
-      # Version comes from src-tauri/tauri.conf.json; bump it before running to cut a new release.
+      # Version = major.minor from src-tauri/tauri.conf.json + total commit count as the patch number.
+      - name: Set version from commit count
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const p = 'src-tauri/tauri.conf.json';
+            const c = JSON.parse(fs.readFileSync(p, 'utf8'));
+            const [major, minor] = c.version.split('.');
+            c.version = major + '.' + minor + '.' + process.argv[1];
+            fs.writeFileSync(p, JSON.stringify(c, null, 2) + '\n');
+            console.log('Version ' + c.version);
+          " "$(git rev-list --count HEAD)"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
