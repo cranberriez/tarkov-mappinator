@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
-import { floorAt, floorById, floorLevels, floorOf, floorsOf, levelText, type FloorSelection } from "./floors.ts";
+import { floorAt, floorById, floorLevels, floorOf, floorOrder, floorsOf, levelText, type FloorSelection } from "./floors.ts";
 import { roomRings } from "./rooms.ts";
 import { MapArt } from "./MapArt.tsx";
 import { MapOverlay, type OverlayArea } from "./MapOverlay.tsx";
@@ -251,7 +251,7 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, l
       "--s": view.scale,
     } as CSSProperties}>
       <MapOverlay markers={markers} filters={filters} preset={preset} projection={projection}
-        floors={markerFloors} floor={splitOn ? null : floor} shift={shift} labelled={pxPerMetre >= LABEL_PX_PER_M} area={overlayArea}
+        floors={markerFloors} floor={splitOn ? null : floor} order={map ? floorOrder(map) : undefined} shift={shift} labelled={pxPerMetre >= LABEL_PX_PER_M} area={overlayArea}
         selected={selected} lootIcons={lootIcons} />
       {layout.labels.length > 0 && <div className="split-labels">
         {layout.labels.map((label) => label.width * view.scale >= SPLIT_LABEL_MIN_PX && <span key={label.floor} className="split-label"

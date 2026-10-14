@@ -38,4 +38,5 @@ export const FolderIcon = () => <Icon size={16}><path d="M3 6.5A1.5 1.5 0 0 1 4.
 export const CameraIcon = () => <Icon><path d="M4 8a2 2 0 0 1 2-2h2l1.5-2h5L16 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" /><circle cx="12" cy="13" r="3.5" /></Icon>;
 export const MissingImageIcon = () => <Icon size={48}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m3 16 5-5 4 4M14 13l2-2 5 5" /><path d="M3 3l18 18" /></Icon>;
 export const FloorsIcon = () => <Icon><path d="m12 3 9 4.5-9 4.5-9-4.5z" /><path d="m3 12 9 4.5 9-4.5" /><path d="m3 16.5 9 4.5 9-4.5" /></Icon>;
+export const AllFloorsIcon = () => <Icon size={13}><path d="m12 3 9 4.5-9 4.5-9-4.5z" /><path d="m3 12 9 4.5 9-4.5" /><path d="m3 16.5 9 4.5 9-4.5" /></Icon>;
 export const CheckIcon = () => <Icon size={14}><path d="m5 12 5 5 9-10" /></Icon>;

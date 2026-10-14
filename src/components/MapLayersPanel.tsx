@@ -1,12 +1,13 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { groupOn, layerState, sameFilters, tarkovPreset, toggleLayer, useMapAssets, type Filters, type LayerDef, type MarkerPreset } from "../maps";
-import { CaretIcon, PinIcon, ResetIcon } from "./Icons";
+import { allFloorsOn, groupOn, layerState, sameFilters, tarkovPreset, toggleLayer, useMapAssets, type Filters, type LayerDef, type MarkerPreset } from "../maps";
+import { AllFloorsIcon, CaretIcon, PinIcon, ResetIcon } from "./Icons";
 
 export const PRESET_SLOTS = 3;
 
 /**
- * Tiered marker filter: each layer row switches the whole layer, the rows under it switch its groups.
+ * Tiered marker filter: each layer row switches the whole layer, the rows under it switch its groups;
+ * the floors button beside a layer keeps its markers visible on other floors.
  * Groups the current map has no markers for are left out. Layers fold behind a caret; three preset
  * slots save and restore the switches (right click a saved slot to overwrite or clear it).
  * Folding (by layer key, and `layer.category` key) and the preset slots are the caller's to keep.
@@ -27,7 +28,7 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
 
   const shown = layers.filter((layer) => counts[layer.key]);
   const setGroup = (key: string, group: string, on: boolean) => onChange({
-    ...filters, [key]: { groups: { ...filters[key].groups, [group]: on } },
+    ...filters, [key]: { ...filters[key], groups: { ...filters[key].groups, [group]: on } },
   });
 
   const groupRow = (layerKey: string, state: Filters[string], group: LayerDef["groups"][number], sub: boolean) => {
@@ -70,6 +71,7 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
       // The header speaks for the groups this map has.
       const present = layer.groups.filter((group) => counts[`${layer.key}.${group.key}`]);
       const status = layerState(state, present.map((group) => group.key), layer.key, markerPreset);
+      const floorsOn = allFloorsOn(state, layer.key, markerPreset);
       return <div key={layer.key} className={`layer ${status}`}>
         <div className="layer-head">
           <button type="button" className={`caret ${folded ? "folded" : ""}`} aria-expanded={!folded}
@@ -81,6 +83,9 @@ export function MapLayersPanel({ layers, filters, defaults, counts, open, onOpen
             <span className="layer-name">{layer.label}</span>
             <span className="faint">{counts[layer.key]}</span>
           </button>
+          <button type="button" className={`layer-floors ${floorsOn ? "on" : ""}`} aria-pressed={floorsOn}
+            title={floorsOn ? "Only on the shown floor" : "Show on all floors"}
+            onClick={() => onChange({ ...filters, [layer.key]: { ...state, allFloors: !floorsOn } })}><AllFloorsIcon /></button>
         </div>
         {!folded && <div className="layer-groups">
           {layer.categories ? layer.categories.map((category) => {

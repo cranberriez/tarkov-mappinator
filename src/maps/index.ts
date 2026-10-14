@@ -9,14 +9,14 @@ export { games, mapName, maps, mapSources, normalizeMapName, resolveGame, resolv
 export { setRooms } from "./roomData.ts";
 export { heightMiss, inRoom, roomAt, roomBox, roomCorners, roomRings, tenth, toRoom, type MapRoom, type RoomRect, type RoomShape } from "./rooms.ts";
 export { artRect, metricProjection, planeRect, projectionFor, type MapProjection } from "./projection.ts";
-export { baseFloor, extentsAt, floorAt, floorById, floorLevels, floorOf, floorsOf, GROUND, levelText, UNDERGROUND_OPACITY, type ExtentHit, type Floor, type FloorSelection } from "./floors.ts";
+export { baseFloor, extentsAt, floorAt, floorById, floorLevels, floorOf, floorOrder, floorsOf, GROUND, levelText, UNDERGROUND_OPACITY, type ExtentHit, type Floor, type FloorSelection } from "./floors.ts";
 export { tileBounds, tileCount, tilePathAt, tileRange, tileSets, tileZoom, tilesIn, type Tile } from "./tiles.ts";
 export { iconUrl, MapAssetsContext, useMapAssets, webAssets, type MapAssets } from "./assets.ts";
 export { containerIcon, mapIcons } from "./icons.ts";
 export { documentLocations, documentPhoto, documentSource, type DocumentLocation } from "./documents.ts";
 export { tarkovPreset, type CategoryDef, type DocumentType, type DynamicLayer, type GroupDef, type LayerDef, type MarkerPreset } from "./markerPreset.ts";
 export {
-  buildMarkers, countMarkers, defaultFilters, groupOn, isVisible, layerState, layersFor, markerIcon, markerTint, roleOf, sameFilters,
+  allFloorsOn, buildMarkers, countMarkers, defaultFilters, groupOn, isVisible, layerState, layersFor, markerIcon, markerTint, roleOf, sameFilters,
   toggleLayer, withDefaults, type BossInfo, type Detail, type Filters, type LayerFilter, type Lookups, type MapMarker, type Role,
 } from "./markers.ts";
 export { freshness, usePlayerTracks, withPosition, type PlayerPosition, type PlayerTrack, type TrackInfo } from "./players.ts";

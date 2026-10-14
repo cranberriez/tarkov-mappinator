@@ -48,7 +48,7 @@ export type MapMarker = {
   slot?: { index: number; of: number };
 };
 
-export type LayerFilter = { groups: Record<string, boolean> };
+export type LayerFilter = { groups: Record<string, boolean>; /** Markers on floors other than the one shown stay, smaller and with a caret. */ allFloors?: boolean };
 export type Filters = Record<string, LayerFilter>;
 export type Role = "pmc" | "scav" | "unknown";
 
@@ -67,6 +67,7 @@ export function defaultFilters(role: Role, preset: MarkerPreset = tarkovPreset):
   return Object.fromEntries(preset.layers.map((layer) => [layer.key, {
     groups: Object.fromEntries(layer.groups.map((group) =>
       [group.key, !layer.off && !group.off && !(preset.factional.includes(layer.key) && off.has(group.key))])),
+    allFloors: !!layer.allFloors,
   }]));
 }
 
@@ -81,13 +82,17 @@ export function withDefaults(stored: Partial<Record<string, LayerFilter & { on?:
     const groups = { ...layer.groups, ...saved?.groups };
     for (const group of preset.dynamic[key]?.legacy ?? []) delete groups[group];
     if (saved?.on === false) for (const group of Object.keys(groups)) groups[group] = false;
-    return [key, { groups }];
+    return [key, { groups, allFloors: typeof saved?.allFloors === "boolean" ? saved.allFloors : layer.allFloors }];
   }));
 }
 
 /** Whether a group is on; one the filter has no entry for (a boss or container type not seen before) takes its default. */
 export const groupOn = (filter: LayerFilter | undefined, group: string, layer: string, preset: MarkerPreset = tarkovPreset) =>
   filter?.groups[group] ?? !preset.dynamic[layer]?.off(group);
+
+/** Whether a layer keeps its markers on other floors; a layer the filter has no say for takes its preset default. */
+export const allFloorsOn = (filter: LayerFilter | undefined, layer: string, preset: MarkerPreset = tarkovPreset) =>
+  filter?.allFloors ?? !!preset.layers.find((def) => def.key === layer)?.allFloors;
 
 /** Header state of a layer over the given groups: all on, none on, or some. */
 export function layerState(filter: LayerFilter, groups: string[], layer: string, preset: MarkerPreset = tarkovPreset): "on" | "off" | "mixed" {
@@ -98,7 +103,7 @@ export function layerState(filter: LayerFilter, groups: string[], layer: string,
 /** The header click: any of the groups on turns them all off, otherwise all on. Other groups are left alone. */
 export function toggleLayer(filter: LayerFilter, groups: string[], layer: string, preset: MarkerPreset = tarkovPreset): LayerFilter {
   const on = layerState(filter, groups, layer, preset) === "off";
-  return { groups: { ...filter.groups, ...Object.fromEntries(groups.map((group) => [group, on])) } };
+  return { ...filter, groups: { ...filter.groups, ...Object.fromEntries(groups.map((group) => [group, on])) } };
 }
 
 export const isVisible = (marker: MapMarker, filters: Filters, preset: MarkerPreset = tarkovPreset) => {
@@ -442,6 +447,7 @@ export function sameFilters(a: Filters, b: Filters, preset: MarkerPreset = tarko
     const keys = new Set(layer.groups.map((group) => group.key));
     const legacy = preset.dynamic[layer.key]?.legacy;
     if (legacy) for (const side of [a, b]) for (const group of Object.keys(side[layer.key]?.groups ?? {})) if (!legacy.includes(group)) keys.add(group);
-    return [...keys].every((group) => groupOn(a[layer.key], group, layer.key, preset) === groupOn(b[layer.key], group, layer.key, preset));
+    return allFloorsOn(a[layer.key], layer.key, preset) === allFloorsOn(b[layer.key], layer.key, preset)
+      && [...keys].every((group) => groupOn(a[layer.key], group, layer.key, preset) === groupOn(b[layer.key], group, layer.key, preset));
   });
 }

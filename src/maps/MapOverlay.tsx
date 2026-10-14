@@ -3,7 +3,7 @@ import { useMapAssets } from "./assets.ts";
 import type { FloorSelection } from "./floors.ts";
 import { mapIcons } from "./icons.ts";
 import { tarkovPreset, type MarkerPreset } from "./markerPreset.ts";
-import { markerIcon, markerTint, type Filters, type MapMarker } from "./markers.ts";
+import { allFloorsOn, markerIcon, markerTint, type Filters, type MapMarker } from "./markers.ts";
 import type { MapProjection } from "./projection.ts";
 
 /** Layers thick enough to crowd the map; their markers give way to anything else that would overlap them. */
@@ -18,17 +18,20 @@ export type OverlayArea = { x: number; y: number; width: number; height: number;
  * Data markers placed in plane units, relative to the plane origin. The caller translates this layer
  * for panning and sets `--s` (pixels per plane unit) on it for zooming, so neither re-renders the markers;
  * only filtering, a floor change or crossing the label zoom does.
- * With one floor shown, markers and zones on other floors are hidden, except extracts, which dim.
+ * With one floor shown, markers and zones on other floors are hidden unless their layer is kept on all floors
+ * (`allFloors`); then markers are drawn smaller with a caret pointing to the floor's side, and zones faded.
  * Zones draw their outline underneath their icon. Extract names show when `labelled`; hovering any marker
  * shows its name and what it is.
  * With `area`, only markers inside it are drawn, and a dense marker is left out where something drawn before it
  * already holds its cell: others first, then containers before loose loot.
  * Cells are fixed to the plane, so panning never changes which marker wins one.
  */
-export const MapOverlay = memo(function MapOverlay({ markers, filters, preset = tarkovPreset, projection, floors, floor, shift, labelled, area, selected, lootIcons }: {
+export const MapOverlay = memo(function MapOverlay({ markers, filters, preset = tarkovPreset, projection, floors, floor, order, shift, labelled, area, selected, lootIcons }: {
   markers: MapMarker[]; filters: Filters; preset?: MarkerPreset; projection: MapProjection;
   /** Floor id per marker id, and the floor shown (null for every floor). */
   floors: Map<string, string>; floor: FloorSelection;
+  /** Floor id → place bottom to top (`floorOrder`), for the caret on markers from other floors. */
+  order?: Map<string, number>;
   /** How far a thing on a floor moves sideways (plane units) when floors are split apart; it moves with its building's floor. */
   shift?: (floor: string, x: number, y: number) => number;
   labelled: boolean; area: OverlayArea | null;
@@ -46,7 +49,7 @@ export const MapOverlay = memo(function MapOverlay({ markers, filters, preset = 
   };
   const at = (point: { x: number; z: number }, dx = 0) => { const plane = projection.toPlane(point); return { x: plane.x + dx, y: plane.y }; };
   const otherFloor = (marker: MapMarker) => floor !== null && floors.get(marker.id) !== floor;
-  const hidden = (marker: MapMarker) => otherFloor(marker) && marker.layer !== "extracts";
+  const hidden = (marker: MapMarker) => otherFloor(marker) && !allFloorsOn(filters[marker.layer], marker.layer, preset);
   const zones = markers.filter((marker) => marker.outline?.length && !hidden(marker));
   const placed = useMemo(() => {
     const all = markers.filter((marker) => !hidden(marker)).map((marker) => ({ marker, ...at(marker.position, shiftOf(marker)) }));
@@ -63,7 +66,7 @@ export const MapOverlay = memo(function MapOverlay({ markers, filters, preset = 
     }
     // Drawn in their original order, so what sits on top stays the same.
     return inside.filter((entry) => kept.has(entry));
-  }, [markers, projection, floors, floor, shift, area]);
+  }, [markers, filters, preset, projection, floors, floor, order, shift, area]);
 
   return <>
     {zones.length > 0 && <svg className="overlay-zones" width="1" height="1"><g className="overlay-zones-scale">
@@ -77,11 +80,14 @@ export const MapOverlay = memo(function MapOverlay({ markers, filters, preset = 
       // Only extracts keep their name on the map; everything else names itself on hover.
       const named = labelled && marker.layer === "extracts" && !!marker.label;
       const lootItem = lootIcons?.get(marker.id);
-      return <div key={marker.id} className={`overlay-marker ${marker.layer} ${lootItem ? "valuable" : ""} ${otherFloor(marker) ? "other-floor" : ""} ${marker.id === selected ? "selected" : ""}`}
+      const rank = order?.get(floors.get(marker.id) ?? ""), shown = order?.get(floor ?? "");
+      const side = otherFloor(marker) && rank !== undefined && shown !== undefined ? rank > shown ? "above" : "below" : undefined;
+      return <div key={marker.id} className={`overlay-marker ${marker.layer} ${lootItem ? "valuable" : ""} ${otherFloor(marker) ? "other-floor" : ""} ${side ?? ""} ${marker.id === selected ? "selected" : ""}`}
         data-marker={marker.id} style={{ left: `calc(${x}px * var(--s))`, top: `calc(${y}px * var(--s))`,
           ...marker.slot ? { "--slot": marker.slot.index - (marker.slot.of - 1) / 2 } : {} } as CSSProperties}>
         <img src={icon(lootItem ? `item:${lootItem}` : markerIcon(marker, filters, preset)) ?? mapIcons.container_crate} alt="" draggable={false}
           className={tint ? "tinted" : undefined} style={tint ? { "--tint": tint } as CSSProperties : undefined} />
+        {side && <span className="floor-caret" aria-hidden="true" />}
         {named && <span className="overlay-label">{marker.label}</span>}
         {hover && <span className={`overlay-label overlay-hover ${named ? "replaces" : ""}`}>{hover}</span>}
       </div>;

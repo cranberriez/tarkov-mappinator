@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { artRect, metricProjection, projectionFor } from "./projection.ts";
-import { AREA_MARGIN, floorAt, floorOf, floorsOf, GROUND } from "./floors.ts";
+import { AREA_MARGIN, floorAt, floorOf, floorOrder, floorsOf, GROUND } from "./floors.ts";
 import { games, mapName, maps, resolveGame, resolveMap } from "./catalog.ts";
 import { tileCount, tileRange, tilesIn, tileZoom } from "./tiles.ts";
 
@@ -169,4 +169,16 @@ test("tiles cover the map bounds and follow the view zoom", () => {
   assert.ok(part.every((tile) => tile.rect.width === 16));
   assert.ok(tileCount(customs) > 1000);
   assert.equal(tileCount(maps.terminal), 0, "SVG only");
+});
+
+test("floor order runs underground floors, the base, then the floors above", () => {
+  for (const [key, map] of Object.entries(maps)) {
+    const order = floorOrder(map), floors = floorsOf(map);
+    assert.deepEqual([...order.keys()].sort(), floors.map((floor) => floor.id).sort(), key);
+    const rank = (floor) => order.get(floor.id);
+    for (const floor of floors) {
+      if (floor.underground) assert.ok(rank(floor) < rank(floors[0]), key);
+      else if (!floor.base) assert.ok(rank(floor) > rank(floors[0]), key);
+    }
+  }
 });

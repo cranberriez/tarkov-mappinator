@@ -13,6 +13,7 @@ export type LayerDef = {
   /** Groups are listed under these, in this order, by their `parent`. */ categories?: CategoryDef[];
   /** All groups hidden until switched on. */ off?: boolean;
   /** Folded in the panel until opened. */ folded?: boolean;
+  /** Kept on every floor by default: markers on other floors stay, smaller and with a caret. */ allFloors?: boolean;
 };
 
 /** A layer whose groups come from the map's data, so its `LayerDef` can't list them. */
@@ -72,7 +73,7 @@ const bossOff = ["pmcs", "raider", "rogue", "black-div", "af", "pmcBot", "exUsec
 
 export const tarkovPreset: MarkerPreset = {
   layers: [
-    { key: "extracts", label: "Extracts", icon: "extract_pmc", groups: [
+    { key: "extracts", label: "Extracts", icon: "extract_pmc", allFloors: true, groups: [
       { key: "pmc", label: "PMC", icon: "extract_pmc" },
       { key: "scav", label: "Scav", icon: "extract_scav" },
       { key: "transit", label: "Transit", icon: "extract_transit" },

@@ -535,7 +535,11 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .zone.artillery { fill: rgb(240 140 60 / 14%); stroke: rgb(240 140 60 / 75%); }
 .zone.other { fill: rgb(170 140 230 / 12%); stroke: rgb(170 140 230 / 65%); }
 .zone.other-floor { opacity: .35; }
-.overlay-marker.other-floor { opacity: .35; }
+.overlay-marker.other-floor img { scale: .75; }
+.floor-caret { position: absolute; left: 0; top: 0; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 85%)); pointer-events: none; }
+.overlay-marker.above .floor-caret { border-bottom: 5px solid var(--text); }
+.overlay-marker.below .floor-caret { border-top: 5px solid var(--text); }
 .overlay-marker:hover { z-index: 5; }
 .overlay-hover { display: none; padding: 1px 6px; border-radius: 4px; background: rgb(15 16 17 / 88%); text-shadow: none; }
 .overlay-marker:hover .overlay-hover { display: block; }
@@ -562,6 +566,9 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .caret:hover { color: var(--text); }
 .caret.folded svg { transform: rotate(-90deg); }
 .layer-head .layer-row { padding-left: 4px; }
+.layer-floors { width: 20px; height: 20px; padding: 0; flex-shrink: 0; display: grid; place-items: center; border-radius: 5px; color: var(--faint); visibility: hidden; }
+.layer-head:hover .layer-floors, .layer-floors.on, .layer-floors:focus-visible { visibility: visible; }
+.layer-floors.on, .layer-floors:hover { color: var(--text); }
 
 .context-menu { position: fixed; z-index: 20; min-width: 150px; display: flex; flex-direction: column; padding: 4px;
   border-radius: var(--radius); background: rgb(35 36 40 / 96%); box-shadow: 0 8px 24px rgb(0 0 0 / 40%); }

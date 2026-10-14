@@ -283,3 +283,18 @@ test("a spawn that can hold two document types gets a marker per type, each with
     ["document:0:project", ["project"], "desk", { index: 1, of: 2 }],
   ]);
 });
+
+test("only extracts are kept on all floors by default; saves keep their own choice", async () => {
+  const { allFloorsOn, sameFilters, toggleLayer } = await import("./markers.ts");
+  const defaults = defaultFilters("unknown");
+  assert.deepEqual(Object.entries(defaults).filter(([, layer]) => layer.allFloors).map(([key]) => key), ["extracts"]);
+  assert.equal(withDefaults({ extracts: { groups: {}, allFloors: false } }, "unknown").extracts.allFloors, false);
+  assert.equal(withDefaults({ extracts: { groups: {} } }, "unknown").extracts.allFloors, true);
+  assert.equal(withDefaults({ spawns: { groups: {}, allFloors: true } }, "unknown").spawns.allFloors, true);
+  assert.equal(allFloorsOn(undefined, "extracts"), true);
+  assert.equal(allFloorsOn({ groups: {} }, "spawns"), false);
+  assert.equal(toggleLayer({ groups: { pmc: true }, allFloors: false }, ["pmc"], "extracts").allFloors, false);
+  const changed = structuredClone(defaults);
+  changed.extracts.allFloors = false;
+  assert.equal(sameFilters(defaults, changed), false);
+});

@@ -53,6 +53,19 @@ export function floorsOf(map: MapCalibration): Floor[] {
   return floors;
 }
 
+const orders = new WeakMap<MapCalibration, Map<string, number>>();
+
+/** Floor id → place bottom to top: underground floors, then the base, then the rest as tarkov.dev lists them. */
+export function floorOrder(map: MapCalibration): Map<string, number> {
+  let order = orders.get(map);
+  if (order) return order;
+  const floors = floorsOf(map);
+  order = new Map([...floors.filter((floor) => floor.underground), ...floors.filter((floor) => floor.base && !floor.underground),
+    ...floors.filter((floor) => !floor.base && !floor.underground)].map((floor, rank) => [floor.id, rank]));
+  orders.set(map, order);
+  return order;
+}
+
 const bound = (height: number) => Math.abs(height) >= 1000 ? null : +height.toFixed(1);
 
 /** "Y 10 – 15", "Y > 25", "Y < -6": the heights a height range covers, for display. */
