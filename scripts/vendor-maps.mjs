@@ -1,10 +1,9 @@
 // Refreshes the vendored map library in src/maps from pinned upstream commits.
 //   node scripts/vendor-maps.mjs [svgCommit] [tarkovDevCommit]
 // Writes src/maps/assets/{svg,icons}/* and src/maps/calibration.json (game identities, art calibration, tile paths). Review the diff before committing.
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyFloors, stringifyCalibration } from "./apply-floors.mjs";
 
 const SVG_REPO = "the-hideout/tarkov-dev-svg-maps";
 const DEV_REPO = "the-hideout/tarkov-dev";
@@ -96,18 +95,6 @@ for (const [mapKey, floors] of Object.entries(FLOOR_HEIGHTS)) {
   }
 }
 
-// Upper floors start lower than upstream's bands say: Streets' ground floors read 3.5-4.7 and a 2nd floor 6.7-7.3 in game,
-// against a 2nd-floor band starting at 10. Shifts the height range of every floor above the ground, by map key.
-const ABOVE_GROUND_SHIFT = { "streets-of-tarkov": -4 };
-for (const [mapKey, shift] of Object.entries(ABOVE_GROUND_SHIFT)) {
-  for (const layer of calibration[mapKey]?.layers ?? []) {
-    for (const extent of layer.extents ?? []) {
-      if (extent.height[0] <= -1000) continue;
-      extent.height = extent.height.map((height) => Math.abs(height) >= 1000 ? height : height + shift);
-    }
-  }
-}
-
 // Every game map, keyed by tarkov.dev normalizedName, with both identifiers seen in game logs.
 const games = gameMaps.map((game) => ({
   key: game.normalizedName,
@@ -129,17 +116,11 @@ for (const entry of listing.filter((entry) => entry.name.endsWith(".png"))) {
   await writeFile(join(root, "assets", "icons", entry.name), await get(raw(DEV_REPO, devCommit, `${iconsDir}/${entry.name}`), "bytes"));
 }
 
-// Per-building floors from the hand-edited table (scripts/apply-floors.mjs), over the art just written; they replace the
-// shifted bands of the maps in the table.
-const svgText = new Map();
-for (const map of Object.values(calibration)) if (map.svg && !svgText.has(map.svg)) svgText.set(map.svg, await readFile(join(root, "assets", "svg", map.svg), "utf8"));
-applyFloors(calibration, (svg) => svgText.get(svg));
-
-await writeFile(join(root, "calibration.json"), stringifyCalibration({
+await writeFile(join(root, "calibration.json"), JSON.stringify({
   source: { svg: `${SVG_REPO}@${svgCommit}`, calibration: `${DEV_REPO}@${devCommit}`, aliases: `${API}/maps` },
   games,
   maps: calibration,
-}));
+}, null, 1) + "\n");
 
 console.log(`maps: ${Object.keys(calibration).join(", ")}`);
 console.log(`games without art: ${games.filter((game) => !game.art).map((game) => game.key).join(", ") || "none"}`);

@@ -87,15 +87,6 @@ test("floors match areas as drawn, just outside them only where no area holds th
   assert.equal(floorOf(map, { position: { x: 5, z: 5, y: 4 }, floor: "nowhere" }).id, "2nd Floor", "unknown hand floor");
 });
 
-test("Streets floors put marked spots on their floors", () => {
-  const streets = maps["streets-of-tarkov"];
-  assert.equal(floorAt(streets, { x: 139.6, z: 376.8, y: 7.3 }).id, "2nd Floor", "Concordia office");
-  assert.equal(floorAt(streets, { x: -41.51, z: -45.62, y: 6.39 }).id, "2nd Floor", "Beluga restaurant");
-  assert.equal(floorAt(streets, { x: 146.79, z: -17.51, y: 3.19 }).id, "2nd Floor", "Cardinal TerraGroup apartment");
-  assert.equal(floorAt(streets, { x: 220.72, z: 397.42, y: 9.56 }).id, "2nd Floor", "Concordia Apartment 8");
-  assert.equal(floorAt(streets, { x: -181.96, z: 220.93, y: 3.58 }).id, GROUND, "Audit building ground floor");
-});
-
 test("every map has one base floor, listed first, and floor ids are unique", () => {
   for (const [key, map] of Object.entries(maps)) {
     const floors = floorsOf(map);
