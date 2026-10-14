@@ -3,8 +3,8 @@ import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
 import type { Scanner } from "../lib/useScanner";
 import type { PositionObservation } from "../bindings/PositionObservation";
 import { clock } from "../lib/format";
-import { extentName, guessAt, useFloorData, type FloorData } from "../lib/floorData";
-import { extentsAt, floorAt, floorLevels, floorsOf, levelText, mapName, resolveGame, resolveMap, type ExtentHit, type MapCalibration } from "../maps";
+import { guessAt, heightMiss, inRoom, useFloorData, type FloorData, type FloorRoom } from "../lib/floorData";
+import { floorAt, floorsOf, levelText, mapName, resolveGame, resolveMap, type MapCalibration } from "../maps";
 import { ChevronLeftIcon, ChevronRightIcon, MissingImageIcon } from "../components/Icons";
 
 const fixed = (value: number) => value.toFixed(2);
@@ -54,17 +54,19 @@ function Shot({ shot, rawMap, folder, floorData, onNewer, onOlder }: {
   const map = resolveMap(rawMap);
   const [x, y, z] = shot.xyz;
   const point = { x, y, z };
-  const floor = map ? floorAt(map, point) : null;
-  const range = map && floor ? floorLevels(map, floor) : null;
-  const hits = map ? extentsAt(map, point) : [];
-  const guess = map ? guessAt(map, floorData.data?.rooms ?? [], point) : null;
+  const rooms = floorData.data?.rooms ?? [];
+  const guess = map ? guessAt(map, rooms, point) : null;
+  const here = rooms.filter((room) => inRoom(room, point));
+  const name = (id: string) => (map && floorsOf(map).find((other) => other.id === id)?.name) ?? id;
 
   const rows: [string, string][] = [
     ["X", fixed(x)], ["Y", fixed(y)], ["Z", fixed(z)],
     ["Heading", shot.heading_degrees === null ? "—" : `${shot.heading_degrees.toFixed(1)}°`],
     ["Map", rawMap ? `${mapName(rawMap) ?? rawMap}${map ? "" : " (no art)"}` : "—"],
-    ["Floor", floor ? `${floor.name}${range ? ` · ${levelText(range)}` : ""}` : "—"],
+    ["Floor", guess ? name(guess.floor) : "—"],
     ["Zone", guess?.zone ?? "—"],
+    // For reference: what the live map shows, from the app's own floor data.
+    ["App floor", map ? floorAt(map, point).name : "—"],
     ["Captured", clock(shot.captured_at)], ["Observed", clock(shot.observed_at)],
     ["Raid", shot.raid_id ?? "—"], ["File", shot.filename],
   ];
@@ -81,9 +83,9 @@ function Shot({ shot, rawMap, folder, floorData, onNewer, onOlder }: {
         ? <Label shot={shot} map={map} guess={guess} floorData={floorData} onNewer={onNewer} onOlder={onOlder} />
         : <Keys onNewer={onNewer} onOlder={onOlder} />}
       {floorData.error && <p className="shots-error">{floorData.error}</p>}
-      {hits.length > 0 && <>
-        <h2>Floor extents here</h2>
-        <ul className="shots-extents">{hits.map((hit, at) => <Extent key={at} hit={hit} y={y} />)}</ul>
+      {here.length > 0 && <>
+        <h2>Rooms here</h2>
+        <ul className="shots-extents">{here.map((room) => <Room key={room.id} room={room} floor={name(room.floor)} y={y} />)}</ul>
       </>}
     </div>
   </div>;
@@ -111,7 +113,7 @@ function Keys({ onNewer, onOlder }: { onNewer: () => void; onOlder: () => void }
 }
 
 /**
- * The floor a capture was really taken on, saved to the map's floor dataset. The app's guess is marked; Enter confirms the
+ * The floor a capture was really taken on, saved to the map's floor dataset. The floor the dataset's rooms give is marked; Enter confirms the
  * label shown (the guess until labelled), 1–9 pick a floor, Delete drops the label.
  */
 function Label({ shot, map, guess, floorData, onNewer, onOlder }: {
@@ -141,25 +143,25 @@ function Label({ shot, map, guess, floorData, onNewer, onOlder }: {
     <h2>Actual floor</h2>
     <div className="shots-floors">{floors.map((option, at) => <button key={option.id} type="button"
       className={`${sample?.floor === option.id ? "chosen" : ""} ${guess.floor === option.id ? "guess" : ""}`}
-      title={guess.floor === option.id ? "The app's guess" : undefined} onClick={() => save(option.id)}>
+      title={guess.floor === option.id ? "Where the dataset's rooms put it" : undefined} onClick={() => save(option.id)}>
       {at < 9 && <kbd>{at + 1}</kbd>}{option.name}
     </button>)}</div>
     <input className="shots-zone" list="shots-zones" placeholder="Zone (building or room)" value={zone} onChange={(event) => setZone(event.target.value)} />
     <datalist id="shots-zones">{zones.map((option) => <option key={option} value={option} />)}</datalist>
     <p className="faint">
-      {sample ? <>Labelled {name(sample.floor)}{sample.zone ? ` · ${sample.zone}` : ""}{sample.guess.floor !== sample.floor ? ` · guess was ${name(sample.guess.floor)}` : " · guess was right"}
+      {sample ? <>Labelled {name(sample.floor)}{sample.zone ? ` · ${sample.zone}` : ""}{guess.floor !== sample.floor ? ` · rooms say ${name(guess.floor)}` : " · rooms agree"}
         {" "}<button type="button" className="link" onClick={() => floorData.removeSample(shot.filename)}>Remove</button></>
         : <>Not labelled · Enter confirms {name(guess.floor)}</>}
     </p>
   </section>;
 }
 
-/** An extent over this spot: whether the height falls in it, and by how much it misses or clears its bounds. */
-function Extent({ hit, y }: { hit: ExtentHit; y: number }) {
-  const [low, high] = hit.extent.height;
-  const delta = y < low ? `${fixed(low - y)} below` : y >= high ? `${fixed(y - high)} above` : `+${fixed(y - low)} over floor`;
-  return <li className={hit.inHeight ? "in" : ""}>
-    <span>{hit.floor}{extentName(hit.extent) ? ` · ${extentName(hit.extent)}` : ""}{hit.inside ? "" : " (edge)"}</span>
-    <span className="faint">{levelText(hit.extent.height)} · {Math.abs(low) >= 1000 && y >= low && y < high ? "in" : delta}</span>
+/** A dataset room over this spot: whether the height falls in its range, and by how much it misses or clears it. */
+function Room({ room, floor, y }: { room: FloorRoom; floor: string; y: number }) {
+  const [low, high] = room.height, miss = heightMiss(room, y);
+  const delta = miss ? `${fixed(miss)} ${low !== null && y < low ? "below" : "above"}` : low === null ? "in" : `+${fixed(y - low)} over its start`;
+  return <li className={miss ? "" : "in"}>
+    <span>{floor}{room.zone ? ` · ${room.zone}` : ""}</span>
+    <span className="faint">{levelText([low ?? -10000, high ?? 10000])} · {delta}</span>
   </li>;
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { extentsAt, floorAt } from "../maps/floors";
-import type { FloorExtent, MapCalibration, WorldArea, WorldPoint } from "../maps";
+import { floorsOf } from "../maps/floors";
+import type { MapCalibration, WorldArea, WorldPoint } from "../maps";
 
 /**
  * Dev: the floor dataset, one per map, kept in scripts/data/floor-samples/<map>.json through the dev server
@@ -16,7 +16,7 @@ export type FloorSample = {
   floor: string;
   /** Building or room, as named by hand. */
   zone?: string;
-  /** What the app's floor data said when it was labelled. */
+  /** What the dataset's rooms said when it was labelled. */
   guess: { floor: string; zone?: string };
   /** When it was labelled. */
   at: string;
@@ -90,21 +90,26 @@ const open = (value: number) => Math.abs(value) >= 1000 ? null : value;
 const hash = (text: string) => { let value = 5381; for (let at = 0; at < text.length; at++) value = (value * 33 + text.charCodeAt(at)) | 0; return (value >>> 0).toString(36); };
 const rooms = new WeakMap<MapCalibration, DataRoom[]>();
 
-/** The rooms in a map's floor data, keyed by floor and shape so a copy still finds its original after the data is rebuilt. */
+/**
+ * The rooms in a map's floor data, keyed by floor and shape so a copy still finds its original after the data is rebuilt.
+ * tarkov.dev lists some boxes twice on a floor with different heights; repeats get `|2`, `|3`… in listed order.
+ */
 export function dataRooms(map: MapCalibration): DataRoom[] {
   let found = rooms.get(map);
   if (found) return found;
   found = [];
+  const seen = new Map<string, number>();
+  const unique = (key: string) => { const count = (seen.get(key) ?? 0) + 1; seen.set(key, count); return count === 1 ? key : `${key}|${count}`; };
   for (const layer of map.layers) for (const extent of layer.extents ?? []) {
     const height: [number | null, number | null] = [open(extent.height[0]), open(extent.height[1])];
     for (const bounds of extent.bounds ?? []) {
       const [[x1, z1], [x2, z2]] = bounds;
       const rect = { x: (x1 + x2) / 2, z: (z1 + z2) / 2, width: Math.abs(x2 - x1), depth: Math.abs(z2 - z1), angle: 0 };
       const zone = typeof bounds[2] === "string" ? bounds[2] : extent.label ?? "";
-      found.push({ key: `${layer.name}|box|${hash(JSON.stringify([x1, z1, x2, z2]))}`, floor: layer.name, zone, height, rect });
+      found.push({ key: unique(`${layer.name}|box|${hash(JSON.stringify([x1, z1, x2, z2]))}`), floor: layer.name, zone, height, rect });
     }
     for (const area of extent.areas ?? []) {
-      found.push({ key: `${layer.name}|area|${hash(JSON.stringify(area))}`, floor: layer.name, zone: extent.label ?? "", height, area });
+      found.push({ key: unique(`${layer.name}|area|${hash(JSON.stringify(area))}`), floor: layer.name, zone: extent.label ?? "", height, area });
     }
   }
   rooms.set(map, found);
@@ -117,18 +122,32 @@ export function copyRoom(room: DataRoom): FloorRoom {
   return { id: Math.random().toString(36).slice(2, 10), zone: room.zone, floor: room.floor, height: [...room.height], heightSource: "data", source: room.key, ...shape };
 }
 
-/** What names an extent: its label, else the labels of its room boxes. */
-export const extentName = (extent: FloorExtent) =>
-  extent.label ?? ([...new Set(extent.bounds?.map((bounds) => bounds[2]).filter((label): label is string => typeof label === "string"))].join(", ") || null);
+/** Heights (Y) are compared to the nearest tenth: no level needs finer than that. */
+export const tenth = (y: number) => Math.round(y * 10) / 10;
+const low = (room: FloorRoom) => room.height[0] === null ? -Infinity : tenth(room.height[0]);
+const high = (room: FloorRoom) => room.height[1] === null ? Infinity : tenth(room.height[1]);
+/** How far a height is outside a room's range, both ends included (0 inside it). */
+export const heightMiss = (room: FloorRoom, y: number) => {
+  const at = tenth(y);
+  return at < low(room) ? tenth(low(room) - at) : at > high(room) ? tenth(at - high(room)) : 0;
+};
 
-/** The app's floor at a point, and a zone for it: a drawn room's, else the floor data's building or room. */
+/**
+ * The floor the dataset puts a point on, using its rooms only (not the app's floor data): of the rooms whose outline and
+ * height range (both ends included, to the tenth) hold it, the highest-starting one's. Anywhere else, the ground (base
+ * floor). Where one floor's range ends at the next one's start, a point at exactly that height goes to the upper floor.
+ */
+export function datasetFloorAt(map: MapCalibration, rooms: FloorRoom[], point: Required<WorldPoint>): { floor: string; room: FloorRoom | null } {
+  const holding = rooms.filter((room) => !heightMiss(room, point.y) && inRoom(room, point));
+  if (!holding.length) return { floor: floorsOf(map)[0].id, room: null };
+  const room = holding.reduce((best, other) => low(other) > low(best) ? other : best);
+  return { floor: room.floor, room };
+}
+
+/** The dataset's floor at a point, and the zone of the room that decides it. */
 export function guessAt(map: MapCalibration, rooms: FloorRoom[], point: Required<WorldPoint>): { floor: string; zone?: string } {
-  const floor = floorAt(map, point).id;
-  const room = rooms.find((other) => other.floor === floor && inRoom(other, point)) ?? rooms.find((other) => inRoom(other, point));
-  const hits = extentsAt(map, point).filter((hit) => hit.inside && extentName(hit.extent));
-  const hit = hits.find((other) => other.floor === floor) ?? hits.at(-1);
-  const zone = room?.zone ?? (hit ? extentName(hit.extent) : null);
-  return zone ? { floor, zone } : { floor };
+  const { floor, room } = datasetFloorAt(map, rooms, point);
+  return room?.zone ? { floor, zone: room.zone } : { floor };
 }
 
 const cache = new Map<string, FloorDataset>();

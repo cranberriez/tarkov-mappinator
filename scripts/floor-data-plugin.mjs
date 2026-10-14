@@ -5,6 +5,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 const dir = new URL("./data/floor-samples/", import.meta.url);
 const round = (value) => Math.round(value * 100) / 100;
+/** Room heights are kept to the tenth, as they are matched (src/lib/floorData.ts). */
+const tenth = (value) => Math.round(value * 10) / 10;
 const empty = (map) => ({ map, samples: [], rooms: [] });
 
 /** Rounds coordinates and orders entries so the file diffs cleanly. */
@@ -17,7 +19,7 @@ function tidy(map, data) {
 		...room,
 		...rect ? { rect: { x: round(rect.x), z: round(rect.z), width: round(rect.width), depth: round(rect.depth), angle: round(rect.angle) } } : {},
 		...area ? { area: area.map((ring) => ring.map(([x, z]) => [round(x), round(z)])) } : {},
-		height: room.height && room.height.map((value) => value === null ? null : round(value)),
+		height: room.height && room.height.map((value) => value === null ? null : tenth(value)),
 	})).sort((a, b) => a.id.localeCompare(b.id));
 	return { map, samples, rooms };
 }

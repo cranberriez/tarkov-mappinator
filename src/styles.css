@@ -756,6 +756,7 @@ button.group-member:not(:disabled):hover { background: var(--surface-hover); }
 /* Dev: Floors */
 .floors-page { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 280px; }
 .floors-map { position: relative; overflow: hidden; }
+.floors-tools { position: absolute; left: 14px; bottom: 14px; z-index: 3; }
 .floors-side { min-height: 0; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; font-size: 13px; border-left: 1px solid var(--line); }
 .floors-side select { height: 32px; border-radius: 6px; border: 0; background: var(--surface); color: var(--text); font: inherit; padding: 0 8px; }
 .floors-side p { margin: 0; font-size: 12px; }

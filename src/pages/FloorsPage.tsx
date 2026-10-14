@@ -2,14 +2,15 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerE
 import type { Scanner } from "../lib/useScanner";
 import { keys, usePersisted } from "../lib/persist";
 import {
-  copyRoom, dataRooms, inRoom, roomBox, roomCorners, roomRings, useFloorData,
+  copyRoom, dataRooms, guessAt, inRoom, tenth, roomBox, roomCorners, roomRings, useFloorData,
   type DataRoom, type FloorRoom, type RoomRect, type RoomShape,
 } from "../lib/floorData";
 import {
-  floorAt, floorsOf, games, levelText, MapAssetsContext, maps as calibrations, resolveGame, resolveMap, TarkovMap,
-  type FloorSelection, type MapDrawView, type PlayerPosition, type WorldArea,
+  artStyleOf, floorsOf, games, levelText, MapAssetsContext, maps as calibrations, resolveGame, resolveMap, TarkovMap,
+  type ArtStyle, type FloorSelection, type MapDrawView, type PlayerPosition, type WorldArea,
 } from "../maps";
 import { appAssets } from "../lib/tiles";
+import { TerrainIcon } from "../components/Icons";
 import { shotMap } from "./ShotsPage";
 
 /** Floor colours by the floor's place in `floorsOf`. */
@@ -44,7 +45,7 @@ const sameSelection = (a: Selection, b: Selection) => !!a && !!b && (a.kind === 
 
 /**
  * Dev: a map's floor dataset (src/lib/floorData.ts) over its art: every capture on the map with its height (Y), coloured by
- * the floor it is labelled with (hollow until labelled, ringed red where the app's guess was wrong), and rooms: those drawn
+ * the floor it is labelled with (hollow until labelled, ringed red where the dataset's rooms put it on another floor), and rooms: those drawn
  * or copied into the dataset, and, dashed, those in the app's floor data. Tapping the map picks the room there (again: the
  * next one under it). Nothing here changes the floor data the app uses.
  */
@@ -57,12 +58,19 @@ export function FloorsPage({ scanner, onOpenShot }: { scanner: Scanner; onOpenSh
   const floorData = useFloorData(mapKey);
   const data = floorData.data;
   const floors = map ? floorsOf(map) : [];
+  // Bottom to top: `floorsOf` lists the base first, so underground floors (Customs lists its last) go before it.
+  const stack = [...floors.filter((floor) => floor.underground), ...floors.filter((floor) => !floor.underground)];
   const colour = (floor: string | null) => floor === null ? undefined : PALETTE[Math.max(0, floors.findIndex((other) => other.id === floor)) % PALETTE.length];
   const floorName = (id: string) => floors.find((other) => other.id === id)?.name ?? id;
   const [shown, setShown] = useState<FloorSelection>(null);
   useEffect(() => setShown(null), [mapKey]);
   const visible = (floor: string) => shown === null || floor === shown;
+  // Vector art or the detailed tiles, kept apart from the Map page's choice.
+  const [preferred, setPreferred] = usePersisted<ArtStyle>(keys.floorsStyle, "svg");
+  const style = artStyleOf(map, preferred);
+  const bothStyles = !!(map?.svg && map.tilePath);
 
+  const rooms = data?.rooms ?? [];
   const dots = useMemo((): Dot[] => {
     if (!map) return [];
     const inHistory = new Set<string>();
@@ -73,16 +81,16 @@ export function FloorsPage({ scanner, onOpenShot }: { scanner: Scanner; onOpenSh
       inHistory.add(shot.filename);
       if (labelled.has(shot.filename)) continue;
       const [x, y, z] = shot.xyz;
-      result.push({ id: shot.filename, x, y, z, floor: null, guess: floorAt(map, { x, y, z }).id, inHistory: true });
+      result.push({ id: shot.filename, x, y, z, floor: null, guess: guessAt(map, rooms, { x, y, z }).floor, inHistory: true });
     }
-    for (const sample of labelled.values()) result.push({ ...sample, guess: sample.guess.floor, inHistory: inHistory.has(sample.id) });
+    // Labels are checked against the rooms as they are now, so adjusting a room shows what it fixes or breaks.
+    for (const sample of labelled.values()) result.push({ ...sample, guess: guessAt(map, rooms, sample).floor, inHistory: inHistory.has(sample.id) });
     return result;
-  }, [map, mapKey, scanner.positions, scanner.raids, scanner.snapshot?.raid, data]);
+  }, [map, mapKey, scanner.positions, scanner.raids, scanner.snapshot?.raid, data, rooms]);
   const shownDots = dots.filter((dot) => visible(dot.floor ?? dot.guess));
   const labelled = dots.filter((dot) => dot.floor !== null);
   const right = labelled.filter((dot) => dot.floor === dot.guess).length;
 
-  const rooms = data?.rooms ?? [];
   const [showData, setShowData] = usePersisted(keys.floorsDataRooms, true);
   // Floor data rooms copied into the dataset show as their copy only.
   const copied = new Set(rooms.map((room) => room.source).filter(Boolean));
@@ -104,6 +112,7 @@ export function FloorsPage({ scanner, onOpenShot }: { scanner: Scanner; onOpenSh
       if (event.target instanceof HTMLElement && event.target.matches("input, select, textarea")) return;
       if (event.key === "Escape") { setDrawing(false); setSelection(null); }
       else if (event.key === "Delete" && room) { floorData.removeRoom(room.id); setSelection(null); }
+      else if (event.key === "d" && (event.ctrlKey || event.metaKey) && room) { event.preventDefault(); duplicate(room); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -122,6 +131,22 @@ export function FloorsPage({ scanner, onOpenShot }: { scanner: Scanner; onOpenSh
     const next = copyRoom(source);
     floorData.setRoom(next);
     setSelection({ kind: "drawn", id: next.id });
+  };
+  /**
+   * The same shape one floor up, for stacking a building's floors: it starts where this one ends (Y from = this Y to) and
+   * is open above. It is a new room of its own, not a copy of floor data.
+   */
+  const duplicate = (from: FloorRoom) => {
+    const at = stack.findIndex((other) => other.id === from.floor);
+    const floor = stack[Math.min(at + 1, stack.length - 1)]?.id ?? from.floor;
+    const { source: _source, ...rest } = from;
+    const next: FloorRoom = {
+      ...rest, id: NEW_ID(), floor, heightSource: "manual", height: [from.height[1], null],
+      rect: from.rect && { ...from.rect }, area: from.area?.map((ring) => ring.map(([x, z]): [number, number] => [x, z])),
+    };
+    floorData.setRoom(next);
+    setSelection({ kind: "drawn", id: next.id });
+    if (shown !== null) setShown(floor);
   };
 
   // While a room is dragged it is drawn from here and saved once on release.
@@ -243,7 +268,7 @@ export function FloorsPage({ scanner, onOpenShot }: { scanner: Scanner; onOpenSh
   };
 
   const inside = picked ? labelled.filter((dot) => inRoom(picked, dot)) : [];
-  const place = (id: string) => floors.findIndex((other) => other.id === id);
+  const place = (id: string) => stack.findIndex((other) => other.id === id);
   const onFloor = inside.filter((dot) => dot.floor === picked?.floor).map((dot) => dot.y);
   const below = inside.filter((dot) => picked && place(dot.floor!) < place(picked.floor)).map((dot) => dot.y);
   const above = inside.filter((dot) => picked && place(dot.floor!) > place(picked.floor)).map((dot) => dot.y);
@@ -262,7 +287,12 @@ export function FloorsPage({ scanner, onOpenShot }: { scanner: Scanner; onOpenSh
 
   return <MapAssetsContext.Provider value={appAssets}><div className="floors-page">
     <div className="floors-map">
-      <TarkovMap map={map} floor={shown} centre={centre} draw={draw} onMapTap={tap} />
+      <TarkovMap map={map} art={preferred} floor={shown} centre={centre} draw={draw} onMapTap={tap} />
+      <div className="map-tools floors-tools">
+        <button type="button" className={`icon-button ${style === "tiles" ? "active" : ""}`} aria-pressed={style === "tiles"} disabled={!bothStyles}
+          title={!bothStyles ? "Only one map style for this map" : style === "tiles" ? "Show vector map" : "Show detailed tiles"}
+          onClick={() => setPreferred(style === "tiles" ? "svg" : "tiles")}><TerrainIcon /></button>
+      </div>
     </div>
     <aside className="floors-side">
       <select value={mapKey} onChange={(event) => setStored(event.target.value)}>
@@ -298,8 +328,8 @@ export function FloorsPage({ scanner, onOpenShot }: { scanner: Scanner; onOpenSh
           {floors.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
         </select></label>
         <div className="floors-pair">
-          <NumberField label="Y from" value={room.height[0]} onChange={(value) => edit({ height: [value, room.height[1]] })} />
-          <NumberField label="Y to" value={room.height[1]} onChange={(value) => edit({ height: [room.height[0], value] })} />
+          <NumberField label="Y from" value={room.height[0]} onChange={(value) => edit({ height: [value === null ? null : tenth(value), room.height[1]] })} />
+          <NumberField label="Y to" value={room.height[1]} onChange={(value) => edit({ height: [room.height[0], value === null ? null : tenth(value)] })} />
         </div>
         {hints}
         {room.rect ? <>
@@ -315,6 +345,7 @@ export function FloorsPage({ scanner, onOpenShot }: { scanner: Scanner; onOpenSh
           <button type="button" className="link" onClick={() => edit({ rect: roomBox(room), area: undefined })}>Make a box</button></p>}
         <div className="floors-actions">
           <button type="button" className="secondary" onClick={() => setSelection(null)}>Done</button>
+          <button type="button" className="secondary" title="Same shape on the floor above, starting at this room's Y to (Ctrl+D)" onClick={() => duplicate(room)}>Duplicate</button>
           <button type="button" className="secondary danger" onClick={() => { floorData.removeRoom(room.id); setSelection(null); }}>
             {room.source ? "Delete copy" : "Delete"}</button>
         </div>
