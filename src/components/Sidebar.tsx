@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { DEV } from "../lib/useDevFlags";
-import { ActivityIcon, CameraIcon, GroupIcon, ImportIcon, LinkIcon, MapIcon, OverviewIcon, SettingsIcon, SidebarIcon, TimelineIcon } from "./Icons";
+import { ActivityIcon, CameraIcon, FloorsIcon, GroupIcon, ImportIcon, LinkIcon, MapIcon, OverviewIcon, SettingsIcon, SidebarIcon, TimelineIcon } from "./Icons";
 import type { CompanionConnection } from "../lib/useCompanion";
 import { connectionLabel, connectionTone } from "../lib/companion";
 import { ConnectionPanel } from "./ConnectionPanel";
 
-export type Page = "overview" | "map" | "timeline" | "activity" | "import" | "group" | "shots" | "settings";
+export type Page = "overview" | "map" | "timeline" | "activity" | "import" | "group" | "shots" | "floors" | "settings";
 
 const items: { page: Page; label: string; icon: ReactNode }[] = [
   { page: "overview", label: "Overview", icon: <OverviewIcon /> },
@@ -14,7 +14,7 @@ const items: { page: Page; label: string; icon: ReactNode }[] = [
   { page: "activity", label: "Activity", icon: <ActivityIcon /> },
   { page: "import", label: "Import", icon: <ImportIcon /> },
   // Dev: captures with their resolved position, for checking floor heights.
-  ...DEV ? [{ page: "shots" as const, label: "Shots", icon: <CameraIcon /> }] : [],
+  ...DEV ? [{ page: "shots" as const, label: "Shots", icon: <CameraIcon /> }, { page: "floors" as const, label: "Floors", icon: <FloorsIcon /> }] : [],
 ];
 
 export function Sidebar({ page, onNavigate, collapsed, onToggle, connection, group }: {

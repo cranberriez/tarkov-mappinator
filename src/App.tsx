@@ -20,6 +20,7 @@ import { ActivityPage } from "./pages/ActivityPage";
 import { TimelinePage } from "./pages/TimelinePage";
 import { ImportPage } from "./pages/ImportPage";
 import { ShotsPage } from "./pages/ShotsPage";
+import { FloorsPage } from "./pages/FloorsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
 const COLLAPSED_KEY = "sidebar-collapsed";
@@ -38,11 +39,13 @@ export function App() {
   const dev = useDevFlags();
   const group = useGroup(scanner, dev.flags);
   const [memberFocus, setMemberFocus] = useState<MemberFocus | null>(null);
+  // Dev: a capture opened from the Floors page; Shots shows it instead of following the newest.
+  const [shotFocus, setShotFocus] = useState<string | null>(null);
   const [page, setPage] = useState<Page>("map");
   // A past raid opened from the timeline; the map shows it instead of the live raid until closed.
   const [viewingId, setViewingId] = useState<string | null>(null);
   const viewing = scanner.raids.find((raid) => raid.id === viewingId) ?? null;
-  const navigate = (next: Page) => { setViewingId(null); setMemberFocus(null); setPage(next); };
+  const navigate = (next: Page) => { setViewingId(null); setMemberFocus(null); setShotFocus(null); setPage(next); };
   const groupDot = !group.enabled ? null
     : group.connection === "online" && group.membership === "joined" ? { tone: "ok" as const, label: `in group ${group.code}` }
     : group.connection === "error" || group.membership === "error" ? { tone: "bad" as const, label: "not connected" }
@@ -68,7 +71,8 @@ export function App() {
         {page === "timeline" && <TimelinePage scanner={scanner} onOpenRaid={(id) => { setViewingId(id); setPage("map"); }} />}
         {page === "activity" && <ActivityPage scanner={scanner} />}
         {page === "import" && <ImportPage scanner={scanner} importer={importer} onNavigate={navigate} />}
-        {page === "shots" && <ShotsPage scanner={scanner} />}
+        {page === "shots" && <ShotsPage key={shotFocus ?? ""} scanner={scanner} initial={shotFocus} />}
+        {page === "floors" && <FloorsPage scanner={scanner} onOpenShot={(filename) => { setShotFocus(filename); setPage("shots"); }} />}
         {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} valuableLoot={valuableLoot} group={group} dev={dev} />}
       </main>
     </div>

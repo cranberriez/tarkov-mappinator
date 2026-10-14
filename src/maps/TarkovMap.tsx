@@ -47,6 +47,15 @@ export type TarkovMapHandle = {
   focusFloor(floor: string | null): void;
 };
 
+/** Conversions for content drawn over the map in screen space (`draw`); floors split apart are not accounted for. */
+export type MapDrawView = {
+  /** Frame-relative screen position of a world point. */
+  toScreen(point: { x: number; z: number }): { left: number; top: number };
+  /** World x/z at a frame-relative screen position. */
+  toWorld(left: number, top: number): { x: number; z: number };
+  pxPerMetre: number;
+};
+
 export type TarkovMapProps = {
   /** The map's calibration (`resolveMap`); null draws a plain metric grid. */
   map: MapCalibration | null;
@@ -80,6 +89,8 @@ export type TarkovMapProps = {
   className?: string;
   /** Drawn over the map, inside its frame. */
   children?: ReactNode;
+  /** Drawn over the map in screen space, redrawn as the view moves. Stop pointerdown propagation to keep a drag from panning. */
+  draw?: (view: MapDrawView) => ReactNode;
   ref?: Ref<TarkovMapHandle>;
 };
 
@@ -95,7 +106,7 @@ const noFilters: Filters = {};
  * Positions are world coordinates in the map's own space, so only pass players who are on this map.
  */
 export function TarkovMap({ map, art: preferred = "svg", floor, split = false, levels = false, players = [], follow = null, centre = null, onUserPan,
-  markers = noMarkers, filters = noFilters, preset, lootIcons, selected, onMarkerHover, onMarkerTap, onMapTap, className, children, ref }: TarkovMapProps) {
+  markers = noMarkers, filters = noFilters, preset, lootIcons, selected, onMarkerHover, onMarkerTap, onMapTap, className, children, draw, ref }: TarkovMapProps) {
   const projection = useMemo(() => map ? projectionFor(map) : metricProjection, [map]);
   const style = artStyleOf(map, preferred, floor);
   const art = useMemo((): PlaneRect | null => style === "svg" ? artRect(map!, projection) : style === "tiles" ? tileBounds(map!) : null, [map, style, projection]);
@@ -244,6 +255,11 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, l
       </div>}
     </div>
     <PlayerMarkers players={players} at={(position) => { const { x, y } = toPlane(position); return toScreen(x, y); }} heading={projection.heading} />
+    {draw?.({
+      toScreen: (point) => { const { x, y } = projection.toPlane(point); return toScreen(x, y); },
+      toWorld: (left, top) => projection.toWorld({ x: view.cx + (left - size.width / 2) / view.scale, y: view.cy + (top - size.height / 2) / view.scale }),
+      pxPerMetre,
+    })}
     {children}
   </div>;
 }

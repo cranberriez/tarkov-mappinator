@@ -741,3 +741,55 @@ button.group-member:not(:disabled):hover { background: var(--surface-hover); }
 .shots-extents li { display: flex; flex-direction: column; color: var(--muted); }
 .shots-extents li.in { color: var(--ok); }
 .shots-extents .faint { font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.shots-label { margin-top: 20px; display: grid; gap: 8px; }
+.shots-label h2 { margin: 0; }
+.shots-floors, .floors-floors { display: flex; flex-wrap: wrap; gap: 4px; }
+.shots-floors button, .floors-floors button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 6px; background: var(--surface); color: var(--muted); font-size: 12px; }
+.shots-floors button:hover, .floors-floors button:hover { background: var(--surface-hover); color: var(--text); }
+.shots-floors button.guess { box-shadow: inset 0 0 0 1px var(--faint); }
+.shots-floors button.chosen, .floors-floors button.chosen { background: var(--accent-soft); color: var(--accent); }
+.shots-floors kbd { font: 10px var(--mono); color: var(--faint); }
+.shots-label p { margin: 0; font-size: 12px; }
+.shots-error { color: var(--bad); font-size: 12px; margin: 8px 0 0; }
+
+/* Dev: Floors */
+.floors-page { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 280px; }
+.floors-map { position: relative; overflow: hidden; }
+.floors-side { min-height: 0; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; font-size: 13px; border-left: 1px solid var(--line); }
+.floors-side select { height: 32px; border-radius: 6px; border: 0; background: var(--surface); color: var(--text); font: inherit; padding: 0 8px; }
+.floors-side p { margin: 0; font-size: 12px; }
+.floors-side h2 { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.floors-side h2 .secondary { height: 28px; font-size: 12px; }
+.floors-side .secondary.chosen { color: var(--accent); background: var(--accent-soft); }
+.floors-floors i, .floors-list i { width: 8px; height: 8px; border-radius: 50%; background: var(--floor); flex-shrink: 0; }
+.floors-room { display: grid; gap: 10px; }
+.floors-room label { display: grid; gap: 4px; color: var(--faint); font-size: 11px; }
+.floors-room input { height: 30px; }
+.floors-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.floors-actions { display: flex; justify-content: space-between; }
+.floors-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.floors-list button { width: 100%; display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 8px; padding: 6px 8px; border-radius: 6px; text-align: left; }
+.floors-list button:hover { background: var(--surface-hover); }
+.floors-list .faint { grid-column: 2; font-size: 11px; }
+.floors-layer { position: absolute; inset: 0; pointer-events: none; }
+.floors-layer.drawing { pointer-events: auto; cursor: crosshair; }
+.floors-rooms { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.floors-rooms path { fill-rule: evenodd; fill: color-mix(in srgb, var(--floor) 14%, transparent); stroke: var(--floor); stroke-width: 2; pointer-events: auto; cursor: pointer; filter: drop-shadow(0 0 1px #000); }
+.floors-rooms path.rotated { stroke-dasharray: 6 3; }
+.floors-rooms path.selected { fill: color-mix(in srgb, var(--floor) 26%, transparent); stroke-width: 2.5; cursor: move; }
+.floors-rooms path { pointer-events: none; }
+.floors-rooms path.selected:not(.data) { pointer-events: auto; }
+.floors-rooms path.data { fill: none; stroke-width: 1.5; opacity: .8; }
+.floors-rooms path.data.selected { fill: color-mix(in srgb, var(--floor) 14%, transparent); stroke-width: 2; opacity: 1; }
+.floors-layer.drawing .floors-rooms path { pointer-events: none; }
+.floors-check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.floors-check input { width: auto; height: auto; }
+.floors-room p strong { font-weight: 600; }
+.floors-room-label { position: absolute; transform: translate(-50%, -50%); font-size: 11px; line-height: 1.3; text-align: center; color: var(--text); text-shadow: 0 1px 2px #000, 0 0 4px #000; white-space: nowrap; pointer-events: none; }
+.floors-handle { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 1px #000; pointer-events: auto; cursor: nwse-resize; }
+.floors-handle.rotate { border-radius: 50%; background: var(--accent); cursor: grab; }
+.floors-dot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; padding: 0; border-radius: 50%; background: var(--floor); box-shadow: 0 0 0 1.5px #000; pointer-events: auto; }
+.floors-dot.unlabelled { background: #131416; box-shadow: 0 0 0 2px var(--floor); }
+.floors-dot.wrong { box-shadow: 0 0 0 1.5px #000, 0 0 0 3.5px var(--bad); }
+.floors-dot span { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font: 10px var(--mono); color: var(--text); text-shadow: 0 1px 2px #000, 0 0 3px #000; white-space: nowrap; pointer-events: none; }
