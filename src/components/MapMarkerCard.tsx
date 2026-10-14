@@ -50,18 +50,20 @@ export function MapMarkerCard({ marker, filters, preset = tarkovPreset, floorNam
   }
   const document = marker.document;
   const photo = document && documentPhoto(document);
+  // A known Battle Pass document location is just what it is: its name, photo and description.
+  if (document) return <div className="marker-cards document"><div className="marker-card">
+    <div className="marker-card-head"><div className="marker-card-title"><span>{document.title}</span></div>{close}</div>
+    {photo && <img className="marker-card-photo" src={photo} alt={document.title} draggable={false} />}
+    {document.description && <span className="marker-card-sub">{document.description}</span>}
+    {children}
+  </div></div>;
   return <div className="marker-cards"><div className="marker-card">
     <div className="marker-card-head">
       <img src={iconSrc(markerIcon(marker, filters, preset))} alt="" draggable={false} />
       <div className="marker-card-title"><span>{title}</span>{rest.length > 0 && <span className="marker-card-sub">{rest.join(" · ")}</span>}</div>
       {close}
     </div>
-    {document && <div className="marker-card-document">
-      {photo && <img className="marker-card-photo" src={photo} alt={document.title} draggable={false} />}
-      <span>{document.title}</span>
-      {document.description && <span className="marker-card-sub">{document.description}</span>}
-    </div>}
-    <Rows get={get} rows={[...document?.key ? [{ label: "Key", value: document.key }] : [], ...marker.details ?? [], ...place]} />
+    <Rows get={get} rows={[...marker.details ?? [], ...place]} />
     {children}
   </div></div>;
 }

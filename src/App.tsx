@@ -8,6 +8,7 @@ import { useCompanion } from "./lib/useCompanion";
 import { useShotCleanup } from "./lib/useShotCleanup";
 import { useToastMode } from "./lib/useToastMode";
 import { useValuableLoot } from "./lib/useValuableLoot";
+import { useAutoZoom } from "./lib/useAutoZoom";
 import { useGameMode } from "./lib/useGameMode";
 import { useGroup } from "./lib/useGroup";
 import { useDevFlags } from "./lib/useDevFlags";
@@ -33,6 +34,7 @@ export function App() {
   const shotCleanup = useShotCleanup();
   const toastMode = useToastMode();
   const valuableLoot = useValuableLoot();
+  const autoZoom = useAutoZoom();
   // App-level so an import keeps streaming while other pages are open.
   const importer = useImport();
   // App-level so the group stays joined on every page and in mini mode.
@@ -65,7 +67,7 @@ export function App() {
       <Sidebar page={page} onNavigate={navigate} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} connection={connection} group={groupDot} />
       <main className="content">
         {page === "overview" && <OverviewPage scanner={scanner} onNavigate={navigate} />}
-        {page === "map" && <MapPage key={viewing?.id ?? "live"} scanner={scanner} viewing={viewing} onCloseViewing={() => setViewingId(null)} mode={gameMode.mode} valuableLoot={valuableLoot.on}
+        {page === "map" && <MapPage key={viewing?.id ?? "live"} scanner={scanner} viewing={viewing} onCloseViewing={() => setViewingId(null)} mode={gameMode.mode} valuableLoot={valuableLoot.on} autoZoom={autoZoom.on}
           members={group.members} focus={memberFocus} documentLinker={dev.flags.documentLinker} floorLevels={dev.flags.floorLevels} />}
         {page === "group" && <GroupPage group={group} onShowMember={(id) => { setViewingId(null); setMemberFocus({ id, nonce: Date.now() }); setPage("map"); }} />}
         {page === "timeline" && <TimelinePage scanner={scanner} onOpenRaid={(id) => { setViewingId(id); setPage("map"); }} />}
@@ -73,7 +75,7 @@ export function App() {
         {page === "import" && <ImportPage scanner={scanner} importer={importer} onNavigate={navigate} />}
         {page === "shots" && <ShotsPage key={shotFocus ?? ""} scanner={scanner} initial={shotFocus} />}
         {page === "floors" && <FloorsPage scanner={scanner} onOpenShot={(filename) => { setShotFocus(filename); setPage("shots"); }} />}
-        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} valuableLoot={valuableLoot} group={group} dev={dev} />}
+        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} valuableLoot={valuableLoot} autoZoom={autoZoom} group={group} dev={dev} />}
       </main>
     </div>
     <Toasts events={scanner.snapshot?.activity} mode={toastMode.mode} />

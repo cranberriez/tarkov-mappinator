@@ -7,7 +7,7 @@ export type * from "./data.ts";
 export { ASSET_HOST, DATA_HOST, TILE_HOST } from "./hosts.ts";
 export { games, mapName, maps, mapSources, normalizeMapName, resolveGame, resolveMap } from "./catalog.ts";
 export { setRooms } from "./roomData.ts";
-export { heightMiss, inRoom, roomAt, roomBox, roomCorners, roomRings, tenth, toRoom, type MapRoom, type RoomRect, type RoomShape } from "./rooms.ts";
+export { heightMiss, inRoom, nearestRoom, roomAt, roomBox, roomCorners, roomRings, tenth, toRoom, type MapRoom, type RoomRect, type RoomShape } from "./rooms.ts";
 export { artRect, metricProjection, planeRect, projectionFor, type MapProjection } from "./projection.ts";
 export { baseFloor, extentsAt, floorAt, floorById, floorLevels, floorOf, floorOrder, floorsOf, GROUND, levelText, UNDERGROUND_OPACITY, type ExtentHit, type Floor, type FloorSelection } from "./floors.ts";
 export { tileBounds, tileCount, tilePathAt, tileRange, tileSets, tileZoom, tilesIn, type Tile } from "./tiles.ts";

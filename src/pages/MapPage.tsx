@@ -30,6 +30,9 @@ const initial = (name: string) => name.charAt(0).toUpperCase();
 /** A request to show a group member: their map, centred on them once. `nonce` makes a repeat click count. */
 export type MemberFocus = { id: string; nonce: number };
 
+/** A Battle Pass document within this many metres across the ground, and this many in height, of the newest position shows its card. */
+const NEARBY_DOCUMENT_M = 6, NEARBY_DOCUMENT_Y = 3;
+
 /** Track id of this player's own positions. */
 const SELF = "self";
 /** Outside the desktop app there is no local mirror; map data comes straight from tarkov.dev. */
@@ -39,8 +42,10 @@ const webSource = isTauri() ? null : httpMapSource();
  * The live raid's map, or with `viewing` a past raid's: its positions up to the one picked on the
  * scrubber, which then stands in for the newest position (followed, floor picked from it).
  */
-export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, members = [], focus = null, documentLinker = false, floorLevels = false }: {
+export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, autoZoom = false, members = [], focus = null, documentLinker = false, floorLevels = false }: {
   scanner: Scanner; viewing: RaidRecord | null; onCloseViewing: () => void; mode: DataMode; valuableLoot: boolean;
+  /** While following, zoom in to fit the room the player is in. */
+  autoZoom?: boolean;
   /** Other group members; those with a position on the shown map are drawn there. */
   members?: GroupMember[];
   focus?: MemberFocus | null;
@@ -108,7 +113,6 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [pinned]);
-  const cardMarker = overlayById.get(pinned ?? hovered ?? "");
   const counts = useMemo(() => countMarkers(overlay), [overlay]);
   const layerDefs = useMemo(() => layersFor(overlay, mapData?.looseCategories), [overlay, mapData]);
   const role = roleOf(raid?.player_role);
@@ -118,6 +122,22 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
   const [collapsed, setCollapsed] = usePersisted<Record<string, boolean>>(keys.mapLayersCollapsed, {});
   const [presets, setPresets] = usePersisted<(Filters | null)[]>(keys.mapPresets, []);
   const shownOverlay = useMemo(() => overlay.filter((marker) => isVisible(marker, filters)), [overlay, filters]);
+  // The nearest shown Battle Pass document photo to the newest position previews its card, under a hovered or pinned one.
+  const nearbyDocument = useMemo(() => {
+    if (!newest) return undefined;
+    const [x, y, z] = newest.xyz;
+    let nearest: { id: string; distance: number } | undefined;
+    for (const marker of shownOverlay) {
+      if (!marker.document?.photo) continue;
+      const distance = Math.hypot(marker.position.x - x, marker.position.z - z);
+      // A few placed by hand have no height (drawn at 0); those match at any height.
+      const height = marker.document.position && marker.document.position.y === undefined ? null : marker.position.y;
+      if (distance > NEARBY_DOCUMENT_M || (height !== null && Math.abs(height - y) > NEARBY_DOCUMENT_Y) || (nearest && nearest.distance <= distance)) continue;
+      nearest = { id: marker.id, distance };
+    }
+    return nearest?.id;
+  }, [newest, shownOverlay]);
+  const cardMarker = overlayById.get(pinned ?? hovered ?? nearbyDocument ?? "");
 
   // Floors: following picks the player's floor (all floors until there is a position); otherwise the
   // chosen floor, or all floors (null). Art draws the shown floor over the base; markers elsewhere hide, extracts elsewhere dim.
@@ -182,7 +202,7 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
   const mapState: MapState = status === "offline" ? "offline" : liveRaid && (viewing || shownKey !== (resolveGame(live.map)?.key ?? null)) ? "elsewhere" : liveRaid ? "live" : "idle";
 
   return <MapAssetsContext.Provider value={appAssets}><div className="map-page">
-    <TarkovMap ref={map} map={calibration} art={preferred} floor={floor} split={split} levels={floorLevels} players={players} follow={follow ? SELF : null}
+    <TarkovMap ref={map} map={calibration} art={preferred} floor={floor} split={split} levels={floorLevels} autoZoom={autoZoom} players={players} follow={follow ? SELF : null}
       centre={centre && centre.map === shownKey ? centre : null}
       onUserPan={onUserPan} markers={shownOverlay} filters={filters} lootIcons={lootIcons} selected={pinned}
       onMarkerHover={setHovered} onMarkerTap={(id) => setPinned((current) => current === id ? null : id)}

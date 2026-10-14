@@ -657,9 +657,8 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
   background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); font-size: 12px; }
 .marker-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
 /* A document's reference photo widens the card so the spot reads at a glance. */
-.marker-cards:has(.marker-card-photo) { width: 340px; }
-.marker-card-document { display: flex; flex-direction: column; gap: 2px; }
-.marker-card-photo { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; border-radius: 6px; margin-bottom: 4px; background: #131416; }
+.marker-cards.document { width: 510px; max-width: calc(100% - 28px); }
+.marker-card-photo { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; border-radius: 6px; background: #131416; }
 .marker-card-head > img { width: 24px; height: 24px; flex-shrink: 0; }
 .marker-card-head .icon-button { width: 24px; height: 24px; margin: -4px -6px -4px 0; flex-shrink: 0; }
 .marker-card-title { display: flex; flex-direction: column; min-width: 0; flex: 1; font-weight: 500; }

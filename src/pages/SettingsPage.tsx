@@ -21,6 +21,7 @@ import type { AutoShot } from "../lib/useAutoShot";
 import type { ShotCleanup } from "../lib/useShotCleanup";
 import { toastModes, type ToastModeState } from "../lib/useToastMode";
 import type { ValuableLootState } from "../lib/useValuableLoot";
+import type { AutoZoomState } from "../lib/useAutoZoom";
 import { DEFAULT_GROUP_SITE, type Group } from "../lib/useGroup";
 import { normalizeSite } from "../lib/group";
 import { DEV, type DevFlagsState } from "../lib/useDevFlags";
@@ -77,8 +78,8 @@ const tabs: { value: SettingsTab; label: string }[] = [
   ...(DEV ? [{ value: "developer" as const, label: "Developer" }] : []),
 ];
 
-export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup, toastMode, valuableLoot, group, dev }: {
-  scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot; shotCleanup: ShotCleanup; toastMode: ToastModeState; valuableLoot: ValuableLootState;
+export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup, toastMode, valuableLoot, autoZoom, group, dev }: {
+  scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot; shotCleanup: ShotCleanup; toastMode: ToastModeState; valuableLoot: ValuableLootState; autoZoom: AutoZoomState;
   group: Group; dev: DevFlagsState;
 }) {
   const { snapshot, running, connected, busy, error, perform, retry } = scanner;
@@ -127,6 +128,7 @@ export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup,
         <h2>Map</h2>
         <Switch label="Valuable loot icons" detail={itemStatus?.config.enabled ? "Experimental. Loose loot shows its most valuable possible item." : "Needs item enrichment (Item data, in the Data tab)."}
           on={valuableLoot.on} disabled={!itemStatus?.config.enabled} onChange={valuableLoot.setOn} />
+        <Switch label="Auto zoom" detail="While following, zoom in to fit the room you are in." on={autoZoom.on} onChange={autoZoom.setOn} />
       </section>
 
       <ConnectionSection connection={connection} />

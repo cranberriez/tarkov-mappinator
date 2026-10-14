@@ -28,10 +28,10 @@ export function initialView(projection: MapProjection, art: PlaneRect | null, fo
 /**
  * Pan and zoom over a map frame: drag to pan (applied once a frame), wheel and double click to zoom, eased `panTo`.
  * `onPan` runs as a drag starts moving the view; `onTap` gets the element under a press that barely moved, and its plane point.
- * With `zoomAroundCentre` the wheel zooms around the frame centre instead of the cursor.
+ * With `zoomAroundCentre` the wheel zooms around the frame centre instead of the cursor. `onZoom` runs when the wheel or a double click zooms.
  */
-export function useMapViewport({ unitsPerMetre, zoomAroundCentre = false, onPan, onTap }: {
-  unitsPerMetre: number; zoomAroundCentre?: boolean; onPan?: () => void; onTap?: (target: Element, at: PlanePoint) => void;
+export function useMapViewport({ unitsPerMetre, zoomAroundCentre = false, onPan, onTap, onZoom }: {
+  unitsPerMetre: number; zoomAroundCentre?: boolean; onPan?: () => void; onTap?: (target: Element, at: PlanePoint) => void; onZoom?: () => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<Size>({ width: 0, height: 0 });
@@ -50,14 +50,17 @@ export function useMapViewport({ unitsPerMetre, zoomAroundCentre = false, onPan,
 
   const stopTween = useCallback(() => { if (tween.current !== null) cancelAnimationFrame(tween.current); tween.current = null; }, []);
 
-  const panTo = useCallback((x: number, y: number, duration = 650) => {
+  /** Eases the centre to a plane point, and the zoom to `scale` when given. */
+  const panTo = useCallback((x: number, y: number, duration = 650, scale?: number) => {
     stopTween();
     const start = viewRef.current;
     const begin = performance.now();
     const step = (time: number) => {
       const t = Math.min(1, (time - begin) / duration);
       const e = 1 - (1 - t) ** 3;
-      setView((current) => ({ ...current, cx: start.cx + (x - start.cx) * e, cy: start.cy + (y - start.cy) * e }));
+      setView((current) => ({ cx: start.cx + (x - start.cx) * e, cy: start.cy + (y - start.cy) * e,
+        // Eased in log space, so zooming feels even whichever way it goes.
+        scale: scale === undefined ? current.scale : start.scale * (scale / start.scale) ** e }));
       tween.current = t < 1 ? requestAnimationFrame(step) : null;
     };
     tween.current = requestAnimationFrame(step);
@@ -116,11 +119,13 @@ export function useMapViewport({ unitsPerMetre, zoomAroundCentre = false, onPan,
     onWheel: (event: WheelEvent) => {
       const rect = event.currentTarget.getBoundingClientRect();
       const factor = Math.exp(-event.deltaY * 0.0015);
+      onZoom?.();
       if (zoomAroundCentre) zoomAt(factor);
       else zoomAt(factor, event.clientX - rect.left, event.clientY - rect.top);
     },
     onDoubleClick: (event: MouseEvent) => {
       const rect = event.currentTarget.getBoundingClientRect();
+      onZoom?.();
       zoomAt(2, event.clientX - rect.left, event.clientY - rect.top);
     },
   };

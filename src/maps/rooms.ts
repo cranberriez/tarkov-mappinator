@@ -75,3 +75,13 @@ export function roomAt<Room extends MapRoom>(rooms: Room[], point: Required<Worl
   const holding = rooms.filter((room) => !heightMiss(room, point.y) && inRoom(room, point));
   return holding.length ? holding.reduce((best, other) => low(other) > low(best) ? other : best) : null;
 }
+
+/**
+ * The room a point is in across the ground, whatever its height: of the rooms whose outline holds it, the one nearest its height
+ * (any, without a height). Unlike `roomAt`, the ground floor under a building with only an upper floor drawn still gets that room.
+ */
+export function nearestRoom<Room extends MapRoom>(rooms: Room[], point: WorldPoint): Room | null {
+  const holding = rooms.filter((room) => inRoom(room, point));
+  if (!holding.length) return null;
+  return point.y === undefined ? holding[0] : holding.reduce((best, other) => heightMiss(other, point.y!) < heightMiss(best, point.y!) ? other : best);
+}

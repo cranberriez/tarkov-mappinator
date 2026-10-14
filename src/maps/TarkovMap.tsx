@@ -1,6 +1,6 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
 import { floorAt, floorById, floorLevels, floorOf, floorOrder, floorsOf, levelText, type FloorSelection } from "./floors.ts";
-import { roomRings } from "./rooms.ts";
+import { nearestRoom, roomRings, type MapRoom } from "./rooms.ts";
 import { MapArt } from "./MapArt.tsx";
 import { MapOverlay, type OverlayArea } from "./MapOverlay.tsx";
 import { MapTiles } from "./MapTiles.tsx";
@@ -21,6 +21,8 @@ const LABEL_PX_PER_M = 1.2;
 const SPLIT_LABEL_MIN_PX = 36;
 /** Overlay markers are culled and thinned for zoom steps of this many per doubling, so zooming only redraws them on a step. */
 const OVERLAY_ZOOM_STEPS = 4;
+/** Auto zoom fits a room no closer than this (screen px per metre), with this share of the frame around the player to fit it in. */
+const ROOM_MAX_PX_PER_M = 6, ROOM_FILL = 0.85;
 
 /**
  * The art a map is drawn with: the preferred style when it has it, else the other, else none (a plain grid).
@@ -68,6 +70,8 @@ export type TarkovMapProps = {
   split?: boolean;
   /** Dev: writes height ranges (Y) on floors and draws the room boxes that limit them. */
   levels?: boolean;
+  /** While following, zooms in to fit the room the followed player is in (any floor's, nearest their height); leaving it zooms back. */
+  autoZoom?: boolean;
   /** Players to draw: older positions faded, the newest as a pointer. */
   players?: PlayerTrack[];
   /** Id of a track to keep centred on its newest position; dragging calls `onUserPan`, which should turn it off. */
@@ -106,7 +110,7 @@ const noFilters: Filters = {};
  * A pannable, zoomable Tarkov map: vector art or tiles by floor, data markers, and player positions.
  * Positions are world coordinates in the map's own space, so only pass players who are on this map.
  */
-export function TarkovMap({ map, art: preferred = "svg", floor, split = false, levels = false, players = [], follow = null, centre = null, onUserPan,
+export function TarkovMap({ map, art: preferred = "svg", floor, split = false, levels = false, autoZoom = false, players = [], follow = null, centre = null, onUserPan,
   markers = noMarkers, filters = noFilters, preset, lootIcons, selected, onMarkerHover, onMarkerTap, onMapTap, className, children, draw, ref }: TarkovMapProps) {
   const projection = useMemo(() => map ? projectionFor(map) : metricProjection, [map]);
   const style = artStyleOf(map, preferred, floor);
@@ -121,9 +125,13 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, l
     return { x: plane.x + (map && shift ? shift(floorAt(map, point).id, plane.x, plane.y) : 0), y: plane.y };
   };
 
+  // Auto zoom: the room fitted and the zoom from before it, to return to on leaving. Zooming by hand keeps the zoom it picks until the next room.
+  const roomFit = useRef<{ key: string; base: number | null } | null>(null);
+  const onUserZoom = () => { if (roomFit.current) roomFit.current.base = null; };
+
   const markerAt = (target: Element) => target.closest<HTMLElement>("[data-marker]")?.dataset.marker ?? null;
   const viewport = useMapViewport({
-    unitsPerMetre: projection.unitsPerMetre, zoomAroundCentre: !!follow, onPan: onUserPan,
+    unitsPerMetre: projection.unitsPerMetre, zoomAroundCentre: !!follow, onPan: onUserPan, onZoom: onUserZoom,
     onTap: (target, at) => { const id = markerAt(target); if (id) onMarkerTap?.(id); else onMapTap?.(projection.toWorld(at)); },
   });
   const { view, size, toScreen, panTo, zoomAt } = viewport;
@@ -138,14 +146,36 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, l
   useLayoutEffect(() => {
     if (!size.width || shownMapKey.current === mapKey) return;
     shownMapKey.current = mapKey;
+    roomFit.current = null;
     viewport.reset(initialView(projection, art, anyNewest ? toPlane(anyNewest) : null, size));
   }, [mapKey, size.width > 0]);
 
   useEffect(() => {
-    if (!newest) return;
+    if (!newest) { roomFit.current = null; return; }
     const { x, y } = toPlane(newest);
-    panTo(x, y);
-  }, [newest?.key, follow, panTo, projection, shift]);
+    const room = autoZoom && map?.rooms && size.width ? nearestRoom(map.rooms, newest) : null;
+    const key = room && `${room.floor}|${room.zone}`;
+    const fit = roomFit.current;
+    if (room && key !== fit?.key) {
+      // Moving straight into another room keeps the zoom from before the first.
+      const base = fit?.base ?? view.scale;
+      roomFit.current = { key: key!, base };
+      panTo(x, y, 650, Math.max(base, roomScale(map!.rooms!.filter((other) => other.floor === room.floor && other.zone === room.zone), x, y)));
+    } else if (!room && fit) {
+      roomFit.current = null;
+      panTo(x, y, 650, fit.base ?? undefined);
+    } else panTo(x, y);
+  }, [newest?.key, follow, panTo, projection, shift, autoZoom]);
+
+  /** The zoom that shows all of a room's pieces (one floor, one zone) with the frame centred on plane point x/y. */
+  function roomScale(rooms: MapRoom[], x: number, y: number) {
+    const corners = rooms.flatMap(roomRings).flat().map(([wx, wz]) => projection.toPlane({ x: wx, z: wz }));
+    // Split floors move a room with its column; the shift is the same for all of it.
+    const dx = shift ? shift(rooms[0].floor, corners[0].x, corners[0].y) : 0;
+    const reachX = Math.max(...corners.map((corner) => Math.abs(corner.x + dx - x))), reachY = Math.max(...corners.map((corner) => Math.abs(corner.y - y)));
+    const fits = Math.min(size.width / 2 / reachX, size.height / 2 / reachY) * ROOM_FILL;
+    return Math.min(fits, ROOM_MAX_PX_PER_M / projection.unitsPerMetre);
+  }
 
   // After the reset above when the map changes, so a jump to another map lands on the point.
   useEffect(() => {
@@ -156,7 +186,7 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, l
 
   useImperativeHandle(ref, () => ({
     panTo: (x, y) => panTo(x, y),
-    zoomBy: (factor) => zoomAt(factor),
+    zoomBy: (factor) => { onUserZoom(); zoomAt(factor); },
     focusFloor: (id) => { const point = layout.focus(id); if (point) panTo(point.x, point.y); },
   }), [panTo, zoomAt, layout.focus]);
 
