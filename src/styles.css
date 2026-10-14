@@ -653,6 +653,7 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .marker-cards { position: absolute; right: 14px; bottom: 14px; z-index: 3; width: 260px; max-height: calc(100% - 28px); overflow-y: auto;
   display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
 .map-page:has(.map-scrubber) .marker-cards { bottom: 58px; max-height: calc(100% - 72px); }
+.map-page:has(.map-scrubber) .doc-picker { bottom: 58px; max-height: calc(100% - 114px); }
 .marker-card { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 10px;
   background: rgb(15 16 17 / 82%); backdrop-filter: blur(8px); font-size: 12px; }
 .marker-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -699,7 +700,8 @@ button.group-member:not(:disabled):hover { background: var(--surface-hover); }
 
 /* Dev-only document photo linker: one photo at a time at the right; the marker card moves aside for it. */
 .doc-link-actions { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
-.doc-picker { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); z-index: 4; width: min(480px, 45%); max-height: calc(100% - 28px); overflow-y: auto;
+/* Anchored bottom right, growing upwards; stops short of the map switcher at the top right. */
+.doc-picker { position: absolute; right: 14px; bottom: 14px; z-index: 4; width: min(480px, 45%); max-height: calc(100% - 70px); overflow-y: auto;
   display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 10px; background: rgb(15 16 17 / 88%); backdrop-filter: blur(8px); font-size: 12px; }
 .doc-picker-head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 500; }
 .doc-picker-photo { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 9; border-radius: 6px; background: #131416; overflow: hidden; }
@@ -716,6 +718,7 @@ button.group-member:not(:disabled):hover { background: var(--surface-hover); }
 .doc-picker-actions { display: flex; gap: 6px; }
 .doc-picker-actions .secondary { flex: 1; }
 .doc-picker-why { color: var(--warn); }
+.doc-picker-check { display: flex; gap: 6px; align-items: center; }
 .level-boxes { position: absolute; left: 0; top: 0; pointer-events: none; }
 .level-box { position: absolute; box-sizing: border-box; border: 1px dashed rgb(120 200 255 / 70%); background: rgb(120 200 255 / 6%); }
 .level-box.room { border-color: rgb(255 190 90 / 80%); background: rgb(255 190 90 / 8%); }

@@ -2,9 +2,11 @@
 // from the Tarkov Hideout repo's tarkovdoc.com snapshot. A location ties to a tarkov.dev document spawn by
 // position: the script snaps confident matches to the spawn, and `documents/links.json` holds hand-made links
 // (a null link means the location is no spawn), which win over the script's. A link can also give the `floor` (id, as in
-// floors.ts) the location is on, for a spot its height puts on the wrong one. Season-specific, like the preset.
+// floors.ts) the location is on, for a spot its height puts on the wrong one. `documents/locked.json` says by hand whether a
+// location is behind a lock, over the key tarkovdoc names. Season-specific, like the preset.
 import data from "./documents/locations.json";
 import links from "./documents/links.json";
+import lockedByHand from "./documents/locked.json";
 import type { WorldPoint } from "./types.ts";
 
 const photos = import.meta.glob<string>("./assets/documents/*.webp", { eager: true, query: "?url", import: "default" });
@@ -20,6 +22,10 @@ export type DocumentLocation = {
   description?: string;
   /** Key needed to reach it. */
   key?: string;
+  /** Behind a lock: set by hand, else whether tarkovdoc names a key. */
+  locked: boolean;
+  /** `locked` was set by hand. */
+  lockedByHand?: boolean;
   /** Photo file in `assets/documents`. */
   photo?: string;
   /** Where it is, when tied to a spawn (or placed by hand where tarkov.dev has none). */
@@ -32,7 +38,10 @@ export type DocumentLocation = {
 };
 
 export const documentSource = data.source;
-const all = data.locations as DocumentLocation[];
+const all = (data.locations as Omit<DocumentLocation, "locked">[]).map((location): DocumentLocation => {
+  const byHand = (lockedByHand as Record<string, boolean>)[location.id];
+  return { ...location, locked: byHand ?? !!location.key, ...byHand === undefined ? {} : { lockedByHand: true } };
+});
 const manual = links as Record<string, (WorldPoint & { floor?: string }) | null>;
 
 /** Locations on a map, with hand-made links applied. */

@@ -13,7 +13,7 @@ import { type DataMode, useDesktopMapSource } from "../tarkov-data";
 import { bestLooseItems, useItemData } from "../lib/itemData";
 import { MapLayersPanel } from "../components/MapLayersPanel";
 import { MapMarkerCard } from "../components/MapMarkerCard";
-import { DocumentLinkActions, DocumentPicker, saveDocumentLink } from "../components/DocumentLinker";
+import { DocumentLinkActions, DocumentPicker, saveDocumentLink, type DocumentFocus } from "../components/DocumentLinker";
 import { appAssets } from "../lib/tiles";
 import { keys, usePersisted } from "../lib/persist";
 import { age } from "../lib/format";
@@ -97,6 +97,8 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
   const lookups = useLookups(source, mode);
   const documents = useMemo(() => mapData ? documentLocations(mapData.normalizedName) : [], [mapData]);
   const overlay = useMemo(() => mapData ? buildMarkers(mapData, lookups, tarkovPreset, documents) : [], [mapData, lookups, documents]);
+  // Hand-placed locations (no spawn there) get a marker of their own, named for them.
+  const placedDocuments = useMemo(() => new Set(overlay.flatMap((marker) => marker.document && marker.id === `document:${marker.document.id}` ? [marker.document.id] : [])), [overlay]);
   const [placing, setPlacing] = useState<string | null>(null);
   useEffect(() => setPlacing(null), [mapData]);
   const itemData = useItemData(mode);
@@ -183,6 +185,7 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
     setCentre(member.position ? { key: `${member.id}|${nonce}`, map: key, point: member.position } : null);
   };
   /** Document linker review: centres on the marker a location is matched to and pins it. */
+  const [documentFocus, setDocumentFocus] = useState<DocumentFocus | null>(null);
   const showDocument = (location: DocumentLocation) => {
     const marker = overlay.find((other) => other.document?.id === location.id);
     if (!marker || !shownKey) return;
@@ -242,12 +245,13 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
       </div>
     </div>
 
-    {cardMarker && <MapMarkerCard marker={cardMarker} filters={filters} get={getItem} pinned={!!pinned} onClose={() => setPinned(null)}
+    {cardMarker && <MapMarkerCard marker={cardMarker} filters={filters} get={getItem} pinned={!!pinned} onClose={() => setPinned(null)} photos={!documentLinker}
       floorName={calibration && floors.length ? floorAt(calibration, cardMarker.position).name : undefined}>
-      {documentLinker && pinned && cardMarker.layer === "documents" && <DocumentLinkActions marker={cardMarker} />}
+      {documentLinker && pinned && cardMarker.layer === "documents" && <DocumentLinkActions marker={cardMarker} onOpen={(id) => setDocumentFocus({ id, nonce: Date.now() })} />}
     </MapMarkerCard>}
-    {documentLinker && documents.length > 0 && <DocumentPicker locations={documents} labels={calibration?.labels ?? []} placing={placing} onPlacing={setPlacing}
-      marker={pinned && overlayById.get(pinned)?.layer === "documents" ? overlayById.get(pinned)! : null} onShow={showDocument} />}
+    {documentLinker && documents.length > 0 && <DocumentPicker locations={documents} labels={calibration?.labels ?? []}
+      floors={floors.map(({ id, name }) => ({ id, name }))} placed={placedDocuments} placing={placing} onPlacing={setPlacing}
+      marker={pinned && overlayById.get(pinned)?.layer === "documents" ? overlayById.get(pinned)! : null} focus={documentFocus} onShow={showDocument} />}
 
     <MapSwitcher maps={mapOptions} current={shownKey} label={mapName(shownMap) ?? (status === "online" ? "No map" : status === "offline" ? "Disconnected" : "Preview")}
       floor={shownFloor && !shownFloor.base ? shownFloor.name : undefined} state={mapState} liveName={mapName(live?.map)} onSelect={chooseMap}

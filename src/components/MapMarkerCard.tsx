@@ -12,9 +12,10 @@ const percent = (chance: number) => `${Math.round(chance * 100)}%`;
  * Hovering previews it; a pinned card stays until closed. A boss spawn point stacks one panel per
  * shown boss type, then one with the place itself.
  */
-export function MapMarkerCard({ marker, filters, preset = tarkovPreset, floorName, pinned, onClose, get, children }: {
+export function MapMarkerCard({ marker, filters, preset = tarkovPreset, floorName, pinned, onClose, get, photos = true, children }: {
   marker: MapMarker; filters: Filters; preset?: MarkerPreset; floorName?: string; /** Item lookup, when enrichment is ready: names, prices and value order. */ get?: ItemGet; pinned: boolean; onClose: () => void;
   /** Extra content at the bottom of the card (not for bosses). */ children?: ReactNode;
+  /** Shows a document's photo (the dev document linker shows it itself). */ photos?: boolean;
 }) {
   const { icon: iconSrc, link: assetUrl } = useMapAssets();
   const [title, ...rest] = [marker.label, ...marker.tags].filter(Boolean) as string[];
@@ -51,9 +52,9 @@ export function MapMarkerCard({ marker, filters, preset = tarkovPreset, floorNam
   const document = marker.document;
   const photo = document && documentPhoto(document);
   // A known Battle Pass document location is just what it is: its name, photo and description.
-  if (document) return <div className="marker-cards document"><div className="marker-card">
+  if (document) return <div className={`marker-cards ${photos ? "document" : ""}`}><div className="marker-card">
     <div className="marker-card-head"><div className="marker-card-title"><span>{document.title}</span></div>{close}</div>
-    {photo && <img className="marker-card-photo" src={photo} alt={document.title} draggable={false} />}
+    {photos && photo && <img className="marker-card-photo" src={photo} alt={document.title} draggable={false} />}
     {document.description && <span className="marker-card-sub">{document.description}</span>}
     {children}
   </div></div>;
