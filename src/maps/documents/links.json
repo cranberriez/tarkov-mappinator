@@ -447,6 +447,166 @@
 		"y": 31.89,
 		"z": 150.51
 	},
+	"icebreaker/pmc-1-1": {
+		"x": -1.2,
+		"z": 30.23,
+		"floor": "Infirmary"
+	},
+	"icebreaker/pmc-1-2": {
+		"x": -3.29,
+		"z": -63,
+		"floor": "Infirmary"
+	},
+	"icebreaker/pmc-1-3": {
+		"x": 0.85,
+		"z": 64.93,
+		"floor": "Infirmary"
+	},
+	"icebreaker/pmc-1-4": {
+		"x": 6.81,
+		"z": 42.13,
+		"floor": "Infirmary"
+	},
+	"icebreaker/pmc-1-5": {
+		"x": 11.33,
+		"z": 43.06,
+		"floor": "Infirmary"
+	},
+	"icebreaker/pmc-12-1": {
+		"x": 7.66,
+		"z": -19.05,
+		"floor": "Engine Room"
+	},
+	"icebreaker/pmc-13-1": {
+		"x": -3.27,
+		"z": -17.67,
+		"floor": "Engine Room"
+	},
+	"icebreaker/pmc-2-1": {
+		"x": -6.44,
+		"z": -21.87,
+		"floor": "Helipad"
+	},
+	"icebreaker/pmc-2-2": {
+		"x": -1.24,
+		"z": -24.37,
+		"floor": "Helipad"
+	},
+	"icebreaker/pmc-3-1": {
+		"x": 10.2,
+		"z": 48.25,
+		"floor": "Gym/Canteen"
+	},
+	"icebreaker/pmc-3-2": {
+		"x": -11.85,
+		"z": 29.4,
+		"floor": "Gym/Canteen"
+	},
+	"icebreaker/pmc-4-1": {
+		"x": 0.39,
+		"z": -33.77,
+		"floor": "Accommodation (lower)"
+	},
+	"icebreaker/pmc-4-2": {
+		"x": 1.2,
+		"z": 47.8,
+		"floor": "Accommodation (lower)"
+	},
+	"icebreaker/pmc-4-3": {
+		"x": -11.47,
+		"z": 42.97,
+		"floor": "Accommodation (lower)"
+	},
+	"icebreaker/pmc-5-1": {
+		"x": -1.77,
+		"z": 32.92,
+		"floor": "Accommodation (mid)"
+	},
+	"icebreaker/pmc-7-1": {
+		"x": -1.5,
+		"z": 28,
+		"floor": "Officers' Deck"
+	},
+	"icebreaker/pmc-9-1": {
+		"x": 2.18,
+		"z": 36.82,
+		"floor": "Bridge"
+	},
+	"icebreaker/test-0-1": {
+		"x": -1.84,
+		"z": 36.7,
+		"floor": "Storage/Security"
+	},
+	"icebreaker/test-0-2": {
+		"x": 11.23,
+		"z": 8.92,
+		"floor": "Fuel Pumps"
+	},
+	"icebreaker/test-1-1": {
+		"x": -3.47,
+		"z": 29.84,
+		"floor": "Infirmary"
+	},
+	"icebreaker/test-1-2": {
+		"x": -0.12,
+		"z": 61.11,
+		"floor": "Infirmary"
+	},
+	"icebreaker/test-1-3": {
+		"x": 9.38,
+		"z": 45.44,
+		"floor": "Infirmary"
+	},
+	"icebreaker/test-2-1": {
+		"x": -0.43,
+		"z": -24.4,
+		"floor": "Helipad"
+	},
+	"icebreaker/test-2-2": {
+		"x": -5.93,
+		"z": -22.68,
+		"floor": "Helipad"
+	},
+	"icebreaker/test-2-3": {
+		"x": 5.02,
+		"z": -29.25,
+		"floor": "Helipad"
+	},
+	"icebreaker/test-3-1": {
+		"x": -11.88,
+		"z": 46.46,
+		"floor": "Gym/Canteen"
+	},
+	"icebreaker/test-4-1": {
+		"x": -2.66,
+		"z": 41.31,
+		"floor": "Accommodation (lower)"
+	},
+	"icebreaker/test-4-2": {
+		"x": -3.08,
+		"z": -33.91,
+		"floor": "Accommodation (lower)"
+	},
+	"icebreaker/test-4-3": {
+		"x": 1.04,
+		"z": 42.43,
+		"floor": "Accommodation (lower)"
+	},
+	"icebreaker/test-4-4": {
+		"x": -12.43,
+		"z": 38.85,
+		"floor": "Accommodation (lower)"
+	},
+	"icebreaker/test-5-1": {
+		"x": -2.98,
+		"z": 35.05,
+		"floor": "Accommodation (mid)"
+	},
+	"icebreaker/test-9-1": {
+		"x": 3.4,
+		"z": 38.98,
+		"floor": "Bridge"
+	},
 	"interchange/blueprint-1-1-1": {
 		"x": 3.15,
 		"y": 28.02,
@@ -601,6 +761,329 @@
 		"x": 137.95,
 		"y": 25.63,
 		"z": 268.1
+	},
+	"lab/medical-1-1": {
+		"x": -139.64,
+		"y": 0.87,
+		"z": -389.39
+	},
+	"lab/medical-1-2": {
+		"x": -128.62,
+		"y": 0.96,
+		"z": -392.7
+	},
+	"lab/medical-1-3": {
+		"x": -86.69,
+		"y": 1.49,
+		"z": -432.89
+	},
+	"lab/medical-1-4": {
+		"x": -109.14,
+		"y": 1.27,
+		"z": -443.7
+	},
+	"lab/medical-1-5": {
+		"x": -138.18,
+		"y": 0.68,
+		"z": -401.67
+	},
+	"lab/medical-1-6": {
+		"x": -125.77,
+		"y": 0.32,
+		"z": -352.36
+	},
+	"lab/medical-1-7": {
+		"x": -133.68,
+		"y": 0.93,
+		"z": -397.66
+	},
+	"lab/medical-1-8": {
+		"x": -183.7,
+		"y": 1.05,
+		"z": -363
+	},
+	"lab/medical-1-9": {
+		"x": -134.58,
+		"y": 0.97,
+		"z": -410.86
+	},
+	"lab/medical-2-1": {
+		"x": -131.96,
+		"y": 5.09,
+		"z": -377.93
+	},
+	"lab/medical-2-2": {
+		"x": -124.06,
+		"y": 5.29,
+		"z": -393.87
+	},
+	"lab/medical-2-3": {
+		"x": -134.92,
+		"y": 5.27,
+		"z": -407.74
+	},
+	"lab/medical-2-4": {
+		"x": -121.86,
+		"y": 4.99,
+		"z": -360.92
+	},
+	"lab/medical-2-5": {
+		"x": -230.22,
+		"y": 5.02,
+		"z": -345.02
+	},
+	"lab/medical-2-6": {
+		"x": -233.61,
+		"y": 5.27,
+		"z": -312.34
+	},
+	"lab/medical-2-7": {
+		"x": -114.4,
+		"y": 4.83,
+		"z": -364.46
+	},
+	"lab/medical-2-8": {
+		"x": -122.68,
+		"y": 5.4,
+		"z": -397.78
+	},
+	"lab/medical-2-9": {
+		"x": -139.76,
+		"y": 4.11,
+		"z": -388.85
+	},
+	"lab/user-1-1": {
+		"x": -263.79,
+		"y": 0.62,
+		"z": -343.9
+	},
+	"lab/user-1-2": {
+		"x": -171.88,
+		"y": 1.08,
+		"z": -344.87
+	},
+	"lab/user-2-1": {
+		"x": -265.67,
+		"y": 5.24,
+		"z": -369.38
+	},
+	"lab/user-2-10": {
+		"x": -172.53,
+		"y": 4.64,
+		"z": -342.28
+	},
+	"lab/user-2-11": {
+		"x": -252.2,
+		"y": 5.02,
+		"z": -367.72
+	},
+	"lab/user-2-12": {
+		"x": -230.49,
+		"y": 4.85,
+		"z": -341.37
+	},
+	"lab/user-2-13": {
+		"x": -216.03,
+		"y": 4.89,
+		"z": -382.15
+	},
+	"lab/user-2-14": {
+		"x": -193.75,
+		"y": 4.97,
+		"z": -401.76
+	},
+	"lab/user-2-15": {
+		"x": -171.47,
+		"y": 5.07,
+		"z": -285.03
+	},
+	"lab/user-2-16": {
+		"x": -139.45,
+		"y": 5.18,
+		"z": -283.3
+	},
+	"lab/user-2-2": {
+		"x": -119.29,
+		"y": 0.91,
+		"z": -445.16
+	},
+	"lab/user-2-3": {
+		"x": -187.35,
+		"y": 4.67,
+		"z": -407.28
+	},
+	"lab/user-2-4": {
+		"x": -148.83,
+		"y": 5.16,
+		"z": -393.61
+	},
+	"lab/user-2-5": {
+		"x": -268.74,
+		"y": 4.96,
+		"z": -326.1
+	},
+	"lab/user-2-6": {
+		"x": -163.13,
+		"y": 4.94,
+		"z": -347.64
+	},
+	"lab/user-2-7": {
+		"x": -244.07,
+		"y": 5.01,
+		"z": -382.46
+	},
+	"lab/user-2-8": {
+		"x": -225.92,
+		"y": 4.7,
+		"z": -308.57
+	},
+	"lab/user-2-9": {
+		"x": -142.74,
+		"y": 4.72,
+		"z": -409.54
+	},
+	"labyrinth/blueprints-1": {
+		"x": 3.73,
+		"y": 1.07,
+		"z": 28.7
+	},
+	"labyrinth/blueprints-10": {
+		"x": 7.86,
+		"y": 0.69,
+		"z": -11.08
+	},
+	"labyrinth/blueprints-11": {
+		"x": 0.26,
+		"y": 0.95,
+		"z": 54.58
+	},
+	"labyrinth/blueprints-12": {
+		"x": 11.27,
+		"y": 0.22,
+		"z": 31.41
+	},
+	"labyrinth/blueprints-13": {
+		"x": -24.66,
+		"z": -8.25
+	},
+	"labyrinth/blueprints-14": {
+		"x": -0.14,
+		"y": 0.15,
+		"z": -0.02
+	},
+	"labyrinth/blueprints-2": {
+		"x": 9.44,
+		"y": 0.97,
+		"z": 2.97
+	},
+	"labyrinth/blueprints-3": {
+		"x": -7.34,
+		"y": 0.32,
+		"z": 23.27
+	},
+	"labyrinth/blueprints-4": {
+		"x": -16.29,
+		"y": 1.18,
+		"z": 8.62
+	},
+	"labyrinth/blueprints-5": {
+		"x": -15.03,
+		"y": 0.35,
+		"z": 51.26
+	},
+	"labyrinth/blueprints-6": {
+		"x": -10.97,
+		"y": 1.04,
+		"z": 26.57
+	},
+	"labyrinth/blueprints-7": {
+		"x": -6.51,
+		"y": 0.75,
+		"z": 35.67
+	},
+	"labyrinth/blueprints-8": {
+		"x": 16.54,
+		"y": 0.05,
+		"z": 3.9
+	},
+	"labyrinth/blueprints-9": {
+		"x": 12.31,
+		"y": 0.44,
+		"z": 4.6
+	},
+	"labyrinth/medical-1": {
+		"x": -16.89,
+		"y": 0.05,
+		"z": 34.95
+	},
+	"labyrinth/medical-10": {
+		"x": -9.11,
+		"y": 0.96,
+		"z": 30.45
+	},
+	"labyrinth/medical-11": {
+		"x": -5.44,
+		"y": 0.69,
+		"z": 26.74
+	},
+	"labyrinth/medical-12": {
+		"x": -1.72,
+		"y": 0.26,
+		"z": 35.82
+	},
+	"labyrinth/medical-13": {
+		"x": 12.3,
+		"y": 1.02,
+		"z": 19.15
+	},
+	"labyrinth/medical-14": {
+		"x": -24.96,
+		"y": 0.54,
+		"z": 40.09
+	},
+	"labyrinth/medical-15": {
+		"x": -24.58,
+		"z": -7.39
+	},
+	"labyrinth/medical-2": {
+		"x": 14.29,
+		"y": 0.3,
+		"z": 9.44
+	},
+	"labyrinth/medical-3": {
+		"x": 0.26,
+		"y": 0.95,
+		"z": 54.58
+	},
+	"labyrinth/medical-4": {
+		"x": -7.47,
+		"y": 0.35,
+		"z": 30.63
+	},
+	"labyrinth/medical-5": {
+		"x": -4.73,
+		"y": 0.22,
+		"z": 10.18
+	},
+	"labyrinth/medical-6": {
+		"x": 7.96,
+		"y": 0.85,
+		"z": 4.32
+	},
+	"labyrinth/medical-7": {
+		"x": 7.86,
+		"y": 0.69,
+		"z": -11.08
+	},
+	"labyrinth/medical-8": {
+		"x": 12.27,
+		"y": 0.24,
+		"z": 33.6
+	},
+	"labyrinth/medical-9": {
+		"x": 15.01,
+		"y": 0.98,
+		"z": 16.51
 	},
 	"lighthouse/pmc-1-1-1-1": {
 		"x": 34.55,
@@ -917,6 +1400,166 @@
 		"y": -14.32,
 		"z": 17.45
 	},
+	"shoreline/technical-10-1-1-1": {
+		"x": -318.99,
+		"y": -60.63,
+		"z": 483.07
+	},
+	"shoreline/technical-10-2-1-1": {
+		"x": -183,
+		"y": -54.87,
+		"z": 376.34
+	},
+	"shoreline/technical-2-0-1-1": {
+		"x": -212.29,
+		"y": -17.23,
+		"z": 19.8
+	},
+	"shoreline/technical-2-1-206-1": {
+		"x": -219.12,
+		"y": -0.82,
+		"z": -87.04
+	},
+	"shoreline/technical-2-1-316-1": {
+		"x": -181.01,
+		"y": 2.1,
+		"z": -80.39
+	},
+	"shoreline/technical-2-2-2-1": {
+		"x": -274.28,
+		"y": -0.28,
+		"z": -140.3
+	},
+	"shoreline/technical-2-3-212-1": {
+		"x": -312.04,
+		"y": 0.18,
+		"z": -77.92
+	},
+	"shoreline/technical-2-3-3-1": {
+		"x": -270.35,
+		"y": 2.57,
+		"z": -102.66
+	},
+	"shoreline/technical-3-0-1-1": {
+		"x": -536.44,
+		"y": -17.17,
+		"z": -336.18
+	},
+	"shoreline/technical-3-1-1-1": {
+		"x": -627.6,
+		"y": -25.83,
+		"z": -232.54
+	},
+	"shoreline/technical-4-2-1-1": {
+		"x": 412.84,
+		"y": -54.07,
+		"z": 160.93
+	},
+	"shoreline/technical-6-2-1-1": {
+		"x": 93.6,
+		"y": -47.49,
+		"z": 116.55
+	},
+	"shoreline/technical-7-1-1-1": {
+		"x": -241.17,
+		"y": -40.19,
+		"z": 203.33
+	},
+	"shoreline/technical-8-1-3-1": {
+		"x": -511.19,
+		"y": -13.63,
+		"z": 263.98
+	},
+	"shoreline/technical-8-2-1-1": {
+		"x": -707.49,
+		"y": -26.55,
+		"z": 96.73
+	},
+	"shoreline/test-10-1-1-1": {
+		"x": -319.39,
+		"y": -61.89,
+		"z": 496.45
+	},
+	"shoreline/test-10-2-1-1": {
+		"x": -180.72,
+		"y": -54.72,
+		"z": 374.1
+	},
+	"shoreline/test-2-0-1-1": {
+		"x": -135.74,
+		"y": -21.08,
+		"z": -14.64
+	},
+	"shoreline/test-2-1-211-1": {
+		"x": -196.97,
+		"y": -0.28,
+		"z": -77
+	},
+	"shoreline/test-2-1-216-1": {
+		"x": -181.47,
+		"z": -74.62,
+		"floor": "2nd Floor"
+	},
+	"shoreline/test-2-1-3-1": {
+		"x": -231.25,
+		"y": 2.86,
+		"z": -102.68
+	},
+	"shoreline/test-2-1-314-1": {
+		"x": -183.13,
+		"z": -90.91,
+		"floor": "3rd Floor"
+	},
+	"shoreline/test-2-3-2-1": {
+		"x": -239.01,
+		"y": -0.78,
+		"z": -146.9
+	},
+	"shoreline/test-2-3-218-1": {
+		"x": -328.97,
+		"y": -0.16,
+		"z": -89.19
+	},
+	"shoreline/test-2-3-326-1": {
+		"x": -348.04,
+		"y": 2.46,
+		"z": -89.67
+	},
+	"shoreline/test-3-0-2-1": {
+		"x": -520.24,
+		"y": -15.88,
+		"z": -340.1
+	},
+	"shoreline/test-3-2-1-1": {
+		"x": -612.59,
+		"y": -29.38,
+		"z": -180.02
+	},
+	"shoreline/test-4-1-1-1": {
+		"x": 441.97,
+		"y": -53.26,
+		"z": 154.01
+	},
+	"shoreline/test-5-1-1-1": {
+		"x": 279.46,
+		"y": -54.96,
+		"z": 180.73
+	},
+	"shoreline/test-6-2-1-1": {
+		"x": 97.79,
+		"y": -48.14,
+		"z": 97.18
+	},
+	"shoreline/test-8-1-2-1": {
+		"x": -512.65,
+		"y": -21.76,
+		"z": 236.52
+	},
+	"shoreline/test-8-2-1-1": {
+		"x": -707.73,
+		"y": -26.55,
+		"z": 99.08
+	},
 	"streets_of_tarkov/financial-1-3-2-1": {
 		"x": 146.79,
 		"y": 3.19,
@@ -927,10 +1570,40 @@
 		"y": 4.05,
 		"z": -55.8
 	},
+	"streets_of_tarkov/financial-1-4-1-1": {
+		"x": 71.85,
+		"y": 1.14,
+		"z": -23.61
+	},
+	"streets_of_tarkov/financial-1-6-1-1": {
+		"x": 60.07,
+		"y": 1.22,
+		"z": -62.52
+	},
+	"streets_of_tarkov/financial-1-6-1-2": {
+		"x": 54.8,
+		"y": 1.03,
+		"z": -72.55
+	},
+	"streets_of_tarkov/financial-2-8-1-1": {
+		"x": 158.94,
+		"y": 1.48,
+		"z": 149.49
+	},
+	"streets_of_tarkov/financial-2-8-1-2": {
+		"x": 168.82,
+		"y": 1.65,
+		"z": 165.3
+	},
 	"streets_of_tarkov/financial-4-1-2-1": {
 		"x": -41.51,
 		"y": 6.39,
 		"z": -45.62
+	},
+	"streets_of_tarkov/financial-4-2-2-1": {
+		"x": -31.39,
+		"y": 7.52,
+		"z": -113.87
 	},
 	"streets_of_tarkov/financial-5-1-2-1": {
 		"x": -88.76,
@@ -942,15 +1615,30 @@
 		"y": 9.56,
 		"z": 397.42
 	},
+	"streets_of_tarkov/financial-7-7-1-1": {
+		"x": 139.72,
+		"y": 4.72,
+		"z": 355.09
+	},
 	"streets_of_tarkov/financial-7-7-2-1": {
 		"x": 136.64,
 		"y": 6.67,
 		"z": 370.82
 	},
+	"streets_of_tarkov/financial-8-1-1-1": {
+		"x": -181.96,
+		"y": 3.58,
+		"z": 220.93
+	},
 	"streets_of_tarkov/financial-8-1-2-1": {
 		"x": -163.53,
 		"y": 6.95,
 		"z": 228.01
+	},
+	"streets_of_tarkov/user-1-0-1-1": {
+		"x": 135.2,
+		"y": -2.67,
+		"z": 2.83
 	},
 	"streets_of_tarkov/user-1-3-2-1": {
 		"x": 116.28,
@@ -962,15 +1650,55 @@
 		"y": 4.08,
 		"z": -18.49
 	},
+	"streets_of_tarkov/user-1-4-1-1": {
+		"x": 84.55,
+		"y": 1.75,
+		"z": -26.17
+	},
+	"streets_of_tarkov/user-1-6-1-1": {
+		"x": 58.79,
+		"y": 1.21,
+		"z": -72.78
+	},
+	"streets_of_tarkov/user-1-6-1-2": {
+		"x": 65.72,
+		"y": 1.26,
+		"z": -59.42
+	},
+	"streets_of_tarkov/user-2-8-1-1": {
+		"x": 170.84,
+		"y": 2.09,
+		"z": 160.53
+	},
+	"streets_of_tarkov/user-3-2-1-1": {
+		"x": 46.8,
+		"y": 1.1,
+		"z": 34.47
+	},
 	"streets_of_tarkov/user-4-1-2-1": {
 		"x": -26.41,
 		"y": 5.88,
 		"z": -36.14
 	},
+	"streets_of_tarkov/user-4-2-2-1": {
+		"x": -38.07,
+		"y": 7.52,
+		"z": -110.91
+	},
+	"streets_of_tarkov/user-5-1-1-1": {
+		"x": -53.27,
+		"y": 1.89,
+		"z": 61.17
+	},
 	"streets_of_tarkov/user-5-1-2-1": {
 		"x": -69.49,
 		"y": 5.91,
 		"z": 46.38
+	},
+	"streets_of_tarkov/user-7-7-1-1": {
+		"x": 151.78,
+		"y": 3.51,
+		"z": 344.69
 	},
 	"streets_of_tarkov/user-7-7-2-1": {
 		"x": 139.57,
@@ -981,5 +1709,155 @@
 		"x": -170.89,
 		"y": 7.01,
 		"z": 223.75
+	},
+	"woods/technical-1-1": {
+		"x": 140.77,
+		"y": 27.9,
+		"z": -725.74
+	},
+	"woods/technical-1-2": {
+		"x": 295.2,
+		"y": 23.34,
+		"z": -506.86
+	},
+	"woods/technical-1-3": {
+		"x": 226.69,
+		"y": 25.48,
+		"z": -712.24
+	},
+	"woods/technical-1-4": {
+		"x": -46.05,
+		"y": 20.69,
+		"z": -251.74
+	},
+	"woods/technical-1-5": {
+		"x": -54.91,
+		"y": 8.87,
+		"z": -501.34
+	},
+	"woods/technical-1-6": {
+		"x": -128.82,
+		"y": 10.63,
+		"z": -689.11
+	},
+	"woods/technical-2-1": {
+		"x": -274.57,
+		"y": 7.46,
+		"z": -405.07
+	},
+	"woods/technical-2-1-2": {
+		"x": -475.17,
+		"y": 13.95,
+		"z": -178.18
+	},
+	"woods/technical-2-2": {
+		"x": -459.04,
+		"y": 15.54,
+		"z": -364.49
+	},
+	"woods/technical-2-3": {
+		"x": -153.07,
+		"y": 51.93,
+		"z": -275.22
+	},
+	"woods/technical-3-1": {
+		"x": 371.64,
+		"y": -10.43,
+		"z": 122.86
+	},
+	"woods/technical-4-1": {
+		"x": -1.62,
+		"y": -0.72,
+		"z": -81.39
+	},
+	"woods/technical-5-1": {
+		"x": -248.67,
+		"y": 12.29,
+		"z": -24.46
+	},
+	"woods/technical-5-2": {
+		"x": -210.48,
+		"y": -0.8,
+		"z": 217.72
+	},
+	"woods/technical-6-1": {
+		"x": -675.62,
+		"y": 11.08,
+		"z": 132.79
+	},
+	"woods/test-1-1": {
+		"x": 272.19,
+		"y": 23.95,
+		"z": -511.4
+	},
+	"woods/test-1-2": {
+		"x": 280.04,
+		"y": 23.45,
+		"z": -434.16
+	},
+	"woods/test-1-3": {
+		"x": 270.32,
+		"y": 23.15,
+		"z": -439.88
+	},
+	"woods/test-1-4": {
+		"x": 310.07,
+		"y": 23.21,
+		"z": -462.87
+	},
+	"woods/test-1-5": {
+		"x": 284.06,
+		"y": 23.64,
+		"z": -517.19
+	},
+	"woods/test-2-1-1": {
+		"x": -512.71,
+		"y": 16.95,
+		"z": -177.96
+	},
+	"woods/test-2-2-1": {
+		"x": -513.04,
+		"y": 19.17,
+		"z": -394.17
+	},
+	"woods/test-2-2-2": {
+		"x": -544.89,
+		"y": 18.92,
+		"z": -199.92
+	},
+	"woods/test-2-3": {
+		"x": -456.04,
+		"y": 15.95,
+		"z": -366.54
+	},
+	"woods/test-3-1": {
+		"x": 238.56,
+		"y": -0.88,
+		"z": -71.04
+	},
+	"woods/test-3-2": {
+		"x": 241.46,
+		"y": -1.79,
+		"z": -80.69
+	},
+	"woods/test-4-1": {
+		"x": -27,
+		"y": -2.32,
+		"z": 47.45
+	},
+	"woods/test-4-2": {
+		"x": 58.35,
+		"y": -1.73,
+		"z": -51.01
+	},
+	"woods/test-5-1": {
+		"x": -201.93,
+		"y": -1.74,
+		"z": 232.12
+	},
+	"woods/test-5-2": {
+		"x": -189.85,
+		"y": -1.87,
+		"z": 208.4
 	}
 }
