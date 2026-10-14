@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
 import { floorAt, floorById, floorLevels, floorOf, floorsOf, levelText, type FloorSelection } from "./floors.ts";
+import { roomRings } from "./rooms.ts";
 import { MapArt } from "./MapArt.tsx";
 import { MapOverlay, type OverlayArea } from "./MapOverlay.tsx";
 import { MapTiles } from "./MapTiles.tsx";
@@ -178,8 +179,8 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, l
     "--ox": `${origin.left}px`, "--oy": `${origin.top}px`,
   } as CSSProperties;
 
-  // Dev: a box per floor piece (vector art, split) and per room box tarkov.dev limits a floor to, and the outline of each
-  // building's floor areas, each with its height range.
+  // Dev: a box per floor piece (vector art, split), and with its height range, the outline of each room drawn for the map
+  // (src/maps/floor-data), or on maps without rooms each room box tarkov.dev limits a floor to and each floor area.
   const { levelBoxes, levelAreas } = useMemo((): { levelBoxes: LevelBox[]; levelAreas: LevelArea[] } => {
     if (!levels || !map || !art) return { levelBoxes: [], levelAreas: [] };
     const boxes: LevelBox[] = [], areas: LevelArea[] = [];
@@ -187,6 +188,21 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, l
     const text = (id: string) => { const found = named.get(id), range = found && floorLevels(map, found); return `${found?.name ?? id}${range ? ` · ${levelText(range)}` : ""}`; };
     layout.slots?.forEach((slot, index) => boxes.push({ key: `slot:${index}`, kind: "piece", text: text(slot.floor),
       x: art.x + (slot.x + slot.dx) * art.width, y: art.y + slot.y * art.height, width: slot.width * art.width, height: slot.height * art.height }));
+    if (map.rooms) {
+      const order = floorsOf(map).map((other) => other.id);
+      map.rooms.forEach((room, index) => {
+        if (!splitOn && floor !== null && floor !== room.floor) return;
+        const rings = roomRings(room).map((ring) => ring.map(([x, z]) => projection.toPlane({ x, z })));
+        const xs = rings.flat().map((point) => point.x), ys = rings.flat().map((point) => point.y);
+        const left = Math.min(...xs), right = Math.max(...xs), top = Math.min(...ys), bottom = Math.max(...ys);
+        const dx = shift ? shift(room.floor, (left + right) / 2, (top + bottom) / 2) : 0;
+        const d = rings.map((ring) => `M${ring.map((point) => `${+(point.x + dx).toFixed(2)} ${+point.y.toFixed(2)}`).join("L")}Z`).join("");
+        const height = levelText([room.height[0] ?? -10000, room.height[1] ?? 10000]);
+        areas.push({ key: `room:${index}`, d, text: `${room.zone ? `${room.zone} · ` : ""}${named.get(room.floor)?.name ?? room.floor} · ${height}`,
+          x: left + dx, y: top, width: right - left, row: Math.max(0, order.indexOf(room.floor)) });
+      });
+      return { levelBoxes: boxes, levelAreas: areas };
+    }
     map.layers.forEach((layer, row) => {
       if (!splitOn && floor !== null && floor !== layer.name) return;
       layer.extents?.forEach((extent, index) => {

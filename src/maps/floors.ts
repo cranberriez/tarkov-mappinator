@@ -62,10 +62,16 @@ export function levelText([low, high]: [number, number]): string {
 }
 
 /**
- * The height range a floor covers, for display: its listed extents, or for the base floor (which tarkov.dev does not
- * list) the gap between the floors below and above it. Null when the map gives nothing to go on.
+ * The height range a floor covers, for display. On a map with rooms, the span of its rooms' heights (the base floor has
+ * none: it is wherever no room is). Otherwise its listed extents, or for the base floor (which tarkov.dev does not list)
+ * the gap between the floors below and above it. Null when the map gives nothing to go on.
  */
 export function floorLevels(map: MapCalibration, floor: Floor): [number, number] | null {
+  if (map.rooms) {
+    const rooms = map.rooms.filter((room) => room.floor === floor.id);
+    if (!rooms.length) return null;
+    return [Math.min(...rooms.map((room) => room.height[0] ?? -10000)), Math.max(...rooms.map((room) => room.height[1] ?? 10000))];
+  }
   if (floor.extents?.length) return [Math.min(...floor.extents.map((extent) => extent.height[0])), Math.max(...floor.extents.map((extent) => extent.height[1]))];
   if (!floor.base) return null;
   const others = floorsOf(map).filter((other) => other !== floor && other.extents?.length);

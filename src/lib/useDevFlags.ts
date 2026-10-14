@@ -11,7 +11,7 @@ export type DevFlags = {
   fakePlayers: boolean;
   /** On the map, ties document reference photos to spawns (writes src/maps/documents/links.json through the dev server). */
   documentLinker: boolean;
-  /** On the map, writes each floor's height range (Y) on its pieces and draws the room boxes and building areas that limit it. */
+  /** On the map, writes each floor's height range (Y) on its pieces and outlines the rooms that decide floors, with theirs. */
   floorLevels: boolean;
 };
 
