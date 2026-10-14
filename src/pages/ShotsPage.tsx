@@ -28,7 +28,8 @@ export function ShotsPage({ scanner, initial = null }: { scanner: Scanner; initi
   const shot = shots[index];
   const go = (to: number) => { if (to >= 0 && to < shots.length) setPicked(to === 0 ? null : shots[to].filename); };
   const rawMap = shot ? shotMap(scanner, shot) : null;
-  const floorData = useFloorData(resolveGame(rawMap)?.key ?? null);
+  // Datasets are per map art, shared by its variants (Ground Zero 21+ uses Ground Zero's).
+  const floorData = useFloorData(resolveGame(rawMap)?.art ?? null);
 
   return <div className="shots-page">
     <header className="shots-header">

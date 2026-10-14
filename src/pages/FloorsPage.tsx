@@ -50,10 +50,16 @@ const sameSelection = (a: Selection, b: Selection) => !!a && !!b && (a.kind === 
  * next one under it). Nothing here changes the floor data the app uses.
  */
 export function FloorsPage({ scanner, onOpenShot }: { scanner: Scanner; onOpenShot: (filename: string) => void }) {
-  const mapOptions = useMemo(() => games.filter((game) => game.art && calibrations[game.art]), []);
-  const newestMap = scanner.positions.length ? resolveGame(shotMap(scanner, scanner.positions[scanner.positions.length - 1]))?.key ?? null : null;
+  // One dataset per map art: variants sharing it (Ground Zero and 21+, The Lab and Dark, Factory and Night) share their floors.
+  const mapOptions = useMemo(() => {
+    const byArt = new Map<string, string[]>();
+    for (const game of games) if (game.art && calibrations[game.art]) byArt.set(game.art, [...byArt.get(game.art) ?? [], game.name]);
+    return [...byArt].map(([art, names]) => ({ key: art, label: names.join(" / ") }));
+  }, []);
+  const newestMap = scanner.positions.length ? resolveGame(shotMap(scanner, scanner.positions[scanner.positions.length - 1]))?.art ?? null : null;
   const [stored, setStored] = usePersisted<string | null>(keys.floorsMap, null);
-  const mapKey = stored ?? newestMap ?? "streets-of-tarkov";
+  // Stored before datasets were per art, it may be a variant's own key.
+  const mapKey = (stored && (resolveGame(stored)?.art ?? stored)) ?? newestMap ?? "streets-of-tarkov";
   const map = resolveMap(mapKey);
   const floorData = useFloorData(mapKey);
   const data = floorData.data;
@@ -77,7 +83,7 @@ export function FloorsPage({ scanner, onOpenShot }: { scanner: Scanner; onOpenSh
     const labelled = new Map((data?.samples ?? []).map((sample) => [sample.id, sample]));
     const result: Dot[] = [];
     for (const shot of scanner.positions) {
-      if (resolveGame(shotMap(scanner, shot))?.key !== mapKey) continue;
+      if (resolveGame(shotMap(scanner, shot))?.art !== mapKey) continue;
       inHistory.add(shot.filename);
       if (labelled.has(shot.filename)) continue;
       const [x, y, z] = shot.xyz;
@@ -296,7 +302,7 @@ export function FloorsPage({ scanner, onOpenShot }: { scanner: Scanner; onOpenSh
     </div>
     <aside className="floors-side">
       <select value={mapKey} onChange={(event) => setStored(event.target.value)}>
-        {mapOptions.map((game) => <option key={game.key} value={game.key}>{game.name}</option>)}
+        {mapOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
       </select>
       <p className="faint">{labelled.length} labelled · {dots.length - labelled.length} not{labelled.length ? ` · guess right ${Math.round(right / labelled.length * 100)}%` : ""}</p>
       {floorData.error && <p className="shots-error">{floorData.error}</p>}

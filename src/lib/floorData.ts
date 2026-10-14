@@ -164,7 +164,10 @@ function write(data: FloorDataset) {
   return next;
 }
 
-/** A map's floor dataset (by game key), and edits that save it. Null map: nothing loaded. */
+/**
+ * A map's floor dataset, and edits that save it. Keyed by map art (`GameMap.art`), so variants sharing art share one dataset.
+ * Null map: nothing loaded.
+ */
 export function useFloorData(map: string | null) {
   const [data, setData] = useState<FloorDataset | null>(() => map ? cache.get(map) ?? null : null);
   const [error, setError] = useState<string | null>(null);
