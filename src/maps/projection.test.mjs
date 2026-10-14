@@ -87,6 +87,26 @@ test("floors match areas as drawn, just outside them only where no area holds th
   assert.equal(floorOf(map, { position: { x: 5, z: 5, y: 4 }, floor: "nowhere" }).id, "2nd Floor", "unknown hand floor");
 });
 
+test("a map with rooms takes floors from them alone: outline and heights, both ends in, else the ground", () => {
+  const rooms = [
+    { floor: "2nd Floor", zone: "block", height: [4.7, 7.6], rect: { x: 0, z: 0, width: 20, depth: 10, angle: 0 } },
+    { floor: "3rd Floor", zone: "block", height: [7.6, null], rect: { x: 0, z: 0, width: 20, depth: 10, angle: 0 } },
+    // Turned 45°: its corner reaches past an unturned box of the same size.
+    { floor: "2nd Floor", zone: "tilted", height: [3, 6], rect: { x: 100, z: 0, width: 10, depth: 10, angle: 45 } },
+  ];
+  // tarkov.dev's extents would put y 12 anywhere on the 2nd floor; with rooms they no longer count.
+  const map = { ...maps.customs, key: "test", rooms };
+  assert.equal(floorAt(map, { x: 0, z: 0, y: 5 }).id, "2nd Floor");
+  assert.equal(floorAt(map, { x: 0, z: 0, y: 4.7 }).id, "2nd Floor", "bottom included");
+  assert.equal(floorAt(map, { x: 0, z: 0, y: 4.66 }).id, "2nd Floor", "to the tenth");
+  assert.equal(floorAt(map, { x: 0, z: 0, y: 7.6 }).id, "3rd Floor", "a shared height goes up");
+  assert.equal(floorAt(map, { x: 0, z: 0, y: 3 }).id, GROUND, "in a room, below its heights");
+  assert.equal(floorAt(map, { x: 50, z: 0, y: 5 }).id, GROUND, "outside every room");
+  assert.equal(floorAt(map, { x: 100, z: 6.5, y: 4 }).id, "2nd Floor", "inside the turned room's corner");
+  assert.equal(floorAt(map, { x: 104, z: 4, y: 4 }).id, GROUND, "inside the unturned box, outside the turned room");
+  assert.equal(floorAt(map, { x: 0, z: 0 }).id, GROUND, "no height");
+});
+
 test("every map has one base floor, listed first, and floor ids are unique", () => {
   for (const [key, map] of Object.entries(maps)) {
     const floors = floorsOf(map);

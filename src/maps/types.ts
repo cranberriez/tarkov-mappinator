@@ -1,3 +1,5 @@
+import type { MapRoom } from "./rooms.ts";
+
 /** World bounds corner pair as [x, z] (tarkov.dev convention). Optional third entry is a debug label. */
 export type WorldBounds = [[number, number], [number, number], ...unknown[]];
 
@@ -24,6 +26,11 @@ export type MapLabel = { position: [number, number]; text: string; rotation?: nu
 
 /** Per-art calibration, from tarkov.dev's interactive map definitions. Several game maps can share one. */
 export type MapCalibration = {
+  /**
+   * Floor rooms drawn for this art (src/maps/floor-data, attached by roomData.ts). When present they alone decide floors;
+   * `layers[].extents` are then only tarkov.dev's data, for reference.
+   */
+  rooms?: MapRoom[];
   key: string;
   /** Leaflet transformation [scaleX, offsetX, scaleY, offsetY] applied after rotation. */
   transform: [number, number, number, number];

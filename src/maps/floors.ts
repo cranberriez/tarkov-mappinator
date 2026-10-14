@@ -1,4 +1,5 @@
 import type { FloorExtent, MapCalibration, MapFloor, WorldArea, WorldBounds, WorldPoint } from "./types.ts";
+import { roomAt } from "./rooms.ts";
 
 /** Id of a map's ground floor when its base art is not one of the floors tarkov.dev lists. */
 export const GROUND = "ground";
@@ -125,12 +126,17 @@ const holds = (extent: FloorExtent, point: WorldPoint, exact: boolean) => {
 
 /**
  * The floor a world position is on; the base floor when no other matches or the height is unknown.
- * Later floors win when several match, as tarkov.dev lists them bottom to top. A point inside some floor's area or box
+ * A map with rooms goes by them alone (`roomAt`): outside every room, or in one but outside its heights, is the base floor.
+ * Otherwise, by tarkov.dev's extents: later floors win when several match, as tarkov.dev lists them bottom to top. A point inside some floor's area or box
  * goes by those; only one inside none is matched to the areas it is just outside of.
  */
 export function floorAt(map: MapCalibration, point: WorldPoint): Floor {
   const floors = floorsOf(map);
   if (point.y === undefined) return floors[0];
+  if (map.rooms) {
+    const room = roomAt(map.rooms, point as Required<WorldPoint>);
+    return (room && floorById(map, room.floor)) ?? floors[0];
+  }
   const height = point.y;
   const match = (exact: boolean) => {
     let found: MapFloor | null = null;

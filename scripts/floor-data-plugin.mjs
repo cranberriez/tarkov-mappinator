@@ -1,9 +1,9 @@
-// Dev server only: the floor dataset (src/lib/floorData.ts), one file per map in scripts/data/floor-samples/<map>.json.
+// Dev server only: the floor dataset (src/lib/floorData.ts), one file per map art in src/maps/floor-data/<art>.json, which
+// the map library loads as its floor rooms (src/maps/roomData.ts).
 // GET /__dev/floor-data/<map> reads it (an empty dataset when there is none); POST writes the whole dataset back.
-// Kept apart from the floor table and calibration until exported; nothing in src imports these files, so writes don't reload.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
-const dir = new URL("./data/floor-samples/", import.meta.url);
+const dir = new URL("../src/maps/floor-data/", import.meta.url);
 const round = (value) => Math.round(value * 100) / 100;
 /** Room heights are kept to the tenth, as they are matched (src/lib/floorData.ts). */
 const tenth = (value) => Math.round(value * 10) / 10;
@@ -28,6 +28,12 @@ export function floorData() {
 	return {
 		name: "floor-data",
 		apply: "serve",
+		// The Floors page saves on every edit and hands the map its new rooms itself (setRooms); hot-reloading the file each
+		// time would reload the page mid-edit. Edits made outside the app show after a reload.
+		handleHotUpdate({ file }) {
+			// Vite gives forward-slash paths on every platform.
+			if (file.includes("/src/maps/floor-data/")) return [];
+		},
 		configureServer(server) {
 			server.middlewares.use("/__dev/floor-data", (request, response) => {
 				const map = decodeURIComponent((request.url ?? "").replace(/^\//, "").split("?")[0]);
