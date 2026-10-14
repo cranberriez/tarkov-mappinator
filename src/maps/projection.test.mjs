@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { artRect, metricProjection, projectionFor } from "./projection.ts";
-import { floorAt, floorsOf, GROUND } from "./floors.ts";
+import { AREA_MARGIN, floorAt, floorOf, floorsOf, GROUND } from "./floors.ts";
 import { games, mapName, maps, resolveGame, resolveMap } from "./catalog.ts";
 import { tileCount, tileRange, tilesIn, tileZoom } from "./tiles.ts";
 
@@ -70,6 +70,30 @@ test("floors match by height and optional area", () => {
   assert.equal(floorAt(customs, { ...dorms, y: 4 }).svgLayer, "Second_Floor");
   assert.equal(floorAt(customs, { x: -340, z: 200, y: 4 }).id, GROUND, "outside every 2nd-floor area");
   assert.equal(floorAt(customs, dorms).id, GROUND, "no height, base floor");
+});
+
+test("floors match areas as drawn, just outside them only where no area holds the point", () => {
+  const square = [[[0, 0], [10, 0], [10, 10], [0, 10]]];
+  const map = { ...maps.customs, key: "test", layers: [
+    { name: "2nd Floor", show: true, extents: [{ height: [3, 10000], areas: [square] }] },
+    { name: "3rd Floor", show: true, extents: [{ height: [3, 10000], areas: [[[[10.5, 0], [20, 0], [20, 10], [10.5, 10]]]] }] },
+  ] };
+  assert.equal(floorAt(map, { x: 5, z: 5, y: 4 }).id, "2nd Floor");
+  assert.equal(floorAt(map, { x: 5, z: 5, y: 2 }).id, GROUND, "below the floor");
+  assert.equal(floorAt(map, { x: 5, z: -AREA_MARGIN / 2, y: 4 }).id, "2nd Floor", "just outside the edge");
+  assert.equal(floorAt(map, { x: 5, z: -AREA_MARGIN * 2, y: 4 }).id, GROUND, "beyond the margin");
+  assert.equal(floorAt(map, { x: 9.9, z: 5, y: 4 }).id, "2nd Floor", "inside one area beats the margin of the next");
+  assert.equal(floorOf(map, { position: { x: 5, z: 5, y: 4 }, floor: "3rd Floor" }).id, "3rd Floor", "set by hand");
+  assert.equal(floorOf(map, { position: { x: 5, z: 5, y: 4 }, floor: "nowhere" }).id, "2nd Floor", "unknown hand floor");
+});
+
+test("Streets floors put marked spots on their floors", () => {
+  const streets = maps["streets-of-tarkov"];
+  assert.equal(floorAt(streets, { x: 139.6, z: 376.8, y: 7.3 }).id, "2nd Floor", "Concordia office");
+  assert.equal(floorAt(streets, { x: -41.51, z: -45.62, y: 6.39 }).id, "2nd Floor", "Beluga restaurant");
+  assert.equal(floorAt(streets, { x: 146.79, z: -17.51, y: 3.19 }).id, "2nd Floor", "Cardinal TerraGroup apartment");
+  assert.equal(floorAt(streets, { x: 220.72, z: 397.42, y: 9.56 }).id, "2nd Floor", "Concordia Apartment 8");
+  assert.equal(floorAt(streets, { x: -181.96, z: 220.93, y: 3.58 }).id, GROUND, "Audit building ground floor");
 });
 
 test("every map has one base floor, listed first, and floor ids are unique", () => {

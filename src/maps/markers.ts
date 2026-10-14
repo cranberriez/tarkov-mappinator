@@ -42,6 +42,8 @@ export type MapMarker = {
   bosses?: BossInfo[];
   /** Battle Pass document spots: the known location here, with its reference photo. */
   document?: DocumentLocation;
+  /** Floor id it is on, when set by hand rather than found from its position (see `floorOf`). */
+  floor?: string;
   /** Its place among markers sharing one spot, drawn side by side. */
   slot?: { index: number; of: number };
 };
@@ -336,7 +338,7 @@ function pointMarkers(data: GameMapData, lookups: Lookups, preset: MarkerPreset,
         if (document) claimed.add(document);
         const shared = documents.length > 1;
         markers.push({ id: shared ? `document:${index}:${type}` : `document:${index}`, layer: "documents", groups: [type], position: loot.position,
-          document, ...shared ? { slot: { index: slot, of: documents.length } } : {},
+          document, ...document?.floor ? { floor: document.floor } : {}, ...shared ? { slot: { index: slot, of: documents.length } } : {},
           tags: [`${labels[slot]} document`, ...shared ? [`Shares its spot with ${labels.filter((_, other) => other !== slot).join(", ")}`] : []],
           details: [{ label: "Document types", value: labels.join(", ") }, { label: "Possible items", items: loot.items.map((id) => ({ id })) }] });
       });
@@ -354,7 +356,7 @@ function pointMarkers(data: GameMapData, lookups: Lookups, preset: MarkerPreset,
   for (const location of placed) {
     if (claimed.has(location) || spawnSpots.some((spot) => distance(spot, location.position as Vec3) < SAME_SPOT_M)) continue;
     const label = preset.documents.find((type) => type.key === location.type)?.label ?? location.type;
-    markers.push({ id: `document:${location.id}`, layer: "documents", groups: [location.type], document: location,
+    markers.push({ id: `document:${location.id}`, layer: "documents", groups: [location.type], document: location, ...location.floor ? { floor: location.floor } : {},
       position: { y: 0, ...location.position! }, tags: [`${label} document`] });
   }
   return markers;

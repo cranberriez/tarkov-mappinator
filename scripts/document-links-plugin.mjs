@@ -1,5 +1,5 @@
 // Dev server only: the map's document linker (src/components/DocumentLinker.tsx) POSTs `{ id, position }` here and it
-// lands in src/maps/documents/links.json (position null rejects a location, undefined drops the link). HMR picks it up.
+// lands in src/maps/documents/links.json (position null rejects a location, undefined drops the link; a hand-added `floor` is kept). HMR picks it up.
 import { readFile, writeFile } from "node:fs/promises";
 
 const file = new URL("../src/maps/documents/links.json", import.meta.url);
@@ -20,7 +20,8 @@ export function documentLinks() {
 						if (typeof id !== "string") throw new Error("id required");
 						const links = JSON.parse(await readFile(file, "utf8"));
 						if (position === undefined) delete links[id];
-						else links[id] = position && { x: round(position.x), ...position.y === undefined ? {} : { y: round(position.y) }, z: round(position.z) };
+						// A floor set by hand on the link stays with it when it moves.
+						else links[id] = position && { x: round(position.x), ...position.y === undefined ? {} : { y: round(position.y) }, z: round(position.z), ...links[id]?.floor ? { floor: links[id].floor } : {} };
 						const sorted = Object.fromEntries(Object.entries(links).sort(([a], [b]) => a.localeCompare(b)));
 						await writeFile(file, JSON.stringify(sorted, null, "\t") + "\n");
 						response.end("ok");

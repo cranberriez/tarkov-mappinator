@@ -19,6 +19,7 @@ import { GroupPage } from "./pages/GroupPage";
 import { ActivityPage } from "./pages/ActivityPage";
 import { TimelinePage } from "./pages/TimelinePage";
 import { ImportPage } from "./pages/ImportPage";
+import { ShotsPage } from "./pages/ShotsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
 const COLLAPSED_KEY = "sidebar-collapsed";
@@ -62,11 +63,12 @@ export function App() {
       <main className="content">
         {page === "overview" && <OverviewPage scanner={scanner} onNavigate={navigate} />}
         {page === "map" && <MapPage key={viewing?.id ?? "live"} scanner={scanner} viewing={viewing} onCloseViewing={() => setViewingId(null)} mode={gameMode.mode} valuableLoot={valuableLoot.on}
-          members={group.members} focus={memberFocus} documentLinker={dev.flags.documentLinker} />}
+          members={group.members} focus={memberFocus} documentLinker={dev.flags.documentLinker} floorLevels={dev.flags.floorLevels} />}
         {page === "group" && <GroupPage group={group} onShowMember={(id) => { setViewingId(null); setMemberFocus({ id, nonce: Date.now() }); setPage("map"); }} />}
         {page === "timeline" && <TimelinePage scanner={scanner} onOpenRaid={(id) => { setViewingId(id); setPage("map"); }} />}
         {page === "activity" && <ActivityPage scanner={scanner} />}
         {page === "import" && <ImportPage scanner={scanner} importer={importer} onNavigate={navigate} />}
+        {page === "shots" && <ShotsPage scanner={scanner} />}
         {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} valuableLoot={valuableLoot} group={group} dev={dev} />}
       </main>
     </div>

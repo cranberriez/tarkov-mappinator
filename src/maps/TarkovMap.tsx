@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
-import { floorAt, floorById, type FloorSelection } from "./floors.ts";
+import { floorAt, floorById, floorLevels, floorOf, floorsOf, levelText, type FloorSelection } from "./floors.ts";
 import { MapArt } from "./MapArt.tsx";
 import { MapOverlay, type OverlayArea } from "./MapOverlay.tsx";
 import { MapTiles } from "./MapTiles.tsx";
@@ -56,6 +56,8 @@ export type TarkovMapProps = {
   floor: FloorSelection;
   /** Draws every floor side by side instead of stacked. */
   split?: boolean;
+  /** Dev: writes height ranges (Y) on floors and draws the room boxes that limit them. */
+  levels?: boolean;
   /** Players to draw: older positions faded, the newest as a pointer. */
   players?: PlayerTrack[];
   /** Id of a track to keep centred on its newest position; dragging calls `onUserPan`, which should turn it off. */
@@ -81,6 +83,10 @@ export type TarkovMapProps = {
   ref?: Ref<TarkovMapHandle>;
 };
 
+type LevelBox = { key: string; kind: "piece" | "room"; text: string; named?: boolean; x: number; y: number; width: number; height: number };
+/** A floor's areas in one building, as a plane-space path, labelled at the top of its bounding box (`row`: its floor's place). */
+type LevelArea = { key: string; d: string; text: string; x: number; y: number; width: number; row: number };
+
 const noMarkers: MapMarker[] = [];
 const noFilters: Filters = {};
 
@@ -88,7 +94,7 @@ const noFilters: Filters = {};
  * A pannable, zoomable Tarkov map: vector art or tiles by floor, data markers, and player positions.
  * Positions are world coordinates in the map's own space, so only pass players who are on this map.
  */
-export function TarkovMap({ map, art: preferred = "svg", floor, split = false, players = [], follow = null, centre = null, onUserPan,
+export function TarkovMap({ map, art: preferred = "svg", floor, split = false, levels = false, players = [], follow = null, centre = null, onUserPan,
   markers = noMarkers, filters = noFilters, preset, lootIcons, selected, onMarkerHover, onMarkerTap, onMapTap, className, children, ref }: TarkovMapProps) {
   const projection = useMemo(() => map ? projectionFor(map) : metricProjection, [map]);
   const style = artStyleOf(map, preferred, floor);
@@ -97,7 +103,7 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, p
   const layout = useSplitLayout(map, style, splitOn, art);
   const { shift } = layout;
 
-  const markerFloors = useMemo(() => new Map(map ? markers.map((marker) => [marker.id, floorAt(map, marker.position).id]) : []), [markers, map]);
+  const markerFloors = useMemo(() => new Map(map ? markers.map((marker) => [marker.id, floorOf(map, marker).id]) : []), [markers, map]);
   const toPlane = (point: PlayerPosition) => {
     const plane = projection.toPlane(point);
     return { x: plane.x + (map && shift ? shift(floorAt(map, point).id, plane.x, plane.y) : 0), y: plane.y };
@@ -161,6 +167,44 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, p
     "--ox": `${origin.left}px`, "--oy": `${origin.top}px`,
   } as CSSProperties;
 
+  // Dev: a box per floor piece (vector art, split) and per room box tarkov.dev limits a floor to, and the outline of each
+  // building's floor areas, each with its height range.
+  const { levelBoxes, levelAreas } = useMemo((): { levelBoxes: LevelBox[]; levelAreas: LevelArea[] } => {
+    if (!levels || !map || !art) return { levelBoxes: [], levelAreas: [] };
+    const boxes: LevelBox[] = [], areas: LevelArea[] = [];
+    const named = new Map(floorsOf(map).map((other) => [other.id, other]));
+    const text = (id: string) => { const found = named.get(id), range = found && floorLevels(map, found); return `${found?.name ?? id}${range ? ` · ${levelText(range)}` : ""}`; };
+    layout.slots?.forEach((slot, index) => boxes.push({ key: `slot:${index}`, kind: "piece", text: text(slot.floor),
+      x: art.x + (slot.x + slot.dx) * art.width, y: art.y + slot.y * art.height, width: slot.width * art.width, height: slot.height * art.height }));
+    map.layers.forEach((layer, row) => {
+      if (!splitOn && floor !== null && floor !== layer.name) return;
+      layer.extents?.forEach((extent, index) => {
+        if (!extent.areas?.length) return;
+        const rings = extent.areas.flat().map((ring) => ring.map(([x, z]) => projection.toPlane({ x, z })));
+        const xs = rings.flat().map((point) => point.x), ys = rings.flat().map((point) => point.y);
+        const left = Math.min(...xs), right = Math.max(...xs), top = Math.min(...ys), bottom = Math.max(...ys);
+        const dx = shift ? shift(layer.name, (left + right) / 2, (top + bottom) / 2) : 0;
+        const d = rings.map((ring) => `M${ring.map((point) => `${+(point.x + dx).toFixed(2)} ${+point.y.toFixed(2)}`).join("L")}Z`).join("");
+        areas.push({ key: `area:${layer.name}:${index}`, d, text: `${extent.label ? `${extent.label} · ` : ""}${layer.name} · ${levelText(extent.height)}`,
+          x: left + dx, y: top, width: right - left, row });
+      });
+      layer.extents?.forEach((extent, index) => extent.bounds?.forEach((bounds, at) => {
+        const [[x1, z1], [x2, z2]] = bounds;
+        const corners = [projection.toPlane({ x: x1, z: z1 }), projection.toPlane({ x: x2, z: z2 })];
+        const x = Math.min(corners[0].x, corners[1].x), y = Math.min(corners[0].y, corners[1].y);
+        const width = Math.abs(corners[0].x - corners[1].x), height = Math.abs(corners[0].y - corners[1].y);
+        const dx = shift ? shift(layer.name, x + width / 2, y + height / 2) : 0;
+        const label = typeof bounds[2] === "string" ? `${bounds[2]} · ` : "";
+        boxes.push({ key: `room:${layer.name}:${index}:${at}`, kind: "room", text: `${label}${layer.name} · ${levelText(extent.height)}`, x: x + dx, y, width, height });
+      }));
+    });
+    // A room drawn as several boxes is named once, on its largest.
+    const largest = new Map<string, LevelBox>();
+    for (const box of boxes) if (box.kind === "room" && box.width * box.height > (largest.get(box.text)?.width ?? 0) * (largest.get(box.text)?.height ?? 0)) largest.set(box.text, box);
+    for (const box of boxes) if (box.kind === "room") box.named = largest.get(box.text) === box;
+    return { levelBoxes: boxes, levelAreas: areas };
+  }, [levels, map, art, layout.slots, splitOn, floor, projection, shift]);
+
   const onPointerOver = (event: React.PointerEvent) => { if (!viewport.dragging()) onMarkerHover?.(markerAt(event.target as Element)); };
   const onPointerOut = (event: React.PointerEvent) => { if (!viewport.dragging() && markerAt(event.target as Element)) onMarkerHover?.(null); };
 
@@ -184,7 +228,19 @@ export function TarkovMap({ map, art: preferred = "svg", floor, split = false, p
         selected={selected} lootIcons={lootIcons} />
       {layout.labels.length > 0 && <div className="split-labels">
         {layout.labels.map((label) => label.width * view.scale >= SPLIT_LABEL_MIN_PX && <span key={label.floor} className="split-label"
-          style={{ left: `calc(${label.x}px * var(--s))`, top: `calc(${label.y}px * var(--s))`, maxWidth: label.width * view.scale }}>{label.name}</span>)}
+          style={{ left: `calc(${label.x}px * var(--s))`, top: `calc(${label.y}px * var(--s))`, maxWidth: label.width * view.scale }}>
+          {label.name}{levels && label.levels ? ` · ${label.levels}` : ""}</span>)}
+      </div>}
+      {levels && map && art && <div className="level-boxes">
+        {levelBoxes.map((box) => <div key={box.key} className={`level-box ${box.kind}`}
+          style={{ left: `calc(${box.x}px * var(--s))`, top: `calc(${box.y}px * var(--s))`, width: `calc(${box.width}px * var(--s))`, height: `calc(${box.height}px * var(--s))` }}>
+          {box.width * view.scale >= SPLIT_LABEL_MIN_PX && box.named !== false && <span>{box.text}</span>}</div>)}
+        {/* Plane units: the 1-unit box is --s pixels wide. */}
+        <svg className="level-areas" viewBox="0 0 1 1" style={{ width: "calc(1px * var(--s))", height: "calc(1px * var(--s))" }}>
+          {levelAreas.map((area) => <path key={area.key} d={area.d} />)}
+        </svg>
+        {levelAreas.map((area) => area.width * view.scale >= SPLIT_LABEL_MIN_PX && <span key={area.key} className="level-area-label"
+          style={{ left: `calc(${area.x}px * var(--s))`, top: `calc(${area.y}px * var(--s))`, transform: `translateY(${area.row * 100}%)` }}>{area.text}</span>)}
       </div>}
     </div>
     <PlayerMarkers players={players} at={(position) => { const { x, y } = toPlane(position); return toScreen(x, y); }} heading={projection.heading} />

@@ -287,6 +287,8 @@ function DeveloperSection({ dev }: { dev: DevFlagsState }) {
       onChange={(fakePlayers) => dev.set({ fakePlayers })} />
     <Switch label="Document linker" detail="Link Battle Pass document photos to map spawns, or place them on the map." on={dev.flags.documentLinker}
       onChange={(documentLinker) => dev.set({ documentLinker })} />
+    <Switch label="Floor levels" detail="Label floors and rooms on the map with their height range (Y); most useful with floors split." on={dev.flags.floorLevels}
+      onChange={(floorLevels) => dev.set({ floorLevels })} />
   </section>;
 }
 

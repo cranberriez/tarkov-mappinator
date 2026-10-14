@@ -7,7 +7,7 @@ export type * from "./data.ts";
 export { ASSET_HOST, DATA_HOST, TILE_HOST } from "./hosts.ts";
 export { games, mapName, maps, mapSources, normalizeMapName, resolveGame, resolveMap } from "./catalog.ts";
 export { artRect, metricProjection, planeRect, projectionFor, type MapProjection } from "./projection.ts";
-export { baseFloor, floorAt, floorById, floorsOf, GROUND, UNDERGROUND_OPACITY, type Floor, type FloorSelection } from "./floors.ts";
+export { baseFloor, floorAt, floorById, floorOf, floorsOf, GROUND, UNDERGROUND_OPACITY, type Floor, type FloorSelection } from "./floors.ts";
 export { tileBounds, tileCount, tilePathAt, tileRange, tileSets, tileZoom, tilesIn, type Tile } from "./tiles.ts";
 export { iconUrl, MapAssetsContext, useMapAssets, webAssets, type MapAssets } from "./assets.ts";
 export { containerIcon, mapIcons } from "./icons.ts";

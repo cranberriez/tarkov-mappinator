@@ -1,7 +1,8 @@
 // Battle Pass document locations with a reference photo each, vendored by `node scripts/vendor-documents.mjs`
 // from the Tarkov Hideout repo's tarkovdoc.com snapshot. A location ties to a tarkov.dev document spawn by
 // position: the script snaps confident matches to the spawn, and `documents/links.json` holds hand-made links
-// (a null link means the location is no spawn), which win over the script's. Season-specific, like the preset.
+// (a null link means the location is no spawn), which win over the script's. A link can also give the `floor` (id, as in
+// floors.ts) the location is on, for a spot its height puts on the wrong one. Season-specific, like the preset.
 import data from "./documents/locations.json";
 import links from "./documents/links.json";
 import type { WorldPoint } from "./types.ts";
@@ -24,13 +25,15 @@ export type DocumentLocation = {
   /** Where it is, when tied to a spawn (or placed by hand where tarkov.dev has none). */
   position?: WorldPoint;
   match?: "auto" | "manual";
+  /** Floor id it is on, set by hand where its height misleads; otherwise its floor is found from its position. */
+  floor?: string;
   /** Where the fit puts it, when not tied to a spawn; rough. */
   estimate?: WorldPoint;
 };
 
 export const documentSource = data.source;
 const all = data.locations as DocumentLocation[];
-const manual = links as Record<string, WorldPoint | null>;
+const manual = links as Record<string, (WorldPoint & { floor?: string }) | null>;
 
 /** Locations on a map, with hand-made links applied. */
 export function documentLocations(mapKey: string): DocumentLocation[] {
@@ -39,7 +42,9 @@ export function documentLocations(mapKey: string): DocumentLocation[] {
     if (!(location.id in manual) && location.match !== "manual") return location;
     const link = manual[location.id];
     const { position: _, match: __, ...rest } = location;
-    return link ? { ...rest, position: link, match: "manual" } : rest;
+    if (!link) return rest;
+    const { floor, ...position } = link;
+    return { ...rest, position, match: "manual", ...floor ? { floor } : {} };
   });
 }
 

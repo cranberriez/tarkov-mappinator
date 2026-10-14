@@ -11,9 +11,11 @@ export type DevFlags = {
   fakePlayers: boolean;
   /** On the map, ties document reference photos to spawns (writes src/maps/documents/links.json through the dev server). */
   documentLinker: boolean;
+  /** On the map, writes each floor's height range (Y) on its pieces and draws the room boxes and building areas that limit it. */
+  floorLevels: boolean;
 };
 
-const off: DevFlags = { fakePlayers: false, documentLinker: false };
+const off: DevFlags = { fakePlayers: false, documentLinker: false, floorLevels: false };
 
 export function useDevFlags() {
   const [stored, setFlags] = usePersisted<DevFlags>(keys.devFlags, off);

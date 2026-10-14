@@ -339,5 +339,70 @@
 		"x": 137.95,
 		"y": 25.63,
 		"z": 268.1
+	},
+	"streets_of_tarkov/financial-1-3-2-1": {
+		"x": 146.79,
+		"y": 3.19,
+		"z": -17.51
+	},
+	"streets_of_tarkov/financial-1-3-2-2": {
+		"x": 129.25,
+		"y": 4.05,
+		"z": -55.8
+	},
+	"streets_of_tarkov/financial-4-1-2-1": {
+		"x": -41.51,
+		"y": 6.39,
+		"z": -45.62
+	},
+	"streets_of_tarkov/financial-5-1-2-1": {
+		"x": -88.76,
+		"y": 5.86,
+		"z": 72.11
+	},
+	"streets_of_tarkov/financial-7-6-2-1": {
+		"x": 220.72,
+		"y": 9.56,
+		"z": 397.42
+	},
+	"streets_of_tarkov/financial-7-7-2-1": {
+		"x": 136.64,
+		"y": 6.67,
+		"z": 370.82
+	},
+	"streets_of_tarkov/financial-8-1-2-1": {
+		"x": -163.53,
+		"y": 6.95,
+		"z": 228.01
+	},
+	"streets_of_tarkov/user-1-3-2-1": {
+		"x": 116.28,
+		"y": 5.24,
+		"z": -42.34
+	},
+	"streets_of_tarkov/user-1-3-2-2": {
+		"x": 137.3,
+		"y": 4.08,
+		"z": -18.49
+	},
+	"streets_of_tarkov/user-4-1-2-1": {
+		"x": -26.41,
+		"y": 5.88,
+		"z": -36.14
+	},
+	"streets_of_tarkov/user-5-1-2-1": {
+		"x": -69.49,
+		"y": 5.91,
+		"z": 46.38
+	},
+	"streets_of_tarkov/user-7-7-2-1": {
+		"x": 139.57,
+		"y": 7.33,
+		"z": 376.78
+	},
+	"streets_of_tarkov/user-8-1-2-1": {
+		"x": -170.89,
+		"y": 7.01,
+		"z": 223.75
 	}
 }

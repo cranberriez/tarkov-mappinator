@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import type { FloorSlot } from "./MapArt.tsx";
-import { floorsOf, GROUND } from "./floors.ts";
+import { floorLevels, floorsOf, GROUND, levelText, type Floor } from "./floors.ts";
 import { columnShifts } from "./split.ts";
 import { columnWidthOf, splitLayoutFor } from "./splitLayouts.ts";
 import type { MapCalibration, PlanePoint, PlaneRect } from "./types.ts";
@@ -8,9 +8,11 @@ import type { MapCalibration, PlanePoint, PlaneRect } from "./types.ts";
 /** A split-floor marker follows the building piece nearest it within this fraction of the art's width. */
 const SLOT_REACH = 0.03;
 
+const levelsOf = (map: MapCalibration, floor: Floor) => { const range = floorLevels(map, floor); return range ? levelText(range) : undefined; };
+
 export type ArtStyle = "svg" | "tiles";
 /** Where a floor's column name hangs (plane units), when tiled floors are split into columns. */
-export type SplitLabel = { floor: string; name: string; x: number; y: number; width: number };
+export type SplitLabel = { floor: string; name: string; levels?: string; x: number; y: number; width: number };
 
 /**
  * Where everything goes when floors are split apart. Vector art moves each building's floors beside it (measured by
@@ -48,7 +50,7 @@ export function useSplitLayout(map: MapCalibration | null, style: ArtStyle | nul
     const anchor = { x: layout.label?.x ?? art.x + art.width / 2, y: layout.label?.y ?? art.y };
     // The ground column goes unnamed.
     return floorsOf(map).filter((floor) => floor.id !== GROUND && columns.has(floor.id)).map((floor) =>
-      ({ floor: floor.id, name: floor.name, x: anchor.x + columns.get(floor.id)!, y: anchor.y, width: widthOf(floor) }));
+      ({ floor: floor.id, name: floor.name, levels: levelsOf(map, floor), x: anchor.x + columns.get(floor.id)!, y: anchor.y, width: widthOf(floor) }));
   }, [columns, map, art, widthOf, layout]);
 
   /** Plane point to centre on to see a floor (null: every floor) while split. */
@@ -60,5 +62,5 @@ export function useSplitLayout(map: MapCalibration | null, style: ArtStyle | nul
     return slot ? { x: art.x + (slot.x + slot.dx + slot.width / 2) * art.width, y: art.y + (slot.y + slot.height / 2) * art.height } : centre;
   }, [art, columns, svgSlots, layout]);
 
-  return { onSplit, shift, columns, labels, focus };
+  return { onSplit, shift, columns, labels, focus, slots: svgSlots };
 }

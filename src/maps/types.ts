@@ -1,7 +1,14 @@
 /** World bounds corner pair as [x, z] (tarkov.dev convention). Optional third entry is a debug label. */
 export type WorldBounds = [[number, number], [number, number], ...unknown[]];
 
-export type FloorExtent = { height: [number, number]; bounds?: WorldBounds[] };
+/** An area as rings of [x, z] points; a point is inside when an odd number of rings contain it. */
+export type WorldArea = [number, number][][];
+
+/**
+ * Heights a floor covers, anywhere or only within `bounds` boxes (tarkov.dev) or `areas` (footprints, matched with a small
+ * margin). `label` names what the areas are, for display.
+ */
+export type FloorExtent = { height: [number, number]; bounds?: WorldBounds[]; areas?: WorldArea[]; label?: string };
 
 export type MapFloor = {
   name: string;

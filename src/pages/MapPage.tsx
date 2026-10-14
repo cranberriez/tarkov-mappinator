@@ -5,7 +5,7 @@ import { inCaptureOrder, positionsForRaid, toPlayerPosition } from "../lib/posit
 import type { RaidRecord } from "../lib/raids";
 import type { PositionObservation } from "../bindings/PositionObservation";
 import {
-  artStyleOf, baseFloor, buildMarkers, countMarkers, defaultFilters, documentLocations, floorAt, floorById, floorsOf, games, httpMapSource, isVisible, layersFor,
+  artStyleOf, baseFloor, buildMarkers, countMarkers, defaultFilters, documentLocations, floorAt, floorById, floorOf, floorsOf, games, httpMapSource, isVisible, layersFor,
   MapAssetsContext, mapName, maps as calibrations, resolveGame, resolveMap, roleOf, TarkovMap, tarkovPreset, useLookups, useMapData, withDefaults,
   type ArtStyle, type DocumentLocation, type Filters, type FloorSelection, type PlayerPosition, type PlayerTrack, type Role, type TarkovMapHandle,
 } from "../maps";
@@ -39,13 +39,15 @@ const webSource = isTauri() ? null : httpMapSource();
  * The live raid's map, or with `viewing` a past raid's: its positions up to the one picked on the
  * scrubber, which then stands in for the newest position (followed, floor picked from it).
  */
-export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, members = [], focus = null, documentLinker = false }: {
+export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, members = [], focus = null, documentLinker = false, floorLevels = false }: {
   scanner: Scanner; viewing: RaidRecord | null; onCloseViewing: () => void; mode: DataMode; valuableLoot: boolean;
   /** Other group members; those with a position on the shown map are drawn there. */
   members?: GroupMember[];
   focus?: MemberFocus | null;
   /** Dev builds: the document photo linker (see DocumentLinker). */
   documentLinker?: boolean;
+  /** Dev builds: height ranges on floors and rooms. */
+  floorLevels?: boolean;
 }) {
   const { snapshot, positions, connected, desktop } = scanner;
   const live = snapshot?.raid;
@@ -127,7 +129,7 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
   const [pinFloor, setPinFloor] = useState<string | undefined>(undefined);
   useEffect(() => {
     const marker = pinned ? overlayById.get(pinned) : undefined;
-    setPinFloor(pinned && calibration && floors.length ? (marker ? floorAt(calibration, marker.position) : baseFloor(calibration)).id : undefined);
+    setPinFloor(pinned && calibration && floors.length ? (marker ? floorOf(calibration, marker) : baseFloor(calibration)).id : undefined);
   }, [pinned]);
   const wanted = pinFloor ?? (follow ? followedFloor : chosenFloor);
   // A floor of the map before a switch means nothing here.
@@ -180,7 +182,7 @@ export function MapPage({ scanner, viewing, onCloseViewing, mode, valuableLoot, 
   const mapState: MapState = status === "offline" ? "offline" : liveRaid && (viewing || shownKey !== (resolveGame(live.map)?.key ?? null)) ? "elsewhere" : liveRaid ? "live" : "idle";
 
   return <MapAssetsContext.Provider value={appAssets}><div className="map-page">
-    <TarkovMap ref={map} map={calibration} art={preferred} floor={floor} split={split} players={players} follow={follow ? SELF : null}
+    <TarkovMap ref={map} map={calibration} art={preferred} floor={floor} split={split} levels={floorLevels} players={players} follow={follow ? SELF : null}
       centre={centre && centre.map === shownKey ? centre : null}
       onUserPan={onUserPan} markers={shownOverlay} filters={filters} lootIcons={lootIcons} selected={pinned}
       onMarkerHover={setHovered} onMarkerTap={(id) => setPinned((current) => current === id ? null : id)}

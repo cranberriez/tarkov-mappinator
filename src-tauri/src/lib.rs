@@ -613,6 +613,12 @@ fn start_scanner(
     app: tauri::AppHandle,
     service: State<'_, Mutex<ScannerService>>,
 ) -> Result<ScannerSnapshot, String> {
+    // The dev Shots page shows captures full size through the asset protocol.
+    if !config.screenshots.is_empty() {
+        if let Err(error) = app.asset_protocol_scope().allow_directory(&config.screenshots, false) {
+            eprintln!("Unable to allow screenshot previews: {error}");
+        }
+    }
     let (snapshot, batch) = {
         let mut service = service.lock().map_err(|_| "Scanner state unavailable")?;
         (service.start(config), service.take_history())
