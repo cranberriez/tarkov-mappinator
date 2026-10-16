@@ -1,5 +1,5 @@
 //! Companion types: the UI status model (Tauri events) and the `/v1` wire contract the site reads.
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 /// Connection state shown in the app. `Stale` and `Connected` need a paired site that has polled since
@@ -139,6 +139,32 @@ pub struct CurrentState {
     pub scanner_running: bool,
     pub raid: Option<CurrentRaid>,
     pub position: Option<Position>,
+    /// Group members on the same raid map as the player, newest position each. Empty outside a raid or a group.
+    pub group: Vec<GroupMember>,
+}
+
+/// A group member on the player's raid map. Latest state only: not journaled, never replayed.
+#[derive(Clone, Debug, Serialize, PartialEq, TS)]
+pub struct GroupMember {
+    /// Stable per member (the group channel's user id).
+    pub id: String,
+    pub name: String,
+    /// On the player's raid map, in its coordinates.
+    pub position: Position,
+}
+
+/// A member's newest position as the app's group feature reports it (the UI pushes these to the companion).
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct GroupPosition {
+    pub id: String,
+    pub name: String,
+    /// Raw game map ID of the member's raid, as the scanner reports it.
+    pub map: String,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub heading: Option<f64>,
+    pub at: String,
 }
 
 /// `GET /v1/sync?since=<seq>`.

@@ -82,6 +82,7 @@ impl Journal {
             scanner_running: false,
             raid: None,
             position: None,
+            group: Vec::new(),
         })
     }
 
@@ -222,6 +223,7 @@ impl Journal {
             scanner_running: snapshot.monitoring == crate::scanner::MonitoringStatus::Running,
             raid: current_raid,
             position: latest.map(position),
+            group: Vec::new(),
         });
         before != (self.seq, self.state.clone())
     }

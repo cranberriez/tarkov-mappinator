@@ -41,7 +41,7 @@ independent of it.
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /v1/status` | app version, protocol version, scanner running, source health, latest `seq` |
-| `GET /v1/sync?since=<seq>` | current state (raid, last position) plus every event after `seq`; `since=0` returns everything retained |
+| `GET /v1/sync?since=<seq>` | current state (raid, last position, `group`) plus every event after `seq`; `since=0` returns everything retained. `state.group` lists the other group members on the player's raid map (`id`, `name`, newest `position`): latest only, not journaled, empty outside an in-progress raid or a group |
 
 The site makes every request. On first connection it calls `sync?since=0` and
 stores the returned `seq`. After that it polls `sync?since=<seq>`: about every

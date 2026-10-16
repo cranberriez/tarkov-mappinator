@@ -9,8 +9,9 @@ mod server;
 use api::{Method, Request, Response, PROTOCOL};
 use chrono::{DateTime, Utc};
 use model::{
-    CompanionStatus, ConnectionState, PairRequested, PairedClient, PairingState, PendingPairing,
-    RevokedSite, SourceState, StatusResponse, SyncResponse,
+    CompanionStatus, ConnectionState, CurrentState, GroupMember, GroupPosition, PairRequested,
+    PairedClient, PairingState, PendingPairing, Position, RaidPhase, RevokedSite, SourceState,
+    StatusResponse, SyncResponse,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -93,6 +94,8 @@ struct Inner {
     /// Pairing attempts from revoked origins, newest per origin. In memory only.
     blocked: Vec<(String, Instant)>,
     journal: journal::Journal,
+    /// Latest group member positions pushed by the UI. In memory only.
+    group: Vec<GroupPosition>,
     health: Health,
     persisted: Instant,
     last_status: Option<CompanionStatus>,
@@ -130,6 +133,37 @@ fn source_state(status: &crate::scanner::SourceStatus) -> SourceState {
     }
 }
 
+/// Fills `state.group` with the members on the player's raid map: only while in a raid, and only the same map.
+fn with_group(mut state: CurrentState, members: &[GroupPosition]) -> CurrentState {
+    let Some(raid) = state
+        .raid
+        .as_ref()
+        .filter(|raid| raid.phase == RaidPhase::InRaid)
+    else {
+        return state;
+    };
+    let Some(map) = raid.map.clone() else {
+        return state;
+    };
+    state.group = members
+        .iter()
+        .filter(|member| member.map == map.raw)
+        .map(|member| GroupMember {
+            id: member.id.clone(),
+            name: member.name.clone(),
+            position: Position {
+                map: Some(map.clone()),
+                x: member.x,
+                y: member.y,
+                z: member.z,
+                yaw: member.heading,
+                captured_at: member.at.clone(),
+            },
+        })
+        .collect();
+    state
+}
+
 impl Companion {
     /// `store` is the paired-clients file; `notify` receives every status change.
     pub fn new(store: PathBuf, version: String, notify: Notify) -> Arc<Self> {
@@ -162,6 +196,7 @@ impl Companion {
                 denied: Vec::new(),
                 blocked: Vec::new(),
                 journal: journal::Journal::default(),
+                group: Vec::new(),
                 health: Health::default(),
                 persisted: Instant::now(),
                 last_status: None,
@@ -438,6 +473,11 @@ impl Companion {
         };
     }
 
+    /// Replaces the group members' newest positions (the UI pushes them as they arrive; empty when the group is left).
+    pub fn set_group(&self, members: Vec<GroupPosition>) {
+        self.lock().group = members;
+    }
+
     pub fn handle(&self, request: &Request) -> Response {
         let mut inner = self.lock();
         let port = inner
@@ -578,7 +618,7 @@ impl Companion {
                         epoch: self.epoch.clone(),
                         seq: inner.journal.seq(),
                         oldest: inner.journal.oldest(),
-                        state: inner.journal.state(),
+                        state: with_group(inner.journal.state(), &inner.group),
                         events,
                     },
                 )
@@ -925,6 +965,45 @@ mod tests {
         let status = companion.status();
         assert_eq!(status.clients.len(), 1);
         assert!(status.revoked.is_empty());
+    }
+
+    #[test]
+    fn group_members_show_only_on_the_players_raid_map() {
+        let raid = |phase, raw: &str| CurrentState {
+            scanner_running: true,
+            raid: Some(model::CurrentRaid {
+                phase,
+                map: Some(model::MapRef {
+                    raw: raw.into(),
+                    normalized_name: Some("customs".into()),
+                }),
+                mode: None,
+                recovered: false,
+            }),
+            position: None,
+            group: Vec::new(),
+        };
+        let member = |id: &str, map: &str| GroupPosition {
+            id: id.into(),
+            name: id.into(),
+            map: map.into(),
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+            heading: Some(90.0),
+            at: "2026-01-01T00:00:00+00:00".into(),
+        };
+        let members = [member("a", "bigmap"), member("b", "Woods")];
+
+        let state = with_group(raid(RaidPhase::InRaid, "bigmap"), &members);
+        assert_eq!(state.group.len(), 1);
+        assert_eq!(state.group[0].id, "a");
+        assert_eq!(
+            state.group[0].position.map.as_ref().unwrap().normalized_name.as_deref(),
+            Some("customs")
+        );
+        assert!(with_group(raid(RaidPhase::Loading, "bigmap"), &members).group.is_empty());
+        assert!(with_group(raid(RaidPhase::Ended, "bigmap"), &members).group.is_empty());
     }
 
     #[test]

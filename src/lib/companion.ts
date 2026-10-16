@@ -16,6 +16,10 @@ export const respondToPairing = (pairingId: string, allow: boolean) =>
   invoke<CompanionStatus>("companion_respond", { pairingId, allow });
 export const revokeClient = (clientId: string) => invoke<CompanionStatus>("companion_revoke", { clientId });
 export const allowSite = (origin: string) => invoke<CompanionStatus>("companion_allow_site", { origin });
+/** A group member's newest position, as the companion expects it. */
+export type GroupPush = { id: string; name: string; map: string; x: number; y: number; z: number; heading: number | null; at: string };
+/** Hands the group's member positions to the companion, which serves those on the player's raid map to the site. */
+export const setCompanionGroup = (members: GroupPush[]) => invoke<void>("companion_set_group", { members });
 export const onCompanionStatus = (receive: (status: CompanionStatus) => void) =>
   listen<CompanionStatus>("companion:updated", (event) => receive(event.payload));
 

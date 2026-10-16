@@ -5,6 +5,8 @@ import { positionsForRaid } from "./positions";
 import { keys, usePersisted } from "./persist";
 import { DEV } from "./useDevFlags";
 import { useFakeGroup } from "./useFakeGroup";
+import { setCompanionGroup } from "./companion";
+import { isTauri } from "./scanner";
 import {
   applyPosition, applyRaid, assignColors, authUrlOf, channelOf, createPacer, defaultName, newCode, newUserId, parsePosition, parseRaid,
   normalizeSite, POSITION_EVENT, RAID_EVENT, waiting, type GroupMember, type MemberState, type PositionMessage, type RaidMessage,
@@ -202,6 +204,15 @@ export function useGroup(scanner: Scanner, { fakePlayers = false } = {}) {
     colors.current = assignColors(everyone.map((member) => member.id), colors.current);
     return everyone.map((member) => ({ ...member, color: colors.current.get(member.id)!, ...(latest[member.id] ?? waiting) }));
   }, [roster, states, fakes]);
+
+  // The site can draw members on the player's raid map: the companion filters to that map, so every member with a position goes.
+  useEffect(() => {
+    if (!isTauri()) return;
+    const pushed = members.flatMap((member) => member.position && member.map
+      ? [{ id: member.id, name: member.name, map: member.map, x: member.position.x, y: member.position.y ?? 0, z: member.position.z, heading: member.position.heading ?? null, at: member.position.at ?? "" }]
+      : []);
+    void setCompanionGroup(pushed).catch(() => {});
+  }, [members]);
 
   return {
     /** The site in use, and the Settings override (empty: default). */

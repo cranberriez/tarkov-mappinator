@@ -569,6 +569,7 @@ pub fn run() {
             companion_respond,
             companion_revoke,
             companion_allow_site,
+            companion_set_group,
             autoshot_status,
             autoshot_configure,
             screenshot_cleanup_configure,
@@ -666,6 +667,12 @@ fn companion_respond(
 #[tauri::command(async)]
 fn companion_revoke(client_id: String, companion: State<'_, Arc<Companion>>) -> CompanionStatus {
     companion.revoke(&client_id)
+}
+
+/// The group feature's latest member positions; the companion sends those on the player's raid map to the site.
+#[tauri::command(async)]
+fn companion_set_group(members: Vec<companion::model::GroupPosition>, companion: State<'_, Arc<Companion>>) {
+    companion.set_group(members);
 }
 
 #[tauri::command(async)]
