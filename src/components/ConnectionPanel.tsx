@@ -1,7 +1,8 @@
 import type { CompanionConnection } from "../lib/useCompanion";
-import { connectionLabel, connectionTone, siteName, type PairedClient } from "../lib/companion";
+import { connectedClients, connectionLabel, connectionTone, siteName, type PairedClient } from "../lib/companion";
 import { age } from "../lib/format";
 import { useNow } from "../lib/useNow";
+import { SettingsIcon } from "./Icons";
 
 const ago = (value: string | null, now: number) => value ? `${age(value, now)} ago` : null;
 
@@ -34,9 +35,12 @@ export function PendingPrompts({ connection }: { connection: CompanionConnection
 
 const ALLOW_AGAIN = "Lets this site ask to pair again. You still approve it.";
 
-/** `all` lists every revoked site (Settings); `attempting` only those blocked while trying to connect, as prompts. */
+/**
+ * `all` lists every paired and revoked site (Settings); `attempting` only the currently connected sites, plus
+ * revoked ones blocked while trying to connect, as prompts.
+ */
 export function ClientList({ connection, now, revoked: mode }: { connection: CompanionConnection; now: number; revoked: "all" | "attempting" }) {
-  const clients: PairedClient[] = connection.status?.clients ?? [];
+  const clients: PairedClient[] = mode === "all" ? connection.status?.clients ?? [] : connectedClients(connection.status, now);
   const allRevoked = connection.status?.revoked ?? [];
   const revoked = mode === "all" ? allRevoked : allRevoked.filter((site) => site.attempted_at);
   // The status line already says when nothing is paired.
@@ -68,7 +72,7 @@ export function ClientList({ connection, now, revoked: mode }: { connection: Com
 }
 
 /** Opens upward in the sidebar, above the Connection item: status, pending requests and paired sites. */
-export function ConnectionPanel({ connection, open }: { connection: CompanionConnection; open: boolean }) {
+export function ConnectionPanel({ connection, open, onOpenSettings }: { connection: CompanionConnection; open: boolean; onOpenSettings: () => void }) {
   const now = useNow();
   const kind = connection.connection;
   const detail = connectionDetail(connection);
@@ -78,7 +82,8 @@ export function ConnectionPanel({ connection, open }: { connection: CompanionCon
       <div className="connection-head">
         <span className={`status ${kind === "error" ? "bad" : ""}`}><span className={`dot ${connectionTone[kind]}`} />
           <strong>{connectionLabel[kind]}</strong></span>
-        {connection.status?.port && <span className="faint">:{connection.status.port}</span>}
+        <button type="button" className="icon-button" aria-label="Site connection settings" title="Site connection settings"
+          onClick={onOpenSettings}><SettingsIcon /></button>
       </div>
       {detail && <p className={kind === "error" ? "bad-text" : "faint"}>{detail}</p>}
       {kind === "error" && <button type="button" className="link" onClick={() => void connection.retry()}>Retry</button>}

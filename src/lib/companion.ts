@@ -32,6 +32,12 @@ export const connectionTone: Record<ConnectionKind, string> = {
   off: "", waiting: "", connected: "ok", stale: "warn", error: "bad",
 };
 
+/** Paired sites that have polled recently enough to count as connected. */
+export function connectedClients(status: CompanionStatus | null, now: number): PairedClient[] {
+  if (!status) return [];
+  return status.clients.filter((client) => client.last_seen && now - Date.parse(client.last_seen) <= status.stale_after_secs * 1000);
+}
+
 /** "Tarkov Hideout" for the production site, otherwise the origin's host. */
 export function siteName(origin: string) {
   try {

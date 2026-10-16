@@ -17,8 +17,8 @@ const items: { page: Page; label: string; icon: ReactNode }[] = [
   ...DEV ? [{ page: "shots" as const, label: "Shots", icon: <CameraIcon /> }, { page: "floors" as const, label: "Floors", icon: <FloorsIcon /> }] : [],
 ];
 
-export function Sidebar({ page, onNavigate, collapsed, onToggle, connection, group }: {
-  page: Page; onNavigate: (page: Page) => void; collapsed: boolean; onToggle: () => void; connection: CompanionConnection;
+export function Sidebar({ page, onNavigate, onOpenConnectionSettings, collapsed, onToggle, connection, group }: {
+  page: Page; onNavigate: (page: Page) => void; onOpenConnectionSettings: () => void; collapsed: boolean; onToggle: () => void; connection: CompanionConnection;
   /** The Group item's dot while in a group (or trying to be); null otherwise. */
   group: { tone: "ok" | "warn" | "bad"; label: string } | null;
 }) {
@@ -42,7 +42,7 @@ export function Sidebar({ page, onNavigate, collapsed, onToggle, connection, gro
     </button>
     <div className="sidebar-spacer" />
     {connection.enabled && <>
-      <ConnectionPanel connection={connection} open={panel && !collapsed} />
+      <ConnectionPanel connection={connection} open={panel && !collapsed} onOpenSettings={onOpenConnectionSettings} />
       <button type="button" className={`nav-item ${panel && !collapsed ? "active" : ""} ${pending ? "attention" : ""}`}
         aria-expanded={panel && !collapsed} aria-controls="connection-panel"
         title={collapsed ? `Connection: ${pending ? "request waiting" : connectionLabel[kind]}` : undefined}

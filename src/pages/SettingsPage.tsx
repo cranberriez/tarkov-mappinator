@@ -78,7 +78,9 @@ const tabs: { value: SettingsTab; label: string }[] = [
   ...(DEV ? [{ value: "developer" as const, label: "Developer" }] : []),
 ];
 
-export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup, toastMode, valuableLoot, autoZoom, group, dev }: {
+export function SettingsPage({ focus, scanner, mini, connection, autoShot, shotCleanup, toastMode, valuableLoot, autoZoom, group, dev }: {
+  /** Id of a section to open and scroll to. Only the site connection is supported. */
+  focus: string | null;
   scanner: Scanner; mini: MiniMode; connection: CompanionConnection; autoShot: AutoShot; shotCleanup: ShotCleanup; toastMode: ToastModeState; valuableLoot: ValuableLootState; autoZoom: AutoZoomState;
   group: Group; dev: DevFlagsState;
 }) {
@@ -91,6 +93,10 @@ export function SettingsPage({ scanner, mini, connection, autoShot, shotCleanup,
   const [stored, setTab] = usePersisted<SettingsTab>(keys.settingsTab, "preferences");
   // A remembered tab that no longer exists (Developer, in a release build) falls back to the first.
   const tab = tabs.some((option) => option.value === stored) ? stored : "preferences";
+  useEffect(() => { if (focus) setTab("preferences"); }, [focus, setTab]);
+  useEffect(() => {
+    if (focus && tab === "preferences") document.getElementById(focus)?.scrollIntoView({ block: "start" });
+  }, [focus, tab]);
   const update = (patch: Partial<FolderConfig>) => { edited.current = true; setFolders((current) => ({ ...current, ...patch })); };
   /** A picked folder is saved and checked straight away; a typed one waits for Check folders. */
   const pick = (patch: Partial<FolderConfig>) => { const next = { ...folders, ...patch }; edited.current = false; setFolders(next); void perform("check", next); };
@@ -325,7 +331,7 @@ function ConnectionSection({ connection }: { connection: CompanionConnection }) 
   const now = useNow();
   const kind = connection.connection;
   const detail = connectionDetail(connection);
-  return <section className="settings-section">
+  return <section id="site-connection" className="settings-section">
     <h2>Site connection</h2>
     <Switch label="Connect to Tarkov Hideout"
       detail="Lets tarkovhideout.com, in a browser on this PC, read your quest accepts, completions and failures, your current raid (map, mode, phase), your latest screenshot position and this connection's status. Sites must be allowed here first; nothing else is shared."

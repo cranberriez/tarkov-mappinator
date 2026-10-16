@@ -621,6 +621,8 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .connection-panel-body { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 8px; padding: 0 11px;
   font-size: 12px; color: var(--muted); white-space: normal; }
 .connection-panel.open .connection-panel-body { padding: 10px 11px 8px; }
+.connection-head .icon-button { width: 24px; height: 24px; margin: -4px -6px -4px 0; }
+.connection-head svg { width: 15px; height: 15px; }
 .connection-head { display: flex; align-items: center; justify-content: space-between; }
 .connection-head strong { font-weight: 500; color: var(--text); }
 .bad-text { color: var(--bad); }
@@ -637,7 +639,13 @@ img.tinted { border-radius: 50%; padding: 2px; box-sizing: border-box; object-fi
 .mini-status.attention { color: var(--text); }
 .mini-button.allow { color: var(--ok); }
 .mini-button.deny:hover { color: var(--bad); }
-.mini-connection { width: 26px; height: 30px; flex-shrink: 0; display: grid; place-items: center; color: var(--faint); }
+.mini-shell { height: 100vh; display: flex; flex-direction: column; justify-content: flex-end; background: var(--chrome); }
+.mini-info { display: flex; flex-direction: column; padding: 5px 14px 5px; font-size: 11px; line-height: 18px; color: var(--muted);
+  user-select: none; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mini-info > span { overflow: hidden; text-overflow: ellipsis; }
+.mini-info .dot { display: inline-block; margin-right: 6px; }
+.mini-connection { width: 26px; height: 30px; flex-shrink: 0; display: grid; place-items: center; color: var(--faint); border-radius: 6px; }
+.mini-connection:hover, .mini-connection.active { background: var(--surface-hover); }
 .mini-connection.ok { color: var(--ok); }
 .mini-connection.warn { color: var(--warn); }
 .mini-connection.bad { color: var(--bad); }

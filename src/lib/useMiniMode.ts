@@ -5,7 +5,7 @@ import { LogicalSize } from "@tauri-apps/api/dpi";
 import { isTauri } from "./scanner";
 import { keys, load, save } from "./persist";
 
-const MINI = { width: 320, height: 40 };
+const MINI = { width: 354, height: 40 };
 const FULL = { width: 1280, height: 820 };
 const FULL_MIN = new LogicalSize(820, 560);
 const DURATION_MS = 180;
@@ -42,8 +42,25 @@ async function enterMini(rememberFull: boolean, animated: boolean) {
   await animate({ x: at.x, y: at.y, width: MINI.width * scale, height: MINI.height * scale }, animated ? DURATION_MS : 0);
 }
 
+/** Logical pixels the strip is currently taller than MINI.height, grown upward so the bar stays put. */
+let extra = 0;
+
+/** Grows or shrinks the strip to MINI.height plus `next`, keeping its bottom edge fixed (within the monitor). */
+async function setExtra(next: number, durationMs = DURATION_MS) {
+  if (next === extra) return;
+  const scale = await getCurrentWindow().scaleFactor();
+  const rect = await currentRect();
+  const monitor = await currentMonitor();
+  const bottom = rect.y + rect.height;
+  const height = (MINI.height + next) * scale;
+  const y = Math.max(monitor?.position.y ?? -Infinity, bottom - height);
+  extra = next;
+  await animate({ x: rect.x, y, width: rect.width, height }, durationMs);
+}
+
 async function exitMini() {
   const win = getCurrentWindow();
+  await setExtra(0, 0);
   await rememberMiniPosition();
   const bounds = load<Bounds | null>(keys.fullBounds, null);
   await animate(bounds ?? await centered());
@@ -113,14 +130,20 @@ export function useMiniMode() {
     return queue.current;
   }, [desktop]);
 
+  /** Makes the strip `px` taller (0 restores it), for a row of detail above the bar. */
+  const setExtraHeight = useCallback((px: number) => {
+    if (!desktop || !applied.current) return;
+    queue.current = queue.current.then(() => setExtra(px)).catch((cause) => console.error("mini mode", cause));
+  }, [desktop]);
+
   const close = useCallback(() => {
     queue.current = queue.current
-      .then(() => applied.current ? rememberMiniPosition() : undefined)
+      .then(() => applied.current ? setExtra(0, 0).then(rememberMiniPosition) : undefined)
       .catch(() => {})
       .finally(() => void getCurrentWindow().close());
   }, []);
 
-  return { desktop, mini, view, setMini, startMini, setStartMini, close };
+  return { desktop, mini, view, setMini, setExtraHeight, startMini, setStartMini, close };
 }
 
 export type MiniMode = ReturnType<typeof useMiniMode>;

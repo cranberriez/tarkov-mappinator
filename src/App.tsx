@@ -47,7 +47,10 @@ export function App() {
   // A past raid opened from the timeline; the map shows it instead of the live raid until closed.
   const [viewingId, setViewingId] = useState<string | null>(null);
   const viewing = scanner.raids.find((raid) => raid.id === viewingId) ?? null;
-  const navigate = (next: Page) => { setViewingId(null); setMemberFocus(null); setShotFocus(null); setPage(next); };
+  const navigate = (next: Page) => { setViewingId(null); setMemberFocus(null); setShotFocus(null); setSettingsFocus(null); setPage(next); };
+  // Settings scrolls to this section on opening.
+  const [settingsFocus, setSettingsFocus] = useState<string | null>(null);
+  const openConnectionSettings = () => { navigate("settings"); setSettingsFocus("site-connection"); };
   const groupDot = !group.enabled ? null
     : group.connection === "online" && group.membership === "joined" ? { tone: "ok" as const, label: `in group ${group.code}` }
     : group.connection === "error" || group.membership === "error" ? { tone: "bad" as const, label: "not connected" }
@@ -64,7 +67,7 @@ export function App() {
   return <div className="shell">
     <TitleBar scanner={scanner} mini={mini} gameMode={gameMode} />
     <div className="body">
-      <Sidebar page={page} onNavigate={navigate} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} connection={connection} group={groupDot} />
+      <Sidebar page={page} onNavigate={navigate} onOpenConnectionSettings={openConnectionSettings} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} connection={connection} group={groupDot} />
       <main className="content">
         {page === "overview" && <OverviewPage scanner={scanner} onNavigate={navigate} />}
         {page === "map" && <MapPage key={viewing?.id ?? "live"} scanner={scanner} viewing={viewing} onCloseViewing={() => setViewingId(null)} mode={gameMode.mode} valuableLoot={valuableLoot.on} autoZoom={autoZoom.on}
@@ -75,7 +78,7 @@ export function App() {
         {page === "import" && <ImportPage scanner={scanner} importer={importer} onNavigate={navigate} />}
         {page === "shots" && <ShotsPage key={shotFocus ?? ""} scanner={scanner} initial={shotFocus} />}
         {page === "floors" && <FloorsPage scanner={scanner} onOpenShot={(filename) => { setShotFocus(filename); setPage("shots"); }} />}
-        {page === "settings" && <SettingsPage scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} valuableLoot={valuableLoot} autoZoom={autoZoom} group={group} dev={dev} />}
+        {page === "settings" && <SettingsPage focus={settingsFocus} scanner={scanner} mini={mini} connection={connection} autoShot={autoShot} shotCleanup={shotCleanup} toastMode={toastMode} valuableLoot={valuableLoot} autoZoom={autoZoom} group={group} dev={dev} />}
       </main>
     </div>
     <Toasts events={scanner.snapshot?.activity} mode={toastMode.mode} />
