@@ -14,6 +14,8 @@ const EXTRACT_CHANCE = 0.01;
 const LOAD_IN_CHANCE = 0.08;
 /** Chance a member loading in picks your map (or the group's usual map when you're out of raid). */
 const SAME_MAP_CHANCE = 0.75;
+/** How many members (after the stash and elsewhere ones) are pinned to your map whenever you're in a raid. */
+const PINNED = 2;
 
 type Fake = { id: string; name: string; state: MemberState; heading: number };
 type Roster = { id: string; name: string }[];
@@ -77,7 +79,11 @@ export function useFakeGroup(on: boolean, selfMap: string | null): { roster: Ros
       const fake: Fake = { id: `fake-${index + 1}`, name, state: { ...waiting, status: "out-of-raid" }, heading: 0 };
       return index === 0 ? fake : loadIn(fake, index === 1 ? randomMap() : home());
     }));
-    const timer = window.setInterval(() => setFakes((current) => current.map((fake) => {
+    const timer = window.setInterval(() => setFakes((current) => current.map((fake, index) => {
+      // While you're in a raid, the pinned members are always on your map, never extracting.
+      if (preferred.current && index >= 2 && index < 2 + PINNED) {
+        return fake.state.status === "in-raid" && fake.state.map === preferred.current ? walk(fake) : loadIn(fake, preferred.current);
+      }
       if (fake.state.status !== "in-raid") return Math.random() < LOAD_IN_CHANCE ? loadIn(fake, Math.random() < SAME_MAP_CHANCE ? home() : randomMap()) : fake;
       if (Math.random() < EXTRACT_CHANCE) return { ...fake, state: { status: "out-of-raid", map: null, position: null } };
       return walk(fake);
